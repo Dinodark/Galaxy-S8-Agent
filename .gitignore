@@ -1,0 +1,17 @@
+# secrets
+.env
+.env.local
+
+# runtime data (memory is private agent state)
+memory/
+logs/
+*.log
+
+# deps
+node_modules/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
