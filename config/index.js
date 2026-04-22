@@ -31,7 +31,7 @@ function parseIdList(v) {
 const config = {
   openrouter: {
     apiKey: required('OPENROUTER_API_KEY'),
-    model: optional('OPENROUTER_MODEL', 'openai/gpt-4o-mini'),
+    model: optional('OPENROUTER_MODEL', 'deepseek/deepseek-chat'),
     baseUrl: 'https://openrouter.ai/api/v1',
   },
   telegram: {
@@ -44,6 +44,12 @@ const config = {
   },
   safety: {
     allowShell: parseBool(process.env.ALLOW_SHELL, false),
+  },
+  battery: {
+    enabled: parseBool(process.env.BATTERY_WATCH_ENABLED, true),
+    lowThreshold: Number(optional('BATTERY_LOW_THRESHOLD', '20')),
+    pollIntervalMs: Number(optional('BATTERY_POLL_INTERVAL_MS', '300000')),
+    hysteresis: Number(optional('BATTERY_HYSTERESIS', '5')),
   },
   paths: {
     memoryDir: 'memory',

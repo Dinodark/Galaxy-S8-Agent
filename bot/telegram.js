@@ -1,7 +1,9 @@
 const TelegramBot = require('node-telegram-bot-api');
 const config = require('../config');
 const { runAgent } = require('../core/agent');
+const { checkKey } = require('../core/llm');
 const memory = require('../core/memory');
+const { startBatteryWatcher } = require('../core/watchers/battery');
 const { isAllowed } = require('./auth');
 
 function start() {
@@ -18,7 +20,11 @@ function start() {
       msg.chat.id,
       `Galaxy S8 Agent online.\nYour id: ${id}\nModel: ${config.openrouter.model}\nShell: ${
         config.safety.allowShell ? 'enabled' : 'disabled'
-      }\n\nCommands:\n/reset — wipe this chat's history\n/ping — liveness check`
+      }\nBattery watch: ${
+        config.battery.enabled
+          ? `on (<${config.battery.lowThreshold}%)`
+          : 'off'
+      }\n\nCommands:\n/ping — liveness check\n/diag — OpenRouter key status\n/battery — phone battery status\n/reset — wipe this chat's history`
     );
   });
 
@@ -31,6 +37,40 @@ function start() {
     if (!isAllowed(msg.from && msg.from.id)) return replyUnauthorized(bot, msg);
     await memory.resetHistory(msg.chat.id);
     await bot.sendMessage(msg.chat.id, 'History reset.');
+  });
+
+  bot.onText(/^\/battery$/, async (msg) => {
+    if (!isAllowed(msg.from && msg.from.id)) return replyUnauthorized(bot, msg);
+    try {
+      const tool = require('../core/tools').registry.phone_battery;
+      const result = await tool.handler({});
+      await bot.sendMessage(
+        msg.chat.id,
+        '```\n' +
+          JSON.stringify(result, null, 2).slice(0, 3500) +
+          '\n```',
+        { parse_mode: 'Markdown' }
+      );
+    } catch (err) {
+      await bot.sendMessage(msg.chat.id, 'battery error: ' + err.message);
+    }
+  });
+
+  bot.onText(/^\/diag$/, async (msg) => {
+    if (!isAllowed(msg.from && msg.from.id)) return replyUnauthorized(bot, msg);
+    try {
+      const { status, data } = await checkKey();
+      await bot.sendMessage(
+        msg.chat.id,
+        `OpenRouter /auth/key → HTTP ${status}\n` +
+          '```\n' +
+          JSON.stringify(data, null, 2).slice(0, 3500) +
+          '\n```',
+        { parse_mode: 'Markdown' }
+      );
+    } catch (err) {
+      await bot.sendMessage(msg.chat.id, 'diag error: ' + err.message);
+    }
   });
 
   bot.on('message', async (msg) => {
@@ -65,6 +105,26 @@ function start() {
       );
     }
   });
+
+  const ownerChatId = config.telegram.allowedUserIds[0];
+  if (ownerChatId) {
+    startBatteryWatcher({
+      onLowBattery: async ({ percentage, status }) => {
+        try {
+          await bot.sendMessage(
+            ownerChatId,
+            `🔋 Battery low: ${percentage}% (${status}). Put me on a charger, please.`
+          );
+        } catch (err) {
+          console.warn('[watcher:battery] failed to send alert:', err.message);
+        }
+      },
+    });
+  } else {
+    console.warn(
+      '[watcher:battery] no owner chat id (ALLOWED_TELEGRAM_USER_IDS empty), alerts disabled'
+    );
+  }
 
   console.log(
     `[bot] Galaxy S8 Agent started. Model=${config.openrouter.model} AllowShell=${config.safety.allowShell}`

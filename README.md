@@ -9,15 +9,17 @@ actually control the device through a set of tools.
 ```
 index.js
 └─ bot/telegram.js        thin Telegram adapter + whitelist auth
-   └─ core/agent.js       tool-calling loop (LLM ↔ tools)
-      ├─ core/llm.js      OpenRouter client
-      ├─ core/memory.js   per-chat history + long-term markdown notes
-      └─ core/tools/
-         ├─ phone.js      termux-api: battery, toast, notify, clipboard,
-         │                vibrate, location, sms_send, contacts
-         ├─ shell.js      run_shell (disabled by default, ALLOW_SHELL=true to enable)
-         ├─ files.js      read_file / write_file / list_dir
-         └─ memory.js     list_notes / read_note / write_note
+   ├─ core/agent.js       tool-calling loop (LLM ↔ tools)
+   │  ├─ core/llm.js      OpenRouter client
+   │  ├─ core/memory.js   per-chat history + long-term markdown notes
+   │  └─ core/tools/
+   │     ├─ phone.js      termux-api: battery, toast, notify, clipboard,
+   │     │                vibrate, location, sms_send, contacts
+   │     ├─ shell.js      run_shell (disabled by default, ALLOW_SHELL=true)
+   │     ├─ files.js      read_file / write_file / list_dir
+   │     └─ memory.js     list_notes / read_note / write_note
+   └─ core/watchers/      proactive background tasks
+      └─ battery.js       low-battery DM alert
 ```
 
 Runtime data lives under `memory/` (chat histories + long-term notes) and
@@ -79,9 +81,43 @@ node index.js
 
 - `/start` — status + your Telegram id
 - `/ping` — liveness check
+- `/diag` — check OpenRouter key status (credits, limits)
+- `/battery` — current phone battery (Termux only)
 - `/reset` — wipe the current chat's history
 
+## Background watchers
+
+The bot runs periodic watchers alongside the chat loop. Each watcher is
+self-disabling when its prerequisites are missing (e.g. no `termux-api`).
+
+- **Battery low alert**: polls `termux-battery-status` every
+  `BATTERY_POLL_INTERVAL_MS` (5 min by default). When level drops at or
+  below `BATTERY_LOW_THRESHOLD` (20%) AND the phone is not charging, it
+  DMs the owner once. Re-arms after the battery recovers above
+  `threshold + BATTERY_HYSTERESIS`.
+
 Anything else goes through the agent.
+
+## Troubleshooting
+
+### OpenRouter 403 "violation of provider Terms Of Service"
+The upstream provider (OpenAI / Google) refused the request based on
+your IP region. Both `openai/*` and `google/gemini-*` geo-block RU/BY
+and several other regions. Switch `OPENROUTER_MODEL` in `.env` to a
+geo-safe provider:
+- `deepseek/deepseek-chat` — very cheap, hosted in CN, works everywhere
+- `mistralai/mistral-small-3.1-24b-instruct` — EU-hosted
+- `qwen/qwen-2.5-72b-instruct` — Alibaba
+- `anthropic/claude-haiku-4.5` — best quality/price when available
+Then restart the bot. Full list: <https://openrouter.ai/models>
+
+### 401 / 402 from OpenRouter
+- 401 — bad or revoked key; regenerate at <https://openrouter.ai/keys>.
+- 402 — insufficient credits; top up at <https://openrouter.ai/credits>.
+
+### `/diag` command
+In Telegram send `/diag` to ping `/auth/key` and see your account status
+(credits, rate limits, allowed models).
 
 ## Safety notes
 
