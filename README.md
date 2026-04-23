@@ -21,6 +21,7 @@ index.js
    │     └─ memory.js     list_notes / read_note / write_note
    ├─ core/reminders.js   persistent time-based reminders + scheduler
    ├─ core/journal.js     raw per-chat per-day conversation log (jsonl)
+   ├─ core/modes.js       per-chat mode (chat | silent) persisted
    └─ core/watchers/      proactive background tasks
       ├─ battery.js       low-battery DM alert
       └─ daily_review.js  end-of-day reflective summary (cron-scheduled)
@@ -119,6 +120,10 @@ say STT is off when you send a voice note.
 - `/battery` — current phone battery (Termux only)
 - `/reminders` — list pending reminders with ids
 - `/summary` — generate today's evening review right now
+- `/silent` — capture-only mode: no replies, just a ✍ reaction on each
+  message, everything goes into the journal for the evening review.
+  Auto-exits when the scheduled daily review fires.
+- `/chat` — switch back to normal conversational mode.
 - `/reset` — wipe the current chat's history
 
 ## Background watchers

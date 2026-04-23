@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const fse = require('fs-extra');
+const axios = require('axios');
 const TelegramBot = require('node-telegram-bot-api');
 const config = require('../config');
 const { runAgent } = require('../core/agent');
@@ -9,12 +10,31 @@ const stt = require('../core/stt');
 const memory = require('../core/memory');
 const reminders = require('../core/reminders');
 const journal = require('../core/journal');
+const modes = require('../core/modes');
 const { startBatteryWatcher } = require('../core/watchers/battery');
 const {
   startDailyReviewer,
   runReview,
 } = require('../core/watchers/daily_review');
 const { isAllowed } = require('./auth');
+
+const SILENT_REACTION = '✍';
+
+async function setReaction(chatId, messageId, emoji) {
+  try {
+    await axios.post(
+      `https://api.telegram.org/bot${config.telegram.token}/setMessageReaction`,
+      {
+        chat_id: chatId,
+        message_id: messageId,
+        reaction: [{ type: 'emoji', emoji }],
+      },
+      { timeout: 10_000, validateStatus: () => true }
+    );
+  } catch (err) {
+    console.warn('[telegram] setMessageReaction failed:', err.message);
+  }
+}
 
 function start() {
   const bot = new TelegramBot(config.telegram.token, { polling: true });
@@ -26,9 +46,10 @@ function start() {
   bot.onText(/^\/start$/, async (msg) => {
     const id = msg.from && msg.from.id;
     if (!isAllowed(id)) return replyUnauthorized(bot, msg);
+    const mode = await modes.getMode(msg.chat.id);
     await bot.sendMessage(
       msg.chat.id,
-      `Galaxy S8 Agent online.\nYour id: ${id}\nModel: ${config.openrouter.model}\nShell: ${
+      `Galaxy S8 Agent online.\nYour id: ${id}\nMode: ${mode}\nModel: ${config.openrouter.model}\nShell: ${
         config.safety.allowShell ? 'enabled' : 'disabled'
       }\nBattery watch: ${
         config.battery.enabled
@@ -42,7 +63,7 @@ function start() {
               config.dailyReview.tz || journal.systemTz()
             })`
           : 'off'
-      }\n\nCommands:\n/ping — liveness check\n/diag — OpenRouter key status\n/battery — phone battery status\n/reminders — list pending reminders\n/summary — generate today's evening review now\n/reset — wipe this chat's history`
+      }\n\nCommands:\n/ping — liveness check\n/diag — OpenRouter key status\n/battery — phone battery status\n/reminders — list pending reminders\n/summary — generate today's evening review now\n/silent — capture only, no replies (auto-exits at evening review)\n/chat — normal conversational mode\n/reset — wipe this chat's history`
     );
   });
 
@@ -105,6 +126,21 @@ function start() {
     }
   });
 
+  bot.onText(/^\/silent$/, async (msg) => {
+    if (!isAllowed(msg.from && msg.from.id)) return replyUnauthorized(bot, msg);
+    await modes.setMode(msg.chat.id, 'silent');
+    await bot.sendMessage(
+      msg.chat.id,
+      'Silent mode on. Пиши спокойно — ничего не отвечаю, всё уйдёт в журнал. До вечернего ревью или /chat.'
+    );
+  });
+
+  bot.onText(/^\/chat$/, async (msg) => {
+    if (!isAllowed(msg.from && msg.from.id)) return replyUnauthorized(bot, msg);
+    await modes.setMode(msg.chat.id, 'chat');
+    await bot.sendMessage(msg.chat.id, 'Chat mode on.');
+  });
+
   bot.onText(/^\/summary$/, async (msg) => {
     if (!isAllowed(msg.from && msg.from.id)) return replyUnauthorized(bot, msg);
     try {
@@ -148,6 +184,15 @@ function start() {
     }
   });
 
+  async function captureSilently(chatId, userMessage, { via = 'text', messageId } = {}) {
+    await journal
+      .append(chatId, { source: 'user', text: userMessage, via })
+      .catch((e) => console.warn('[journal] append user failed:', e.message));
+    if (messageId) {
+      await setReaction(chatId, messageId, SILENT_REACTION);
+    }
+  }
+
   async function handleUserMessage(chatId, userMessage, { via = 'text' } = {}) {
     await journal
       .append(chatId, { source: 'user', text: userMessage, via })
@@ -177,6 +222,14 @@ function start() {
     if (!isAllowed(userId)) return replyUnauthorized(bot, msg);
 
     try {
+      const mode = await modes.getMode(msg.chat.id);
+      if (mode === 'silent') {
+        await captureSilently(msg.chat.id, msg.text, {
+          via: 'text',
+          messageId: msg.message_id,
+        });
+        return;
+      }
       await handleUserMessage(msg.chat.id, msg.text);
     } catch (err) {
       console.error('[agent] error:', err);
@@ -243,8 +296,17 @@ function start() {
       console.log(
         `[stt] ${kind} transcribed in ${ms}ms (${trimmed.length} chars)`
       );
-      await bot.sendMessage(chatId, `🎙 ${trimmed}`);
 
+      const mode = await modes.getMode(chatId);
+      if (mode === 'silent') {
+        await captureSilently(chatId, trimmed, {
+          via: kind,
+          messageId: msg.message_id,
+        });
+        return;
+      }
+
+      await bot.sendMessage(chatId, `🎙 ${trimmed}`);
       await handleUserMessage(chatId, trimmed, { via: kind });
     } catch (err) {
       console.error('[stt] error:', err);
@@ -325,11 +387,19 @@ function start() {
     chatIds: config.telegram.allowedUserIds,
     onReview: async (chatId, result) => {
       try {
+        const wasSilent = (await modes.getMode(chatId)) === 'silent';
+        if (wasSilent) await modes.setMode(chatId, 'chat');
         await bot.sendMessage(
           chatId,
           `🌙 Вечерняя сводка — ${result.today} (${result.entries} сообщений, ${result.model})`
         );
         await bot.sendDocument(chatId, result.file);
+        if (wasSilent) {
+          await bot.sendMessage(
+            chatId,
+            'Silent mode off. Давай обсудим — что зацепило или с чем поспорить?'
+          );
+        }
       } catch (err) {
         console.warn(
           `[daily-review] failed to deliver to ${chatId}:`,
