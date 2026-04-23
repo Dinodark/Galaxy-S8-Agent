@@ -34,6 +34,15 @@ const config = {
     model: optional('OPENROUTER_MODEL', 'deepseek/deepseek-chat'),
     baseUrl: 'https://openrouter.ai/api/v1',
   },
+  groq: {
+    apiKey: optional('GROQ_API_KEY', null),
+    sttModel: optional('GROQ_STT_MODEL', 'whisper-large-v3-turbo'),
+  },
+  stt: {
+    enabled: parseBool(process.env.STT_ENABLED, true),
+    language: optional('STT_LANGUAGE', 'ru'),
+    maxDurationSec: Number(optional('STT_MAX_DURATION_SEC', '300')),
+  },
   telegram: {
     token: required('TELEGRAM_BOT_TOKEN'),
     allowedUserIds: parseIdList(process.env.ALLOWED_TELEGRAM_USER_IDS),
@@ -51,10 +60,14 @@ const config = {
     pollIntervalMs: Number(optional('BATTERY_POLL_INTERVAL_MS', '300000')),
     hysteresis: Number(optional('BATTERY_HYSTERESIS', '5')),
   },
+  reminders: {
+    pollIntervalMs: Number(optional('REMINDERS_POLL_INTERVAL_MS', '30000')),
+  },
   paths: {
     memoryDir: 'memory',
     historyDir: 'memory/history',
     notesDir: 'memory/notes',
+    tmpDir: 'memory/tmp',
     logsDir: 'logs',
   },
   logLevel: optional('LOG_LEVEL', 'info'),

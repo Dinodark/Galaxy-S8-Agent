@@ -24,6 +24,35 @@ async function ensureHistorySeeded(chatId) {
   return history;
 }
 
+function buildRuntimeContextMessage() {
+  const now = new Date();
+  let tz = 'unknown';
+  try {
+    tz = Intl.DateTimeFormat().resolvedOptions().timeZone || 'unknown';
+  } catch {
+    // ignore
+  }
+  return {
+    role: 'system',
+    content:
+      'Runtime context (fresh each turn, not stored in history):\n' +
+      `- current_time_utc: ${now.toISOString()}\n` +
+      `- current_time_local: ${now.toString()}\n` +
+      `- timezone: ${tz}\n` +
+      'Use this value to compute ISO timestamps for tools like reminder_add ' +
+      'when the user says things like "in 10 min", "tomorrow at 6pm", "через час".',
+  };
+}
+
+function withRuntimeContext(history) {
+  const ctx = buildRuntimeContextMessage();
+  if (history.length === 0) return [ctx];
+  if (history[0] && history[0].role === 'system') {
+    return [history[0], ctx, ...history.slice(1)];
+  }
+  return [ctx, ...history];
+}
+
 async function runAgent({ chatId, userMessage }) {
   await ensureHistorySeeded(chatId);
 
@@ -32,10 +61,11 @@ async function runAgent({ chatId, userMessage }) {
 
   const toolSchemas = tools.listSchemas();
   const transcript = [];
+  const toolCtx = { chatId };
 
   for (let step = 0; step < config.agent.maxSteps; step++) {
     const assistantMsg = await chatCompletion({
-      messages: history,
+      messages: withRuntimeContext(history),
       tools: toolSchemas,
     });
 
@@ -53,7 +83,7 @@ async function runAgent({ chatId, userMessage }) {
           args = {};
         }
 
-        const result = await tools.execute(name, args);
+        const result = await tools.execute(name, args, toolCtx);
         transcript.push({ tool: name, args, result });
 
         pushed.push({

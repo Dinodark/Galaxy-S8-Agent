@@ -11,6 +11,7 @@ index.js
 └─ bot/telegram.js        thin Telegram adapter + whitelist auth
    ├─ core/agent.js       tool-calling loop (LLM ↔ tools)
    │  ├─ core/llm.js      OpenRouter client
+   │  ├─ core/stt.js      Groq Whisper client (voice message transcription)
    │  ├─ core/memory.js   per-chat history + long-term markdown notes
    │  └─ core/tools/
    │     ├─ phone.js      termux-api: battery, toast, notify, clipboard,
@@ -18,6 +19,7 @@ index.js
    │     ├─ shell.js      run_shell (disabled by default, ALLOW_SHELL=true)
    │     ├─ files.js      read_file / write_file / list_dir
    │     └─ memory.js     list_notes / read_note / write_note
+   ├─ core/reminders.js   persistent time-based reminders + scheduler
    └─ core/watchers/      proactive background tasks
       └─ battery.js       low-battery DM alert
 ```
@@ -39,6 +41,9 @@ node index.js
 Get your Telegram user id by writing to [@userinfobot](https://t.me/userinfobot).
 Get an OpenRouter key at <https://openrouter.ai/keys>.
 Get a bot token from [@BotFather](https://t.me/BotFather).
+Get a free Groq key for voice message transcription at
+<https://console.groq.com/keys> (optional — leave `GROQ_API_KEY` empty
+to disable voice support).
 
 ## Setup (Galaxy S8 via Termux)
 
@@ -77,12 +82,40 @@ node index.js
 # detach: Ctrl-b then d
 ```
 
+## Voice messages
+
+If `GROQ_API_KEY` is set, the bot accepts:
+
+- **Voice notes** (hold-to-record in Telegram) — OGG/Opus
+- **Forwarded audio files** — MP3, M4A, WAV, OGG, etc.
+- **Round video notes** — audio track is transcribed
+
+Flow: Telegram → download to `memory/tmp/` → Groq Whisper
+(`whisper-large-v3-turbo` by default) → bot echoes the transcription
+back as `🎙 <text>` → feeds it into the agent as a normal user
+message. Temp files are auto-deleted after transcription.
+
+Tunables (`.env`):
+
+- `GROQ_STT_MODEL` — default `whisper-large-v3-turbo`. Use
+  `whisper-large-v3` for slightly better quality at ~3x the latency.
+- `STT_LANGUAGE` — ISO-639-1 hint. `ru` is the default. Set empty to
+  auto-detect.
+- `STT_MAX_DURATION_SEC` — cap per message (default 300s) to avoid
+  surprise bills. Messages longer than this are ignored with a note.
+- `STT_ENABLED=false` — hard-disable voice handling even if the key
+  is set.
+
+Set `GROQ_API_KEY=` (empty) to disable entirely; the bot will politely
+say STT is off when you send a voice note.
+
 ## Commands in Telegram
 
 - `/start` — status + your Telegram id
 - `/ping` — liveness check
 - `/diag` — check OpenRouter key status (credits, limits)
 - `/battery` — current phone battery (Termux only)
+- `/reminders` — list pending reminders with ids
 - `/reset` — wipe the current chat's history
 
 ## Background watchers
@@ -95,6 +128,24 @@ self-disabling when its prerequisites are missing (e.g. no `termux-api`).
   below `BATTERY_LOW_THRESHOLD` (20%) AND the phone is not charging, it
   DMs the owner once. Re-arms after the battery recovers above
   `threshold + BATTERY_HYSTERESIS`.
+- **Reminder scheduler**: polls `memory/reminders.json` every
+  `REMINDERS_POLL_INTERVAL_MS` (30s by default). Any reminder whose
+  `fire_at` is in the past is delivered as `⏰ Reminder: <text>` and
+  either removed (one-shot) or rescheduled to its next occurrence
+  (recurring). Reminders are persisted, so they survive restarts;
+  anything that went overdue while the bot was offline fires ~1.5s
+  after boot. Users create reminders through the agent — just ask in
+  natural language:
+  - *"напомни через час выключить чайник"* — one-shot
+  - *"каждое утро в 7:30 напоминай зарядку"* — recurring (cron `30 7 * * *`)
+  - *"по понедельникам в 9 присылай план на неделю"* — `0 9 * * 1`
+  - *"каждые 15 минут напоминай встать"* — `*/15 * * * *`
+
+  Recurring reminders use standard 5-field POSIX cron (`min hour dom mon dow`).
+  Timezone defaults to the phone's system TZ (set `TZ=Europe/Moscow` in
+  `~/.bashrc` if Termux reports UTC). Recurrence can be bounded with
+  `until` (ISO date) or `max_count` (integer) passed to `reminder_add`
+  via the agent.
 
 Anything else goes through the agent.
 
@@ -118,6 +169,17 @@ Then restart the bot. Full list: <https://openrouter.ai/models>
 ### `/diag` command
 In Telegram send `/diag` to ping `/auth/key` and see your account status
 (credits, rate limits, allowed models).
+
+### Voice messages do nothing / "STT is off"
+The bot reports why in the reply:
+- `GROQ_API_KEY is not set in .env` — add a key from
+  <https://console.groq.com/keys>.
+- `STT_ENABLED is false in .env` — set it to `true`.
+After editing `.env`, restart the bot.
+
+### "STT requires Node.js >= 18"
+`core/stt.js` uses native `fetch`/`FormData`/`Blob`. Upgrade Node in
+Termux: `pkg upgrade nodejs`. Verify with `node -v` (should be ≥ 18).
 
 ## Safety notes
 
