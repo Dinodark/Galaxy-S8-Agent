@@ -150,6 +150,29 @@ async function runReview(chatId, { log = console, force = false } = {}) {
   };
 }
 
+async function fireForAll(chatIds, onReview, log) {
+  for (const chatId of chatIds) {
+    try {
+      const result = await runReview(chatId, { log });
+      if (result.skipped) {
+        log.log(`[daily-review] skipped chat ${chatId}: ${result.reason}`);
+        continue;
+      }
+      await onReview(chatId, result);
+    } catch (err) {
+      log.warn(`[daily-review] failed for chat ${chatId}:`, err.message);
+    }
+  }
+}
+
+async function hasTodaysSummary(todayStr) {
+  const file = path.join(
+    config.paths.notesDir,
+    `${SUMMARY_PREFIX}${todayStr}${SUMMARY_SUFFIX}`
+  );
+  return fse.pathExists(file);
+}
+
 function startDailyReviewer({ chatIds, onReview, log = console }) {
   if (!config.dailyReview.enabled) {
     log.log('[daily-review] disabled via DAILY_REVIEW_ENABLED=false');
@@ -165,6 +188,51 @@ function startDailyReviewer({ chatIds, onReview, log = console }) {
 
   let stopped = false;
   let timer = null;
+  let catchupTimer = null;
+
+  // Catch-up: if the bot just booted AFTER the scheduled fire time for
+  // today, and there is no summary-YYYY-MM-DD.md yet, run a missed
+  // review shortly after startup. Prevents losing the day's summary
+  // just because the bot was restarted/offline at the cron time.
+  async function scheduleCatchupIfMissed() {
+    try {
+      const today = journal.todayStr(tz);
+      if (await hasTodaysSummary(today)) return;
+
+      let prev;
+      try {
+        prev = CronExpressionParser.parse(cronExpr, {
+          currentDate: new Date(),
+          tz,
+        })
+          .prev()
+          .toDate();
+      } catch {
+        return;
+      }
+
+      // Only catch up if the most recent scheduled fire was TODAY
+      // (don't fire a stale yesterday's summary).
+      const prevDateStr = new Intl.DateTimeFormat('en-CA', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        timeZone: tz,
+      }).format(prev);
+      if (prevDateStr !== today) return;
+
+      log.log(
+        `[daily-review] missed today's ${prev.toISOString()} fire; running catch-up in 30s`
+      );
+      catchupTimer = setTimeout(() => {
+        fireForAll(chatIds, onReview, log).catch((err) =>
+          log.warn('[daily-review] catch-up failed:', err.message)
+        );
+      }, 30_000);
+    } catch (err) {
+      log.warn('[daily-review] catch-up scheduling failed:', err.message);
+    }
+  }
 
   function schedule() {
     if (stopped) return;
@@ -185,31 +253,17 @@ function startDailyReviewer({ chatIds, onReview, log = console }) {
       `[daily-review] next fire ${next.toISOString()} (tz=${tz}, cron="${cronExpr}")`
     );
     timer = setTimeout(async () => {
-      for (const chatId of chatIds) {
-        try {
-          const result = await runReview(chatId, { log });
-          if (result.skipped) {
-            log.log(
-              `[daily-review] skipped chat ${chatId}: ${result.reason}`
-            );
-            continue;
-          }
-          await onReview(chatId, result);
-        } catch (err) {
-          log.warn(
-            `[daily-review] failed for chat ${chatId}:`,
-            err.message
-          );
-        }
-      }
+      await fireForAll(chatIds, onReview, log);
       schedule();
     }, delay);
   }
 
   schedule();
+  scheduleCatchupIfMissed();
   return () => {
     stopped = true;
     if (timer) clearTimeout(timer);
+    if (catchupTimer) clearTimeout(catchupTimer);
   };
 }
 
