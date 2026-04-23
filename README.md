@@ -20,8 +20,10 @@ index.js
    │     ├─ files.js      read_file / write_file / list_dir
    │     └─ memory.js     list_notes / read_note / write_note
    ├─ core/reminders.js   persistent time-based reminders + scheduler
+   ├─ core/journal.js     raw per-chat per-day conversation log (jsonl)
    └─ core/watchers/      proactive background tasks
-      └─ battery.js       low-battery DM alert
+      ├─ battery.js       low-battery DM alert
+      └─ daily_review.js  end-of-day reflective summary (cron-scheduled)
 ```
 
 Runtime data lives under `memory/` (chat histories + long-term notes) and
@@ -116,6 +118,7 @@ say STT is off when you send a voice note.
 - `/diag` — check OpenRouter key status (credits, limits)
 - `/battery` — current phone battery (Termux only)
 - `/reminders` — list pending reminders with ids
+- `/summary` — generate today's evening review right now
 - `/reset` — wipe the current chat's history
 
 ## Background watchers
@@ -146,6 +149,24 @@ self-disabling when its prerequisites are missing (e.g. no `termux-api`).
   `~/.bashrc` if Termux reports UTC). Recurrence can be bounded with
   `until` (ISO date) or `max_count` (integer) passed to `reminder_add`
   via the agent.
+
+- **Daily evening review**: cron-scheduled (default `30 22 * * *` — 22:30
+  local time). At fire time, for each whitelisted user:
+  1. Load today's journal (`memory/journal/<chatId>/YYYY-MM-DD.jsonl`) —
+     every user and agent message timestamped, incl. transcribed voice.
+  2. Load long-term notes from `memory/notes/` (diary, ideas, work, …).
+  3. Load the last `DAILY_REVIEW_PREV_DAYS` evening summaries for
+     continuity.
+  4. Ask the LLM (optionally a stronger model via `DAILY_REVIEW_MODEL`)
+     for a reflective markdown summary: `Главное за день`, `Связи`,
+     `Мои мысли`, `На завтра`.
+  5. Save to `memory/notes/summary-YYYY-MM-DD.md` (so the agent sees it
+     as long-term memory going forward) and DM it as a markdown file.
+
+  Tweak the tone/structure by editing `core/prompts/daily_review.md`.
+  Trigger an early summary any time with `/summary`. Days with fewer
+  than `DAILY_REVIEW_MIN_MESSAGES` journal entries are skipped silently
+  so empty days don't spam.
 
 Anything else goes through the agent.
 

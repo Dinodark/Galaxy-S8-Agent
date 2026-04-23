@@ -8,7 +8,12 @@ const { checkKey } = require('../core/llm');
 const stt = require('../core/stt');
 const memory = require('../core/memory');
 const reminders = require('../core/reminders');
+const journal = require('../core/journal');
 const { startBatteryWatcher } = require('../core/watchers/battery');
+const {
+  startDailyReviewer,
+  runReview,
+} = require('../core/watchers/daily_review');
 const { isAllowed } = require('./auth');
 
 function start() {
@@ -31,7 +36,13 @@ function start() {
           : 'off'
       }\nSTT: ${
         stt.isEnabled() ? `on (${config.groq.sttModel})` : `off (${stt.whyDisabled()})`
-      }\nReminders: on (poll ${Math.round(config.reminders.pollIntervalMs / 1000)}s)\n\nCommands:\n/ping — liveness check\n/diag — OpenRouter key status\n/battery — phone battery status\n/reminders — list pending reminders\n/reset — wipe this chat's history`
+      }\nReminders: on (poll ${Math.round(config.reminders.pollIntervalMs / 1000)}s)\nDaily review: ${
+        config.dailyReview.enabled
+          ? `on (cron "${config.dailyReview.cron}", tz=${
+              config.dailyReview.tz || journal.systemTz()
+            })`
+          : 'off'
+      }\n\nCommands:\n/ping — liveness check\n/diag — OpenRouter key status\n/battery — phone battery status\n/reminders — list pending reminders\n/summary — generate today's evening review now\n/reset — wipe this chat's history`
     );
   });
 
@@ -94,6 +105,32 @@ function start() {
     }
   });
 
+  bot.onText(/^\/summary$/, async (msg) => {
+    if (!isAllowed(msg.from && msg.from.id)) return replyUnauthorized(bot, msg);
+    try {
+      await bot.sendChatAction(msg.chat.id, 'typing');
+      const result = await runReview(msg.chat.id, { force: true });
+      if (result.skipped) {
+        await bot.sendMessage(
+          msg.chat.id,
+          `Nothing to summarize yet (${result.reason}).`
+        );
+        return;
+      }
+      await bot.sendMessage(
+        msg.chat.id,
+        `🌙 Вечерняя сводка — ${result.today} (${result.entries} сообщений, ${result.model})`
+      );
+      await bot.sendDocument(msg.chat.id, result.file);
+    } catch (err) {
+      console.error('[daily-review] /summary error:', err);
+      await bot.sendMessage(
+        msg.chat.id,
+        'summary error: ' + (err && err.message ? err.message : String(err))
+      );
+    }
+  });
+
   bot.onText(/^\/diag$/, async (msg) => {
     if (!isAllowed(msg.from && msg.from.id)) return replyUnauthorized(bot, msg);
     try {
@@ -111,7 +148,11 @@ function start() {
     }
   });
 
-  async function handleUserMessage(chatId, userMessage) {
+  async function handleUserMessage(chatId, userMessage, { via = 'text' } = {}) {
+    await journal
+      .append(chatId, { source: 'user', text: userMessage, via })
+      .catch((e) => console.warn('[journal] append user failed:', e.message));
+
     await bot.sendChatAction(chatId, 'typing');
     const { reply, toolCalls } = await runAgent({ chatId, userMessage });
 
@@ -123,6 +164,9 @@ function start() {
     }
 
     const text = reply && reply.trim() ? reply : '(empty reply)';
+    await journal
+      .append(chatId, { source: 'assistant', text, via: 'text' })
+      .catch((e) => console.warn('[journal] append assistant failed:', e.message));
     await sendLong(bot, chatId, text);
   }
 
@@ -201,7 +245,7 @@ function start() {
       );
       await bot.sendMessage(chatId, `🎙 ${trimmed}`);
 
-      await handleUserMessage(chatId, trimmed);
+      await handleUserMessage(chatId, trimmed, { via: kind });
     } catch (err) {
       console.error('[stt] error:', err);
       await bot.sendMessage(
@@ -273,6 +317,24 @@ function start() {
         await bot.sendMessage(r.chatId, `⏰ Reminder: ${r.text}`);
       } catch (err) {
         console.warn(`[reminders] failed to deliver ${r.id}:`, err.message);
+      }
+    },
+  });
+
+  startDailyReviewer({
+    chatIds: config.telegram.allowedUserIds,
+    onReview: async (chatId, result) => {
+      try {
+        await bot.sendMessage(
+          chatId,
+          `🌙 Вечерняя сводка — ${result.today} (${result.entries} сообщений, ${result.model})`
+        );
+        await bot.sendDocument(chatId, result.file);
+      } catch (err) {
+        console.warn(
+          `[daily-review] failed to deliver to ${chatId}:`,
+          err.message
+        );
       }
     },
   });

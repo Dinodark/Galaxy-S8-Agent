@@ -26,9 +26,16 @@ function extractErrorMessage(data) {
   }
 }
 
-async function chatCompletion({ messages, tools, toolChoice = 'auto' }) {
+async function chatCompletion({
+  messages,
+  tools,
+  toolChoice = 'auto',
+  model,
+  timeoutMs,
+}) {
+  const effectiveModel = model || config.openrouter.model;
   const body = {
-    model: config.openrouter.model,
+    model: effectiveModel,
     messages,
   };
   if (tools && tools.length > 0) {
@@ -48,7 +55,7 @@ async function chatCompletion({ messages, tools, toolChoice = 'auto' }) {
           'HTTP-Referer': 'https://github.com/Dinodark/Galaxy-S8-Agent',
           'X-Title': 'Galaxy S8 Agent',
         },
-        timeout: 60_000,
+        timeout: timeoutMs || 60_000,
         validateStatus: () => true,
       }
     );
@@ -62,11 +69,11 @@ async function chatCompletion({ messages, tools, toolChoice = 'auto' }) {
   if (res.status >= 400) {
     const providerMsg = extractErrorMessage(res.data) || res.statusText;
     console.error(
-      `[llm] OpenRouter HTTP ${res.status} for model=${config.openrouter.model}:`,
+      `[llm] OpenRouter HTTP ${res.status} for model=${effectiveModel}:`,
       JSON.stringify(res.data, null, 2)
     );
     throw new OpenRouterError(
-      `OpenRouter ${res.status} (${config.openrouter.model}): ${providerMsg}`,
+      `OpenRouter ${res.status} (${effectiveModel}): ${providerMsg}`,
       { status: res.status, raw: res.data }
     );
   }

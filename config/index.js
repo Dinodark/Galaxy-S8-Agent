@@ -63,9 +63,18 @@ const config = {
   reminders: {
     pollIntervalMs: Number(optional('REMINDERS_POLL_INTERVAL_MS', '30000')),
   },
+  dailyReview: {
+    enabled: parseBool(process.env.DAILY_REVIEW_ENABLED, true),
+    cron: optional('DAILY_REVIEW_CRON', '30 22 * * *'),
+    tz: optional('DAILY_REVIEW_TZ', ''),
+    minMessages: Number(optional('DAILY_REVIEW_MIN_MESSAGES', '3')),
+    prevDays: Number(optional('DAILY_REVIEW_PREV_DAYS', '3')),
+    model: optional('DAILY_REVIEW_MODEL', ''),
+  },
   paths: {
     memoryDir: 'memory',
     historyDir: 'memory/history',
+    journalDir: 'memory/journal',
     notesDir: 'memory/notes',
     tmpDir: 'memory/tmp',
     logsDir: 'logs',
