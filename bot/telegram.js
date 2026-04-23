@@ -265,7 +265,7 @@ function start() {
       fileId: msg.voice.file_id,
       duration: msg.voice.duration,
       kind: 'voice',
-      extHint: 'oga',
+      extHint: 'ogg',
     });
   });
 

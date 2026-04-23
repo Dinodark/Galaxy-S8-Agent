@@ -21,6 +21,31 @@ function whyDisabled() {
   return null;
 }
 
+// Groq's Whisper endpoint validates file type by filename extension on
+// multipart upload. It accepts: flac, mp3, mp4, mpeg, mpga, m4a, ogg,
+// opus, wav, webm. Telegram sometimes hands us `.oga` (OGG audio
+// variant) for voice notes, which Groq rejects, so we rewrite the
+// extension to a supported synonym.
+const EXT_ALIASES = {
+  oga: 'ogg',
+  ogx: 'ogg',
+  weba: 'webm',
+};
+const GROQ_SUPPORTED = new Set([
+  'flac', 'mp3', 'mp4', 'mpeg', 'mpga', 'm4a', 'ogg', 'opus', 'wav', 'webm',
+]);
+
+function normalizeFilename(filePath) {
+  const base = path.basename(filePath);
+  const dot = base.lastIndexOf('.');
+  if (dot < 0) return `${base}.ogg`;
+  const stem = base.slice(0, dot);
+  const ext = base.slice(dot + 1).toLowerCase();
+  const mapped = EXT_ALIASES[ext] || ext;
+  if (!GROQ_SUPPORTED.has(mapped)) return `${stem}.ogg`;
+  return `${stem}.${mapped}`;
+}
+
 async function transcribeFile(filePath, { language } = {}) {
   if (!isEnabled()) {
     throw new STTError(`STT disabled: ${whyDisabled()}`);
@@ -34,7 +59,7 @@ async function transcribeFile(filePath, { language } = {}) {
 
   const buf = await fs.promises.readFile(filePath);
   const form = new FormData();
-  form.append('file', new Blob([buf]), path.basename(filePath));
+  form.append('file', new Blob([buf]), normalizeFilename(filePath));
   form.append('model', config.groq.sttModel);
   form.append('response_format', 'json');
   const lang = language || config.stt.language;
