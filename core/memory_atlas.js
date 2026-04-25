@@ -106,7 +106,7 @@ async function readRecentJournal(chatId, days = 3) {
   return out;
 }
 
-function buildGraph(notes, journalDays) {
+function buildGraph(notes) {
   const nodes = [];
   const links = [];
   const topicToFiles = new Map();
@@ -129,24 +129,6 @@ function buildGraph(notes, journalDays) {
     }
   }
 
-  for (const day of journalDays) {
-    nodes.push({
-      id: nodeId('journal', day.day),
-      label: `journal ${day.day}`,
-      type: 'journal',
-      file: `journal/${day.day}`,
-      excerpt: day.excerpt,
-      headings: [],
-      keywords: day.keywords,
-      size: day.entries,
-      mtime: day.day,
-    });
-    for (const kw of day.keywords.slice(0, 6)) {
-      if (!topicToFiles.has(kw.word)) topicToFiles.set(kw.word, []);
-      topicToFiles.get(kw.word).push(`journal:${day.day}`);
-    }
-  }
-
   for (const [topic, refs] of topicToFiles.entries()) {
     if (refs.length < 2 && nodes.length > 6) continue;
     const topicId = nodeId('topic', topic);
@@ -155,16 +137,14 @@ function buildGraph(notes, journalDays) {
       label: topic,
       type: 'topic',
       file: '',
-      excerpt: `Связывает ${refs.length} заметок/дней`,
+      excerpt: `Связывает ${refs.length} файлов`,
       headings: [],
       keywords: [],
       size: refs.length,
       mtime: '',
     });
     for (const ref of refs.slice(0, 12)) {
-      const target = ref.startsWith('journal:')
-        ? nodeId('journal', ref.replace('journal:', ''))
-        : nodeId(ref.startsWith('summary-') ? 'summary' : 'note', ref);
+      const target = nodeId(ref.startsWith('summary-') ? 'summary' : 'note', ref);
       links.push({ source: topicId, target, label: topic });
     }
   }
@@ -184,28 +164,31 @@ function renderHtml(index) {
 :root{color-scheme:dark;--bg:#0b1020;--panel:#11182c;--muted:#8ea0c5;--text:#eef3ff;--line:#2b3557;--accent:#8fd3ff;--topic:#ffd166;--note:#8bd17c;--summary:#c8a2ff;--journal:#ff8fab}
 *{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 20% 10%,#17203a 0,#0b1020 38%,#070a13 100%);font:14px/1.45 system-ui,-apple-system,Segoe UI,sans-serif;color:var(--text);overflow:hidden}
 header{height:58px;display:flex;align-items:center;gap:16px;padding:0 18px;border-bottom:1px solid var(--line);background:rgba(8,12,24,.8);backdrop-filter:blur(12px)}
-h1{font-size:17px;margin:0}header span{color:var(--muted)}#wrap{display:grid;grid-template-columns:minmax(0,1fr) 330px;height:calc(100vh - 58px)}#graph{width:100%;height:100%}#side{border-left:1px solid var(--line);background:rgba(13,19,36,.86);padding:18px;overflow:auto}
+h1{font-size:17px;margin:0}header span{color:var(--muted)}#wrap{display:grid;grid-template-columns:260px minmax(0,1fr) 330px;height:calc(100vh - 58px)}#graph{width:100%;height:100%}#side,#journals{border-left:1px solid var(--line);background:rgba(13,19,36,.86);padding:18px;overflow:auto}#journals{border-left:0;border-right:1px solid var(--line)}
+.journalItem{padding:10px;border:1px solid var(--line);border-radius:12px;margin:8px 0;background:#ffffff08}.journalItem strong{display:block}.journalItem small{color:var(--muted)}
 .pill{display:inline-block;border:1px solid var(--line);border-radius:999px;padding:3px 8px;margin:2px;color:var(--muted)}.node{cursor:pointer}.node circle{stroke:#fff3;stroke-width:1.5}.node text{fill:var(--text);font-size:12px;text-shadow:0 1px 8px #000}.link{stroke:#ffffff24;stroke-width:1}.hint{color:var(--muted)}.empty{max-width:520px;margin:10vh auto;color:var(--muted);font-size:18px}
 h2{margin:0 0 8px;font-size:18px}h3{margin:18px 0 8px;font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}pre{white-space:pre-wrap;font-family:inherit;color:var(--muted)}
 </style>
 </head>
 <body>
-<header><h1>Memory Atlas</h1><span>${escHtml(index.generatedAt)} · ${index.stats.notes} notes · ${index.stats.topics} topics · ${index.stats.links} links</span></header>
-<div id="wrap"><svg id="graph" role="img" aria-label="Memory graph"></svg><aside id="side"><h2>Выбери узел</h2><p class="hint">Карта построена из markdown-заметок, summary и последних journal-дней. Узлы можно перетаскивать.</p></aside></div>
+<header><h1>Memory Atlas</h1><span>${escHtml(index.generatedAt)} · ${index.stats.notes} files · ${index.stats.journalDays} journal days · ${index.stats.topics} topics · ${index.stats.links} links</span></header>
+<div id="wrap"><aside id="journals"><h2>Журналы</h2><p class="hint">Последние дни отдельно от графа.</p></aside><svg id="graph" role="img" aria-label="Memory graph"></svg><aside id="side"><h2>Выбери файл</h2><p class="hint">На графе только файлы заметок, summary и темы. Узлы можно перетаскивать.</p></aside></div>
 <script>const ATLAS=${data};
-const svg=document.getElementById('graph'),side=document.getElementById('side'),W=()=>svg.clientWidth,H=()=>svg.clientHeight;
+const svg=document.getElementById('graph'),side=document.getElementById('side'),journals=document.getElementById('journals'),W=()=>svg.clientWidth,H=()=>svg.clientHeight;
 const colors={topic:'var(--topic)',note:'var(--note)',summary:'var(--summary)',journal:'var(--journal)'};
-let nodes=ATLAS.graph.nodes.map((n,i)=>({...n,x:W()/2+Math.cos(i)*120+Math.random()*80,y:H()/2+Math.sin(i)*120+Math.random()*80,vx:0,vy:0}));
+let nodes=ATLAS.graph.nodes.map((n,i)=>({...n,x:W()/2+Math.cos(i*2.399)*220+Math.random()*140,y:H()/2+Math.sin(i*2.399)*220+Math.random()*140,vx:0,vy:0}));
 let links=ATLAS.graph.links.map(l=>({source:nodes.find(n=>n.id===l.source),target:nodes.find(n=>n.id===l.target),label:l.label})).filter(l=>l.source&&l.target);
 if(!nodes.length){svg.outerHTML='<div class="empty">Пока нет заметок. Надиктуй мысли, дождись вечерней сводки или создай markdown в memory/notes.</div>'}
-function size(n){return n.type==='topic'?8+Math.min(n.size,10):n.type==='summary'?11:n.type==='journal'?10:9}
-function tick(){const w=W(),h=H();for(const n of nodes){n.vx+=(w/2-n.x)*0.0008;n.vy+=(h/2-n.y)*0.0008}
-for(const l of links){const dx=l.target.x-l.source.x,dy=l.target.y-l.source.y,d=Math.hypot(dx,dy)||1,force=(d-120)*0.0009;l.source.vx+=dx/d*force;l.source.vy+=dy/d*force;l.target.vx-=dx/d*force;l.target.vy-=dy/d*force}
-for(let i=0;i<nodes.length;i++)for(let j=i+1;j<nodes.length;j++){const a=nodes[i],b=nodes[j],dx=b.x-a.x,dy=b.y-a.y,d=Math.hypot(dx,dy)||1,min=38;if(d<min){const f=(min-d)*0.01;a.vx-=dx/d*f;a.vy-=dy/d*f;b.vx+=dx/d*f;b.vy+=dy/d*f}}
-for(const n of nodes){n.vx*=0.88;n.vy*=0.88;n.x=Math.max(24,Math.min(w-24,n.x+n.vx));n.y=Math.max(24,Math.min(h-24,n.y+n.vy))}draw();requestAnimationFrame(tick)}
+renderJournals();
+function size(n){return n.type==='topic'?10+Math.min(n.size,12):n.type==='summary'?13:11}
+function tick(){const w=W(),h=H();for(const n of nodes){n.vx+=(w/2-n.x)*0.00035;n.vy+=(h/2-n.y)*0.00035}
+for(const l of links){const dx=l.target.x-l.source.x,dy=l.target.y-l.source.y,d=Math.hypot(dx,dy)||1,force=(d-210)*0.00055;l.source.vx+=dx/d*force;l.source.vy+=dy/d*force;l.target.vx-=dx/d*force;l.target.vy-=dy/d*force}
+for(let i=0;i<nodes.length;i++)for(let j=i+1;j<nodes.length;j++){const a=nodes[i],b=nodes[j],dx=b.x-a.x,dy=b.y-a.y,d=Math.hypot(dx,dy)||1,min=92;if(d<min){const f=(min-d)*0.018;a.vx-=dx/d*f;a.vy-=dy/d*f;b.vx+=dx/d*f;b.vy+=dy/d*f}}
+for(const n of nodes){n.vx*=0.84;n.vy*=0.84;n.x=Math.max(36,Math.min(w-36,n.x+n.vx));n.y=Math.max(36,Math.min(h-36,n.y+n.vy))}draw();requestAnimationFrame(tick)}
 function draw(){svg.innerHTML='';for(const l of links){const line=document.createElementNS('http://www.w3.org/2000/svg','line');line.setAttribute('class','link');line.setAttribute('x1',l.source.x);line.setAttribute('y1',l.source.y);line.setAttribute('x2',l.target.x);line.setAttribute('y2',l.target.y);svg.appendChild(line)}
 for(const n of nodes){const g=document.createElementNS('http://www.w3.org/2000/svg','g');g.setAttribute('class','node');g.setAttribute('transform',\`translate(\${n.x},\${n.y})\`);g.onmousedown=e=>drag(e,n);g.onclick=()=>show(n);const c=document.createElementNS('http://www.w3.org/2000/svg','circle');c.setAttribute('r',size(n));c.setAttribute('fill',colors[n.type]||'#fff');g.appendChild(c);const t=document.createElementNS('http://www.w3.org/2000/svg','text');t.setAttribute('x',size(n)+4);t.setAttribute('y',4);t.textContent=n.label.slice(0,28);g.appendChild(t);svg.appendChild(g)}}
 function show(n){side.innerHTML=\`<h2>\${escapeHtml(n.label)}</h2><p class="hint">\${escapeHtml(n.type)} \${n.file?('· '+escapeHtml(n.file)):''}</p><pre>\${escapeHtml(n.excerpt||'')}</pre><h3>Ключевые темы</h3>\${(n.keywords||[]).map(k=>\`<span class="pill">\${escapeHtml(k.word||k)}</span>\`).join('')||'<p class="hint">Нет</p>'}<h3>Заголовки</h3>\${(n.headings||[]).map(h=>\`<div>• \${escapeHtml(h)}</div>\`).join('')||'<p class="hint">Нет</p>'}\`}
+function renderJournals(){journals.innerHTML='<h2>Журналы</h2><p class="hint">Последние дни отдельно от графа.</p>'+((ATLAS.journalDays||[]).map(d=>\`<div class="journalItem"><strong>\${escapeHtml(d.day)}</strong><small>\${d.entries} entries</small><p>\${escapeHtml(d.excerpt||'')}</p>\${(d.keywords||[]).slice(0,5).map(k=>\`<span class="pill">\${escapeHtml(k.word||k)}</span>\`).join('')}</div>\`).join('')||'<p class="hint">Пока нет journal-записей.</p>')}
 function escapeHtml(s){return String(s??'').replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]))}
 function drag(e,n){e.preventDefault();const move=ev=>{const r=svg.getBoundingClientRect();n.x=ev.clientX-r.left;n.y=ev.clientY-r.top;draw()};const up=()=>{window.removeEventListener('mousemove',move);window.removeEventListener('mouseup',up)};window.addEventListener('mousemove',move);window.addEventListener('mouseup',up)}
 tick();</script>
@@ -215,7 +198,7 @@ tick();</script>
 async function buildAtlas({ chatId } = {}) {
   const notes = await readNotes();
   const journalDays = await readRecentJournal(chatId, 3);
-  const graph = buildGraph(notes, journalDays);
+  const graph = buildGraph(notes);
   const index = {
     generatedAt: new Date().toISOString(),
     stats: {
