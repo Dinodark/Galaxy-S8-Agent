@@ -15,6 +15,21 @@ async function getSystemPrompt() {
 
 async function ensureHistorySeeded(chatId) {
   const history = await memory.loadHistory(chatId);
+  const existingSystem = history[0] && history[0].role === 'system'
+    ? history[0].content || ''
+    : '';
+  // #region agent log
+  fetch('http://127.0.0.1:7933/ingest/05d097ed-198e-47e6-8b77-1f7ddf4809a1',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'047796'},body:JSON.stringify({sessionId:'047796',runId:'pre-fix',hypothesisId:'H6',location:'core/agent.js:ensureHistorySeeded',message:'loaded chat history system prompt state',data:{chatId,historyLength:history.length,hasSystem:!!existingSystem,systemHasReminderAdd:existingSystem.includes('reminder_add'),systemHasSettingsCenter:existingSystem.includes('Settings Center'),systemChars:existingSystem.length},timestamp:Date.now()})}).catch(()=>{});
+  // #endregion
+  if (existingSystem) {
+    console.log('[debug:047796] history system prompt', {
+      chatId,
+      historyLength: history.length,
+      systemHasReminderAdd: existingSystem.includes('reminder_add'),
+      systemHasSettingsCenter: existingSystem.includes('Settings Center'),
+      systemChars: existingSystem.length,
+    });
+  }
   if (history.length === 0 || history[0].role !== 'system') {
     const sys = await getSystemPrompt();
     const seeded = [{ role: 'system', content: sys }, ...history];
@@ -68,6 +83,9 @@ async function runAgent({ chatId, userMessage }) {
       messages: withRuntimeContext(history),
       tools: toolSchemas,
     });
+    // #region agent log
+    fetch('http://127.0.0.1:7933/ingest/05d097ed-198e-47e6-8b77-1f7ddf4809a1',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'047796'},body:JSON.stringify({sessionId:'047796',runId:'pre-fix',hypothesisId:'H1,H2',location:'core/agent.js:after-chatCompletion',message:'assistant response from LLM',data:{chatId,step,hasToolCalls:!!(assistantMsg.tool_calls&&assistantMsg.tool_calls.length),toolCallNames:(assistantMsg.tool_calls||[]).map((c)=>c.function&&c.function.name),contentPreview:String(assistantMsg.content||'').slice(0,500)},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
 
     const pushed = [assistantMsg];
 
@@ -83,7 +101,17 @@ async function runAgent({ chatId, userMessage }) {
           args = {};
         }
 
+        if (name && name.startsWith('reminder_')) {
+          // #region agent log
+          fetch('http://127.0.0.1:7933/ingest/05d097ed-198e-47e6-8b77-1f7ddf4809a1',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'047796'},body:JSON.stringify({sessionId:'047796',runId:'pre-fix',hypothesisId:'H1,H2,H5',location:'core/agent.js:before-tools.execute',message:'agent requested reminder tool',data:{chatId,tool:name,args},timestamp:Date.now()})}).catch(()=>{});
+          // #endregion
+        }
         const result = await tools.execute(name, args, toolCtx);
+        if (name && name.startsWith('reminder_')) {
+          // #region agent log
+          fetch('http://127.0.0.1:7933/ingest/05d097ed-198e-47e6-8b77-1f7ddf4809a1',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'047796'},body:JSON.stringify({sessionId:'047796',runId:'pre-fix',hypothesisId:'H1,H2,H5',location:'core/agent.js:after-tools.execute',message:'reminder tool result returned to agent',data:{chatId,tool:name,result},timestamp:Date.now()})}).catch(()=>{});
+          // #endregion
+        }
         transcript.push({ tool: name, args, result });
 
         pushed.push({

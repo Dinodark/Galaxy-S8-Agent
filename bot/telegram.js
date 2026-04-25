@@ -505,8 +505,17 @@ function start() {
   reminders.startScheduler({
     onFire: async (r) => {
       try {
+        // #region agent log
+        fetch('http://127.0.0.1:7933/ingest/05d097ed-198e-47e6-8b77-1f7ddf4809a1',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'047796'},body:JSON.stringify({sessionId:'047796',runId:'pre-fix',hypothesisId:'H4,H5',location:'bot/telegram.js:reminders.onFire.beforeSend',message:'delivering reminder to Telegram',data:{id:r.id,chatId:r.chatId,fireAt:r.fireAt,text:r.text},timestamp:Date.now()})}).catch(()=>{});
+        // #endregion
         await bot.sendMessage(r.chatId, `⏰ Reminder: ${r.text}`);
+        // #region agent log
+        fetch('http://127.0.0.1:7933/ingest/05d097ed-198e-47e6-8b77-1f7ddf4809a1',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'047796'},body:JSON.stringify({sessionId:'047796',runId:'pre-fix',hypothesisId:'H4,H5',location:'bot/telegram.js:reminders.onFire.afterSend',message:'reminder delivered to Telegram',data:{id:r.id,chatId:r.chatId},timestamp:Date.now()})}).catch(()=>{});
+        // #endregion
       } catch (err) {
+        // #region agent log
+        fetch('http://127.0.0.1:7933/ingest/05d097ed-198e-47e6-8b77-1f7ddf4809a1',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'047796'},body:JSON.stringify({sessionId:'047796',runId:'pre-fix',hypothesisId:'H4,H5',location:'bot/telegram.js:reminders.onFire.error',message:'reminder delivery failed',data:{id:r.id,chatId:r.chatId,error:err.message},timestamp:Date.now()})}).catch(()=>{});
+        // #endregion
         console.warn(`[reminders] failed to deliver ${r.id}:`, err.message);
       }
     },
