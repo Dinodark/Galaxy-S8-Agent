@@ -15,6 +15,7 @@ async function getSystemPrompt() {
 
 async function ensureHistorySeeded(chatId) {
   const history = await memory.loadHistory(chatId);
+  const sys = await getSystemPrompt();
   const existingSystem = history[0] && history[0].role === 'system'
     ? history[0].content || ''
     : '';
@@ -31,10 +32,37 @@ async function ensureHistorySeeded(chatId) {
     });
   }
   if (history.length === 0 || history[0].role !== 'system') {
-    const sys = await getSystemPrompt();
     const seeded = [{ role: 'system', content: sys }, ...history];
     await memory.saveHistory(chatId, seeded);
+    // #region agent log
+    fetch('http://127.0.0.1:7933/ingest/05d097ed-198e-47e6-8b77-1f7ddf4809a1',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'047796'},body:JSON.stringify({sessionId:'047796',runId:'post-fix',hypothesisId:'H6',location:'core/agent.js:ensureHistorySeeded.seed',message:'seeded current system prompt into history',data:{chatId,historyLength:seeded.length,systemHasReminderAdd:sys.includes('reminder_add'),systemHasSettingsCenter:sys.includes('Settings Center'),systemChars:sys.length},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
+    console.log('[debug:047796] seeded current system prompt', {
+      chatId,
+      historyLength: seeded.length,
+      systemHasReminderAdd: sys.includes('reminder_add'),
+      systemHasSettingsCenter: sys.includes('Settings Center'),
+      systemChars: sys.length,
+    });
     return seeded;
+  }
+  if (existingSystem !== sys) {
+    const updated = [{ role: 'system', content: sys }, ...history.slice(1)];
+    await memory.saveHistory(chatId, updated);
+    // #region agent log
+    fetch('http://127.0.0.1:7933/ingest/05d097ed-198e-47e6-8b77-1f7ddf4809a1',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'047796'},body:JSON.stringify({sessionId:'047796',runId:'post-fix',hypothesisId:'H6',location:'core/agent.js:ensureHistorySeeded.refresh',message:'refreshed stale system prompt in history',data:{chatId,historyLength:updated.length,beforeHasReminderAdd:existingSystem.includes('reminder_add'),afterHasReminderAdd:sys.includes('reminder_add'),beforeHasSettingsCenter:existingSystem.includes('Settings Center'),afterHasSettingsCenter:sys.includes('Settings Center'),beforeChars:existingSystem.length,afterChars:sys.length},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
+    console.log('[debug:047796] refreshed system prompt', {
+      chatId,
+      historyLength: updated.length,
+      beforeHasReminderAdd: existingSystem.includes('reminder_add'),
+      afterHasReminderAdd: sys.includes('reminder_add'),
+      beforeHasSettingsCenter: existingSystem.includes('Settings Center'),
+      afterHasSettingsCenter: sys.includes('Settings Center'),
+      beforeChars: existingSystem.length,
+      afterChars: sys.length,
+    });
+    return updated;
   }
   return history;
 }
