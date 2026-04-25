@@ -191,22 +191,24 @@ function start() {
         const current = await modes.getMode(msg.chat.id);
         const next = current === 'silent' ? 'chat' : 'silent';
         await modes.setMode(msg.chat.id, next, actorFromCallback(query));
-        await bot.answerCallbackQuery(query.id, { text: `Mode: ${next}` });
+        await bot.answerCallbackQuery(query.id, {
+          text: next === 'silent' ? 'Режим: тихий' : 'Режим: диалог',
+        });
       } else if (action === 'toggle_stt') {
         const current = await settings.get('stt.enabled');
         await settings.set('stt.enabled', !current, actorFromCallback(query));
         await bot.answerCallbackQuery(query.id, {
-          text: `STT: ${!current ? 'on' : 'off'}`,
+          text: `Голосовые: ${!current ? 'вкл' : 'выкл'}`,
         });
       } else if (action === 'toggle_daily') {
         const current = await settings.get('dailyReview.enabled');
         await settings.set('dailyReview.enabled', !current, actorFromCallback(query));
         if (dailyReviewController) dailyReviewController.restart();
         await bot.answerCallbackQuery(query.id, {
-          text: `Daily review: ${!current ? 'on' : 'off'}`,
+          text: `Вечерняя сводка: ${!current ? 'вкл' : 'выкл'}`,
         });
       } else if (action === 'summary_now') {
-        await bot.answerCallbackQuery(query.id, { text: 'Generating summary...' });
+        await bot.answerCallbackQuery(query.id, { text: 'Генерирую сводку...' });
         await bot.sendChatAction(msg.chat.id, 'typing');
         const result = await runReview(msg.chat.id, { force: true });
         if (result.skipped) {
@@ -225,11 +227,10 @@ function start() {
           parse_mode: 'Markdown',
         });
       } else if (action === 'hint_time') {
-        await bot.answerCallbackQuery(query.id, { text: 'Use /set daily_review_time 22:30' });
+        await bot.answerCallbackQuery(query.id, { text: 'Напиши /set daily_review_time 22:30' });
         await bot.sendMessage(
           msg.chat.id,
-          'Чтобы поменять время вечерней сводки, напиши: `/set daily_review_time 22:30`',
-          { parse_mode: 'Markdown' }
+          'Чтобы поменять время вечерней сводки, напиши: /set daily_review_time 22:30'
         );
       } else {
         await bot.answerCallbackQuery(query.id, { text: 'Unknown action' });
@@ -563,42 +564,46 @@ async function settingsKeyboard(chatId) {
     inline_keyboard: [
       [
         {
-          text: s.mode === 'silent' ? 'Mode: silent' : 'Mode: chat',
+          text:
+            s.mode === 'silent'
+              ? 'Режим: тихий'
+              : 'Режим: диалог',
           callback_data: 'settings:toggle_mode',
         },
       ],
       [
         {
-          text: `STT: ${s.stt.configured ? 'on' : 'off'}`,
+          text: `Голосовые: ${s.stt.configured ? 'вкл' : 'выкл'}`,
           callback_data: 'settings:toggle_stt',
         },
         {
-          text: `Daily: ${s.dailyReview.enabled ? 'on' : 'off'}`,
+          text: `Вечерняя сводка: ${s.dailyReview.enabled ? 'вкл' : 'выкл'}`,
           callback_data: 'settings:toggle_daily',
         },
       ],
       [
-        { text: 'Summary now', callback_data: 'settings:summary_now' },
-        { text: 'Status', callback_data: 'settings:status' },
+        { text: 'Сводка сейчас', callback_data: 'settings:summary_now' },
+        { text: 'Статус', callback_data: 'settings:status' },
       ],
-      [{ text: 'Set review time', callback_data: 'settings:hint_time' }],
+      [{ text: 'Изменить время сводки', callback_data: 'settings:hint_time' }],
     ],
   };
 }
 
 async function settingsMenuText(chatId) {
   const s = await runtime.buildStatus(chatId);
-  const next = s.dailyReview.next ? s.dailyReview.next.local : 'disabled';
+  const next = s.dailyReview.next ? s.dailyReview.next.local : 'выключена';
+  const mode = s.mode === 'silent' ? 'тихий (только записываю)' : 'диалог';
   return [
-    'Settings Center',
+    'Настройки агента',
     '',
-    `Mode: ${s.mode}`,
-    `STT: ${s.stt.configured ? 'on' : 'off'} (${s.stt.language})`,
-    `Daily review: ${s.dailyReview.enabled ? 'on' : 'off'}`,
-    `Review time: ${s.dailyReview.cron} (${s.dailyReview.tz})`,
-    `Next: ${next}`,
+    `Режим: ${mode}`,
+    `Голосовые: ${s.stt.configured ? 'включены' : 'выключены'} (язык: ${s.stt.language})`,
+    `Вечерняя сводка: ${s.dailyReview.enabled ? 'включена' : 'выключена'}`,
+    `Расписание сводки: ${s.dailyReview.cron} (${s.dailyReview.tz})`,
+    `Следующая сводка: ${next}`,
     '',
-    'Точные правки: `/set daily_review_time 22:30`',
+    'Точные правки: /set daily_review_time 22:30',
   ].join('\n');
 }
 
