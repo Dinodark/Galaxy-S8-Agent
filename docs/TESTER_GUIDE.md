@@ -81,6 +81,11 @@ URL from a browser on the same Wi-Fi/VPN network. The URL contains a private
 token; do not post it in group chats. The web UI shows status, memory atlas,
 notes, summaries, journal days, and sanitized settings.
 
+The `Update` panel has an **Update & restart** button. It pulls the latest
+code, installs npm dependencies, runs doctor, and restarts both bot and web
+tmux sessions. It can briefly disconnect the page because the web server
+restarts itself. Use it only from a trusted Wi-Fi/VPN network.
+
 ## Troubleshooting
 
 ### Bot does not answer

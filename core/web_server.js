@@ -1,6 +1,7 @@
 const http = require('http');
 const os = require('os');
 const path = require('path');
+const { spawn } = require('child_process');
 const fse = require('fs-extra');
 const config = require('../config');
 const settings = require('./settings');
@@ -8,6 +9,10 @@ const runtime = require('./runtime');
 const atlas = require('./memory_atlas');
 const memory = require('./memory');
 const journal = require('./journal');
+
+const UPDATE_LOG_FILE = path.join(config.paths.tmpDir, 'update-restart.log');
+const UPDATE_PID_FILE = path.join(config.paths.tmpDir, 'update-restart.pid');
+const UPDATE_SCRIPT = path.join(__dirname, '..', 'scripts', 'update_restart.sh');
 
 function json(res, status, data) {
   const body = JSON.stringify(data, null, 2);
@@ -56,6 +61,62 @@ function sanitizeName(name) {
   return String(name || '').trim().replace(/[^a-zA-Z0-9._-]+/g, '_');
 }
 
+async function isUpdateRunning() {
+  if (!(await fse.pathExists(UPDATE_PID_FILE))) return false;
+  const raw = await fse.readFile(UPDATE_PID_FILE, 'utf8').catch(() => '');
+  const pid = Number(String(raw).trim());
+  if (!Number.isFinite(pid) || pid <= 0) return false;
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    await fse.remove(UPDATE_PID_FILE).catch(() => {});
+    return false;
+  }
+}
+
+async function readUpdateLog() {
+  if (!(await fse.pathExists(UPDATE_LOG_FILE))) {
+    return { exists: false, running: await isUpdateRunning(), content: '' };
+  }
+  const stat = await fse.stat(UPDATE_LOG_FILE);
+  const content = await fse.readFile(UPDATE_LOG_FILE, 'utf8');
+  return {
+    exists: true,
+    running: await isUpdateRunning(),
+    size: stat.size,
+    mtime: stat.mtime.toISOString(),
+    content: content.slice(-12000),
+  };
+}
+
+async function startUpdateRestart() {
+  if (await isUpdateRunning()) {
+    return { ok: false, started: false, reason: 'update already running' };
+  }
+  await fse.ensureDir(config.paths.tmpDir);
+  await fse.writeFile(
+    UPDATE_LOG_FILE,
+    `${new Date().toISOString()} Update/restart requested from web UI.\n`
+  );
+
+  const child = spawn('sh', [UPDATE_SCRIPT], {
+    cwd: path.join(__dirname, '..'),
+    detached: true,
+    stdio: 'ignore',
+    env: {
+      ...process.env,
+      GALAXY_AGENT_SESSION: process.env.GALAXY_AGENT_SESSION || 'galaxy-agent',
+      GALAXY_AGENT_WEB_SESSION:
+        process.env.GALAXY_AGENT_WEB_SESSION || 'galaxy-agent-web',
+      GALAXY_AGENT_UPDATE_LOG: UPDATE_LOG_FILE,
+      GALAXY_AGENT_UPDATE_PID: UPDATE_PID_FILE,
+    },
+  });
+  child.unref();
+  return { ok: true, started: true, pid: child.pid, logFile: UPDATE_LOG_FILE };
+}
+
 async function listNotesDetailed() {
   const files = await memory.listNotes();
   const out = [];
@@ -75,6 +136,17 @@ async function listNotesDetailed() {
 async function handleApi(req, res, url) {
   const pathname = url.pathname;
   const chatId = firstOwnerChatId();
+
+  if (pathname === '/api/actions/update-log') {
+    return json(res, 200, await readUpdateLog());
+  }
+
+  if (pathname === '/api/actions/update-restart') {
+    if (req.method !== 'POST') {
+      return json(res, 405, { error: 'method not allowed' });
+    }
+    return json(res, 200, await startUpdateRestart());
+  }
 
   if (pathname === '/api/status') {
     return json(res, 200, await runtime.buildStatus(chatId));
@@ -125,7 +197,7 @@ function appHtml() {
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:14px/1.45 system-ui,-apple-system,Segoe UI,sans-serif}
 #app{display:grid;grid-template-columns:240px minmax(0,1fr);height:100vh}.side{border-right:1px solid var(--line);background:var(--panel);padding:16px;overflow:auto}.main{display:grid;grid-template-rows:52px minmax(0,1fr);min-width:0}
 h1{font-size:17px;margin:0 0 16px}.nav button{display:block;width:100%;text-align:left;background:transparent;color:var(--text);border:1px solid var(--line);border-radius:10px;padding:10px;margin:8px 0;cursor:pointer}.nav button:hover{border-color:var(--accent)}
-.top{display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--line);padding:0 16px;background:#0d1426}.content{padding:16px;overflow:auto}.grid{display:grid;grid-template-columns:280px minmax(0,1fr);gap:14px;height:100%}.card{background:var(--panel2);border:1px solid var(--line);border-radius:14px;padding:14px}.list{overflow:auto}.item{padding:9px;border-bottom:1px solid var(--line);cursor:pointer}.item:hover{background:#ffffff08}pre{white-space:pre-wrap;font-family:ui-monospace,SFMono-Regular,Consolas,monospace}.muted{color:var(--muted)}iframe{width:100%;height:calc(100vh - 92px);border:1px solid var(--line);border-radius:14px;background:#050812}.journal{display:flex;flex-direction:column;gap:12px}.entry{border:1px solid var(--line);border-radius:12px;padding:12px;background:#0d1426}.entry.user{border-color:#345b7a}.entry.assistant{border-color:#4b5270}.entry-meta{display:flex;gap:8px;align-items:center;margin-bottom:8px;color:var(--muted);font-size:12px}.badge{border:1px solid var(--line);border-radius:999px;padding:2px 8px;background:#ffffff08;color:var(--text)}.entry-text{white-space:pre-wrap;color:var(--text);font-size:14px;line-height:1.5}
+.top{display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--line);padding:0 16px;background:#0d1426}.content{padding:16px;overflow:auto}.grid{display:grid;grid-template-columns:280px minmax(0,1fr);gap:14px;height:100%}.card{background:var(--panel2);border:1px solid var(--line);border-radius:14px;padding:14px}.stack{display:flex;flex-direction:column;gap:14px}.list{overflow:auto}.item{padding:9px;border-bottom:1px solid var(--line);cursor:pointer}.item:hover{background:#ffffff08}button.danger{background:#4b1f2a;color:var(--text);border:1px solid #8c4053;border-radius:10px;padding:10px 12px;cursor:pointer}button.secondary{background:transparent;color:var(--text);border:1px solid var(--line);border-radius:10px;padding:10px 12px;cursor:pointer}.actions{display:flex;gap:10px;flex-wrap:wrap}pre{white-space:pre-wrap;font-family:ui-monospace,SFMono-Regular,Consolas,monospace}.muted{color:var(--muted)}iframe{width:100%;height:calc(100vh - 92px);border:1px solid var(--line);border-radius:14px;background:#050812}.journal{display:flex;flex-direction:column;gap:12px}.entry{border:1px solid var(--line);border-radius:12px;padding:12px;background:#0d1426}.entry.user{border-color:#345b7a}.entry.assistant{border-color:#4b5270}.entry-meta{display:flex;gap:8px;align-items:center;margin-bottom:8px;color:var(--muted);font-size:12px}.badge{border:1px solid var(--line);border-radius:999px;padding:2px 8px;background:#ffffff08;color:var(--text)}.entry-text{white-space:pre-wrap;color:var(--text);font-size:14px;line-height:1.5}
 </style>
 </head>
 <body>
@@ -136,10 +208,12 @@ h1{font-size:17px;margin:0 0 16px}.nav button{display:block;width:100%;text-alig
 <button onclick="showNotes('summary')">Summaries</button>
 <button onclick="showJournal()">Journal</button>
 <button onclick="showSettings()">Settings</button>
+<button onclick="showMaintenance()">Update</button>
 </div><p class="muted">Read-only local UI. Keep this URL private.</p></aside><main class="main"><div class="top"><strong id="title">Status</strong><span class="muted" id="state"></span></div><div class="content" id="content"></div></main></div>
 <script>
 const token=new URL(location.href).searchParams.get('token')||'';
 const api=(p)=>fetch(p+(p.includes('?')?'&':'?')+'token='+encodeURIComponent(token)).then(r=>{if(!r.ok)throw new Error(r.status+' '+r.statusText);return r.json()});
+const apiPost=(p)=>fetch(p+(p.includes('?')?'&':'?')+'token='+encodeURIComponent(token),{method:'POST'}).then(r=>{if(!r.ok)throw new Error(r.status+' '+r.statusText);return r.json()});
 const title=t=>document.getElementById('title').textContent=t;
 const content=html=>document.getElementById('content').innerHTML=html;
 const esc=s=>String(s??'').replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));
@@ -149,6 +223,9 @@ const viaLabel=v=>({voice:'voice',audio:'audio',video_note:'video note',text:'te
 const renderJournalEntry=e=>'<article class="entry '+esc(e.source||'user')+'"><div class="entry-meta"><span class="badge">'+esc(sourceLabel(e.source))+'</span><span>'+esc(fmtTime(e.ts))+'</span><span>'+esc(viaLabel(e.via))+'</span></div><div class="entry-text">'+esc(e.text)+'</div></article>';
 async function showStatus(){title('Status');const s=await api('/api/status');content('<div class="card"><pre>'+esc(JSON.stringify(s,null,2))+'</pre></div>')}
 async function showSettings(){title('Settings');const s=await api('/api/settings');content('<div class="card"><pre>'+esc(JSON.stringify(s,null,2))+'</pre></div>')}
+async function showMaintenance(){title('Update');const l=await api('/api/actions/update-log');content('<div class="stack"><div class="card"><h2>Update & restart agent</h2><p class="muted">Runs git pull, npm install, doctor, then restarts bot and web tmux sessions. The page may disconnect for a few seconds.</p><div class="actions"><button class="danger" onclick="triggerUpdate()">Update & restart</button><button class="secondary" onclick="refreshUpdateLog()">Refresh log</button></div></div><div class="card"><pre id="updateLog">'+esc(l.content||'No update log yet.')+'</pre></div></div>')}
+async function triggerUpdate(){if(!confirm('Update code and restart bot + web UI? The page may disconnect for a few seconds.'))return;const r=await apiPost('/api/actions/update-restart');document.getElementById('updateLog').textContent=JSON.stringify(r,null,2)+'\\n\\nRefresh this log in a few seconds.'}
+async function refreshUpdateLog(){const l=await api('/api/actions/update-log');document.getElementById('updateLog').textContent=(l.running?'[running]\\n':'')+(l.content||'No update log yet.')}
 async function showAtlas(){title('Memory Atlas');document.getElementById('state').textContent='building...';const a=await api('/api/atlas');document.getElementById('state').textContent=a.stats.notes+' files, '+a.stats.topics+' topics';content('<iframe src="/atlas.html?token='+encodeURIComponent(token)+'"></iframe>')}
 async function showNotes(kind){title(kind==='summary'?'Summaries':'Notes');const n=await api('/api/notes');const list=n.notes.filter(x=>x.kind===kind);content('<div class="grid"><div class="card list">'+list.map(x=>'<div class="item" onclick="openNote(\\''+esc(x.name)+'\\')"><strong>'+esc(x.name)+'</strong><br><span class="muted">'+esc(x.mtime||'')+'</span></div>').join('')+'</div><div class="card"><pre id="viewer" class="muted">Select a file</pre></div></div>')}
 async function openNote(name){const n=await api('/api/note?name='+encodeURIComponent(name));document.getElementById('viewer').textContent=n.content}

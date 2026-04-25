@@ -277,6 +277,13 @@ the memory atlas, markdown notes, daily summaries, journal days, and sanitized
 settings. All endpoints require the token, and the MVP does not expose write
 actions or secrets.
 
+The `Update` panel includes a guarded **Update & restart** action. It does not
+run arbitrary shell commands: it only runs the fixed `scripts/update_restart.sh`
+workflow (`git pull --ff-only`, `npm install`, `npm run doctor`, restart bot
+and web tmux sessions). The browser page can disconnect for a few seconds while
+the web session restarts; reopen `/web` if needed. Use this only on a trusted
+Wi-Fi/VPN network.
+
 For local development you can run:
 
 ```sh
