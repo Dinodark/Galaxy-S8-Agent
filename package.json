@@ -6,6 +6,9 @@
   "scripts": {
     "start": "node index.js",
     "web": "node core/web_server.js",
+    "web:build": "vite build --config web/vite.config.js",
+    "web:dev": "node scripts/web_dev.js",
+    "web:dev:client": "vite --config web/vite.config.js",
     "setup": "node scripts/setup.js",
     "doctor": "node scripts/doctor.js"
   },
@@ -26,6 +29,12 @@
     "cron-parser": "^5.5.0",
     "dotenv": "^17.4.2",
     "fs-extra": "^11.3.4",
-    "node-telegram-bot-api": "^0.67.0"
+    "node-telegram-bot-api": "^0.67.0",
+    "react": "^19.2.5",
+    "react-dom": "^19.2.5"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^6.0.1",
+    "vite": "^8.0.10"
   }
 }

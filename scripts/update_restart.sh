@@ -64,6 +64,9 @@ run npm install
 log "Running doctor..."
 npm run doctor >> "$LOG_FILE" 2>&1 || log "Doctor finished with warnings."
 
+log "Building web dashboard..."
+run npm run web:build
+
 stop_session "$BOT_SESSION" "bot"
 stop_session "$WEB_SESSION" "web"
 

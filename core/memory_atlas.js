@@ -161,19 +161,25 @@ function renderHtml(index) {
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Galaxy S8 Agent Memory Atlas</title>
 <style>
-:root{color-scheme:dark;--bg:#0b1020;--panel:#11182c;--muted:#8ea0c5;--text:#eef3ff;--line:#2b3557;--accent:#8fd3ff;--topic:#ffd166;--note:#8bd17c;--summary:#c8a2ff;--journal:#ff8fab}
-*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 20% 10%,#17203a 0,#0b1020 38%,#070a13 100%);font:14px/1.45 system-ui,-apple-system,Segoe UI,sans-serif;color:var(--text);overflow:hidden}
-header{height:58px;display:flex;align-items:center;gap:16px;padding:0 18px;border-bottom:1px solid var(--line);background:rgba(8,12,24,.8);backdrop-filter:blur(12px)}
-h1{font-size:17px;margin:0}header span{color:var(--muted)}#wrap{display:grid;grid-template-columns:260px minmax(0,1fr) 330px;height:calc(100vh - 58px)}#graph{width:100%;height:100%}#side,#journals{border-left:1px solid var(--line);background:rgba(13,19,36,.86);padding:18px;overflow:auto}#journals{border-left:0;border-right:1px solid var(--line)}
-.journalItem{padding:10px;border:1px solid var(--line);border-radius:12px;margin:8px 0;background:#ffffff08}.journalItem strong{display:block}.journalItem small{color:var(--muted)}
-.pill{display:inline-block;border:1px solid var(--line);border-radius:999px;padding:3px 8px;margin:2px;color:var(--muted)}.node{cursor:pointer}.node circle{stroke:#fff3;stroke-width:1.5}.node text{fill:var(--text);font-size:12px;text-shadow:0 1px 8px #000}.link{stroke:#ffffff24;stroke-width:1}.hint{color:var(--muted)}.empty{max-width:520px;margin:10vh auto;color:var(--muted);font-size:18px}
+:root{color-scheme:dark;--bg:#111111;--panel:#171717;--panel-soft:#1d1d1d;--panel-hover:#242424;--muted:#9a9a9a;--text:#f1f1f1;--line:transparent;--accent:#d6d6d6;--topic:#d8c16f;--note:#9cbf8f;--summary:#b6a0d4;--journal:#c98f9b}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);font:14px/1.45 system-ui,-apple-system,Segoe UI,sans-serif;color:var(--text);overflow:hidden}
+header{height:58px;display:flex;align-items:center;gap:16px;padding:0 18px;background:var(--bg)}
+h1{font-size:17px;margin:0}header span{color:var(--muted)}#wrap{display:grid;grid-template-columns:260px minmax(0,1fr) 330px;height:calc(100vh - 58px)}#graph{width:100%;height:100%}#side,#journals{background:var(--panel-soft);padding:18px;overflow:auto}#journals{background:var(--panel)}
+.journalItem{padding:10px;border-radius:12px;margin:8px 0;background:var(--panel-hover)}.journalItem strong{display:block}.journalItem small{color:var(--muted)}
+.pill{display:inline-block;border-radius:999px;padding:3px 8px;margin:2px;color:var(--muted);background:var(--panel-hover)}.node{cursor:pointer}.node circle{stroke:#fff2;stroke-width:1.5}.node text{fill:var(--text);font-size:12px;text-shadow:0 1px 8px #000}.link{stroke:#ffffff20;stroke-width:1}.hint{color:var(--muted)}.empty{max-width:520px;margin:10vh auto;color:var(--muted);font-size:18px}
 h2{margin:0 0 8px;font-size:18px}h3{margin:18px 0 8px;font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}pre{white-space:pre-wrap;font-family:inherit;color:var(--muted)}
 </style>
 </head>
 <body>
 <header><h1>Memory Atlas</h1><span>${escHtml(index.generatedAt)} · ${index.stats.notes} files · ${index.stats.journalDays} journal days · ${index.stats.topics} topics · ${index.stats.links} links</span></header>
 <div id="wrap"><aside id="journals"><h2>Журналы</h2><p class="hint">Последние дни отдельно от графа.</p></aside><svg id="graph" role="img" aria-label="Memory graph"></svg><aside id="side"><h2>Выбери файл</h2><p class="hint">На графе только файлы заметок, summary и темы. Узлы можно перетаскивать.</p></aside></div>
-<script>const ATLAS=${data};
+<script>
+(function applyTheme(){
+const p=new URLSearchParams(location.search);
+const map={theme_bg:'--bg',theme_surface:'--panel',theme_surfaceSoft:'--panel-soft',theme_surfaceHover:'--panel-hover',theme_text:'--text',theme_muted:'--muted',theme_accent:'--accent',theme_line:'--line'};
+for(const [param,cssVar] of Object.entries(map)){const value=p.get(param);if(value)document.documentElement.style.setProperty(cssVar,value)}
+})();
+const ATLAS=${data};
 const svg=document.getElementById('graph'),side=document.getElementById('side'),journals=document.getElementById('journals'),W=()=>svg.clientWidth,H=()=>svg.clientHeight;
 const colors={topic:'var(--topic)',note:'var(--note)',summary:'var(--summary)',journal:'var(--journal)'};
 let nodes=ATLAS.graph.nodes.map((n,i)=>({...n,x:W()/2+Math.cos(i*2.399)*220+Math.random()*140,y:H()/2+Math.sin(i*2.399)*220+Math.random()*140,vx:0,vy:0}));

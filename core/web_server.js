@@ -13,6 +13,7 @@ const journal = require('./journal');
 const UPDATE_LOG_FILE = path.join(config.paths.tmpDir, 'update-restart.log');
 const UPDATE_PID_FILE = path.join(config.paths.tmpDir, 'update-restart.pid');
 const UPDATE_SCRIPT = path.join(__dirname, '..', 'scripts', 'update_restart.sh');
+const WEB_DIST_DIR = path.join(__dirname, '..', 'web', 'dist');
 
 function json(res, status, data) {
   const body = JSON.stringify(data, null, 2);
@@ -29,6 +30,15 @@ function html(res, body) {
     'Cache-Control': 'no-store',
   });
   res.end(body);
+}
+
+function contentType(filePath) {
+  if (filePath.endsWith('.html')) return 'text/html; charset=utf-8';
+  if (filePath.endsWith('.css')) return 'text/css; charset=utf-8';
+  if (filePath.endsWith('.js')) return 'application/javascript; charset=utf-8';
+  if (filePath.endsWith('.svg')) return 'image/svg+xml';
+  if (filePath.endsWith('.json')) return 'application/json; charset=utf-8';
+  return 'application/octet-stream';
 }
 
 function text(res, status, body) {
@@ -185,55 +195,33 @@ async function handleApi(req, res, url) {
   return json(res, 404, { error: 'not found' });
 }
 
-function appHtml() {
-  return `<!doctype html>
-<html lang="ru">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Galaxy S8 Agent</title>
-<style>
-:root{color-scheme:dark;--bg:#090d18;--panel:#10182b;--panel2:#151f38;--line:#2a3556;--text:#eef3ff;--muted:#91a1c4;--accent:#8fd3ff}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:14px/1.45 system-ui,-apple-system,Segoe UI,sans-serif}
-#app{display:grid;grid-template-columns:240px minmax(0,1fr);height:100vh}.side{border-right:1px solid var(--line);background:var(--panel);padding:16px;overflow:auto}.main{display:grid;grid-template-rows:52px minmax(0,1fr);min-width:0}
-h1{font-size:17px;margin:0 0 16px}.nav button{display:block;width:100%;text-align:left;background:transparent;color:var(--text);border:1px solid var(--line);border-radius:10px;padding:10px;margin:8px 0;cursor:pointer}.nav button:hover{border-color:var(--accent)}
-.top{display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--line);padding:0 16px;background:#0d1426}.content{padding:16px;overflow:auto}.grid{display:grid;grid-template-columns:280px minmax(0,1fr);gap:14px;height:100%}.card{background:var(--panel2);border:1px solid var(--line);border-radius:14px;padding:14px}.stack{display:flex;flex-direction:column;gap:14px}.list{overflow:auto}.item{padding:9px;border-bottom:1px solid var(--line);cursor:pointer}.item:hover{background:#ffffff08}button.danger{background:#4b1f2a;color:var(--text);border:1px solid #8c4053;border-radius:10px;padding:10px 12px;cursor:pointer}button.secondary{background:transparent;color:var(--text);border:1px solid var(--line);border-radius:10px;padding:10px 12px;cursor:pointer}.actions{display:flex;gap:10px;flex-wrap:wrap}pre{white-space:pre-wrap;font-family:ui-monospace,SFMono-Regular,Consolas,monospace}.muted{color:var(--muted)}iframe{width:100%;height:calc(100vh - 92px);border:1px solid var(--line);border-radius:14px;background:#050812}.journal{display:flex;flex-direction:column;gap:12px}.entry{border:1px solid var(--line);border-radius:12px;padding:12px;background:#0d1426}.entry.user{border-color:#345b7a}.entry.assistant{border-color:#4b5270}.entry-meta{display:flex;gap:8px;align-items:center;margin-bottom:8px;color:var(--muted);font-size:12px}.badge{border:1px solid var(--line);border-radius:999px;padding:2px 8px;background:#ffffff08;color:var(--text)}.entry-text{white-space:pre-wrap;color:var(--text);font-size:14px;line-height:1.5}
-</style>
-</head>
-<body>
-<div id="app"><aside class="side"><h1>Galaxy S8 Agent</h1><div class="nav">
-<button onclick="showStatus()">Status</button>
-<button onclick="showAtlas()">Memory Atlas</button>
-<button onclick="showNotes('note')">Notes</button>
-<button onclick="showNotes('summary')">Summaries</button>
-<button onclick="showJournal()">Journal</button>
-<button onclick="showSettings()">Settings</button>
-<button onclick="showMaintenance()">Update</button>
-</div><p class="muted">Read-only local UI. Keep this URL private.</p></aside><main class="main"><div class="top"><strong id="title">Status</strong><span class="muted" id="state"></span></div><div class="content" id="content"></div></main></div>
-<script>
-const token=new URL(location.href).searchParams.get('token')||'';
-const api=(p)=>fetch(p+(p.includes('?')?'&':'?')+'token='+encodeURIComponent(token)).then(r=>{if(!r.ok)throw new Error(r.status+' '+r.statusText);return r.json()});
-const apiPost=(p)=>fetch(p+(p.includes('?')?'&':'?')+'token='+encodeURIComponent(token),{method:'POST'}).then(r=>{if(!r.ok)throw new Error(r.status+' '+r.statusText);return r.json()});
-const title=t=>document.getElementById('title').textContent=t;
-const content=html=>document.getElementById('content').innerHTML=html;
-const esc=s=>String(s??'').replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));
-const fmtTime=ts=>{try{return new Date(ts).toLocaleString('ru-RU',{dateStyle:'medium',timeStyle:'short'})}catch{return ts||''}};
-const sourceLabel=s=>s==='assistant'?'white rabbit':'Ты';
-const viaLabel=v=>({voice:'voice',audio:'audio',video_note:'video note',text:'text'}[v||'text']||v||'text');
-const renderJournalEntry=e=>'<article class="entry '+esc(e.source||'user')+'"><div class="entry-meta"><span class="badge">'+esc(sourceLabel(e.source))+'</span><span>'+esc(fmtTime(e.ts))+'</span><span>'+esc(viaLabel(e.via))+'</span></div><div class="entry-text">'+esc(e.text)+'</div></article>';
-async function showStatus(){title('Status');const s=await api('/api/status');content('<div class="card"><pre>'+esc(JSON.stringify(s,null,2))+'</pre></div>')}
-async function showSettings(){title('Settings');const s=await api('/api/settings');content('<div class="card"><pre>'+esc(JSON.stringify(s,null,2))+'</pre></div>')}
-async function showMaintenance(){title('Update');const l=await api('/api/actions/update-log');content('<div class="stack"><div class="card"><h2>Update & restart agent</h2><p class="muted">Runs git pull, npm install, doctor, then restarts bot and web tmux sessions. The page may disconnect for a few seconds.</p><div class="actions"><button class="danger" onclick="triggerUpdate()">Update & restart</button><button class="secondary" onclick="refreshUpdateLog()">Refresh log</button></div></div><div class="card"><pre id="updateLog">'+esc(l.content||'No update log yet.')+'</pre></div></div>')}
-async function triggerUpdate(){if(!confirm('Update code and restart bot + web UI? The page may disconnect for a few seconds.'))return;const r=await apiPost('/api/actions/update-restart');document.getElementById('updateLog').textContent=JSON.stringify(r,null,2)+'\\n\\nRefresh this log in a few seconds.'}
-async function refreshUpdateLog(){const l=await api('/api/actions/update-log');document.getElementById('updateLog').textContent=(l.running?'[running]\\n':'')+(l.content||'No update log yet.')}
-async function showAtlas(){title('Memory Atlas');document.getElementById('state').textContent='building...';const a=await api('/api/atlas');document.getElementById('state').textContent=a.stats.notes+' files, '+a.stats.topics+' topics';content('<iframe src="/atlas.html?token='+encodeURIComponent(token)+'"></iframe>')}
-async function showNotes(kind){title(kind==='summary'?'Summaries':'Notes');const n=await api('/api/notes');const list=n.notes.filter(x=>x.kind===kind);content('<div class="grid"><div class="card list">'+list.map(x=>'<div class="item" onclick="openNote(\\''+esc(x.name)+'\\')"><strong>'+esc(x.name)+'</strong><br><span class="muted">'+esc(x.mtime||'')+'</span></div>').join('')+'</div><div class="card"><pre id="viewer" class="muted">Select a file</pre></div></div>')}
-async function openNote(name){const n=await api('/api/note?name='+encodeURIComponent(name));document.getElementById('viewer').textContent=n.content}
-async function showJournal(){title('Journal');const j=await api('/api/journal');content('<div class="grid"><div class="card list">'+j.days.map(d=>'<div class="item" onclick="openJournal(\\''+esc(d)+'\\')">'+esc(d)+'</div>').join('')+'</div><div class="card"><div id="viewer" class="muted">Select a day</div></div></div>')}
-async function openJournal(day){const j=await api('/api/journal?day='+encodeURIComponent(day));document.getElementById('viewer').className='journal';document.getElementById('viewer').innerHTML=j.entries.length?j.entries.map(renderJournalEntry).join(''):'<p class="muted">No entries for this day.</p>'}
-showStatus().catch(e=>content('<pre>'+esc(e.message)+'</pre>'));
-</script>
-</body></html>`;
+async function serveWebApp(res, token) {
+  const file = path.join(WEB_DIST_DIR, 'index.html');
+  if (!(await fse.pathExists(file))) {
+    return text(res, 503, 'Dashboard build missing. Run: npm run web:build');
+  }
+  const raw = await fse.readFile(file, 'utf8');
+  const tokenParam = `token=${encodeURIComponent(token || '')}`;
+  return html(
+    res,
+    raw
+      .replaceAll('src="/assets/', `src="/assets/?${tokenParam}&file=`)
+      .replaceAll('href="/assets/', `href="/assets/?${tokenParam}&file=`)
+  );
+}
+
+async function serveWebAsset(res, pathname) {
+  const name = path.basename(pathname);
+  if (!name || name.includes('..')) {
+    return text(res, 404, 'Not found');
+  }
+  const file = path.join(WEB_DIST_DIR, 'assets', name);
+  if (!(await fse.pathExists(file))) return text(res, 404, 'Not found');
+  res.writeHead(200, {
+    'Content-Type': contentType(file),
+    'Cache-Control': 'no-store',
+  });
+  return fse.createReadStream(file).pipe(res);
 }
 
 async function serveAtlasHtml(res) {
@@ -265,7 +253,10 @@ async function startServer() {
       if (!(await authorize(req, url, s))) {
         return text(res, 401, 'Unauthorized');
       }
-      if (url.pathname === '/') return html(res, appHtml());
+      if (url.pathname === '/') return serveWebApp(res, s.web.token);
+      if (url.pathname === '/assets/') {
+        return serveWebAsset(res, url.searchParams.get('file') || '');
+      }
       if (url.pathname === '/atlas.html') return serveAtlasHtml(res);
       if (url.pathname.startsWith('/api/')) return handleApi(req, res, url);
       return text(res, 404, 'Not found');

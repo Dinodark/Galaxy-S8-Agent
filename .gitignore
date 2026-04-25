@@ -10,6 +10,10 @@ logs/
 # deps
 node_modules/
 
+# web build
+web/dist/
+core/web_dist/
+
 # OS / editor
 .DS_Store
 Thumbs.db

@@ -264,10 +264,12 @@ lives in `memory/memory_index.json`.
 
 ## Local web UI
 
-The agent can also serve a read-only web dashboard from the phone for devices
-on the same trusted Wi-Fi/VPN network:
+The agent can also serve a React/Vite web dashboard from the phone for devices
+on the same trusted Wi-Fi/VPN network. On the phone, build the dashboard and
+start the web server:
 
 ```sh
+npm run web:build
 agent-web
 ```
 
@@ -287,8 +289,12 @@ Wi-Fi/VPN network.
 For local development you can run:
 
 ```sh
-npm run web
+npm run web:dev
 ```
+
+This starts the API server and Vite dev server together, then prints a local
+URL with the current token. Open that URL in your browser/Cursor preview and
+edit the dashboard under `web/`.
 
 ## Troubleshooting
 

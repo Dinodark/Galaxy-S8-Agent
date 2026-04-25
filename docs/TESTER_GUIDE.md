@@ -73,6 +73,7 @@ Useful commands:
 Start the read-only dashboard on the phone:
 
 ```sh
+npm run web:build
 agent-web
 ```
 
