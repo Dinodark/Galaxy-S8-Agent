@@ -4,6 +4,7 @@ const { CronExpressionParser } = require('cron-parser');
 const config = require('../../config');
 const { chatCompletion } = require('../llm');
 const journal = require('../journal');
+const settings = require('../settings');
 
 const PROMPT_FILE = path.join(__dirname, '..', 'prompts', 'daily_review.md');
 const SUMMARY_PREFIX = 'summary-';
@@ -82,14 +83,15 @@ async function loadPreviousSummaries(upToN, todayStr) {
 }
 
 async function runReview(chatId, { log = console, force = false } = {}) {
-  const tz = journal.effectiveTz();
+  const s = await settings.getSettings();
+  const tz = await journal.effectiveTz();
   const today = journal.todayStr(tz);
 
   const entries = await journal.readDay(chatId, today);
-  if (!force && entries.length < config.dailyReview.minMessages) {
+  if (!force && entries.length < s.dailyReview.minMessages) {
     return {
       skipped: true,
-      reason: `only ${entries.length} entries (min ${config.dailyReview.minMessages})`,
+      reason: `only ${entries.length} entries (min ${s.dailyReview.minMessages})`,
       today,
       entries: entries.length,
     };
@@ -98,7 +100,7 @@ async function runReview(chatId, { log = console, force = false } = {}) {
   const convo = truncateHead(formatEntries(entries, tz), MAX_JOURNAL_CHARS);
   const notes = await loadLongTermNotes();
   const prev = await loadPreviousSummaries(
-    config.dailyReview.prevDays,
+    s.dailyReview.prevDays,
     today
   );
 
@@ -124,7 +126,7 @@ async function runReview(chatId, { log = console, force = false } = {}) {
     `[daily-review] generating for chat ${chatId} (${entries.length} entries, today=${today})`
   );
 
-  const modelOverride = config.dailyReview.model || null;
+  const modelOverride = s.dailyReview.model || null;
   const resp = await chatCompletion({
     messages,
     model: modelOverride,
@@ -174,21 +176,16 @@ async function hasTodaysSummary(todayStr) {
 }
 
 function startDailyReviewer({ chatIds, onReview, log = console }) {
-  if (!config.dailyReview.enabled) {
-    log.log('[daily-review] disabled via DAILY_REVIEW_ENABLED=false');
-    return () => {};
-  }
   if (!chatIds || chatIds.length === 0) {
     log.warn('[daily-review] no chat ids provided, scheduler not started');
     return () => {};
   }
 
-  const cronExpr = config.dailyReview.cron;
-  const tz = config.dailyReview.tz || journal.systemTz();
-
   let stopped = false;
   let timer = null;
   let catchupTimer = null;
+  let cronExpr = null;
+  let tz = null;
 
   // Catch-up: if the bot just booted AFTER the scheduled fire time for
   // today, and there is no summary-YYYY-MM-DD.md yet, run a missed
@@ -258,8 +255,23 @@ function startDailyReviewer({ chatIds, onReview, log = console }) {
     }, delay);
   }
 
-  schedule();
-  scheduleCatchupIfMissed();
+  settings
+    .getSettings()
+    .then((s) => {
+      if (stopped) return;
+      if (!s.dailyReview.enabled) {
+        log.log('[daily-review] disabled via settings');
+        return;
+      }
+      cronExpr = s.dailyReview.cron;
+      tz = s.dailyReview.tz || journal.systemTz();
+      schedule();
+      scheduleCatchupIfMissed();
+    })
+    .catch((err) => {
+      log.warn('[daily-review] failed to load settings:', err.message);
+    });
+
   return () => {
     stopped = true;
     if (timer) clearTimeout(timer);

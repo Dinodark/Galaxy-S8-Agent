@@ -1,6 +1,7 @@
 const path = require('path');
 const fse = require('fs-extra');
 const config = require('../config');
+const settings = require('./settings');
 
 function systemTz() {
   try {
@@ -10,8 +11,8 @@ function systemTz() {
   }
 }
 
-function effectiveTz() {
-  return (config.dailyReview && config.dailyReview.tz) || systemTz();
+async function effectiveTz() {
+  return (await settings.get('dailyReview.tz')) || systemTz();
 }
 
 function dirFor(chatId) {
@@ -30,7 +31,10 @@ function dateInTz(date, tz) {
 }
 
 function todayStr(tz) {
-  return dateInTz(new Date(), tz || effectiveTz());
+  return dateInTz(
+    new Date(),
+    tz || (config.dailyReview && config.dailyReview.tz) || systemTz()
+  );
 }
 
 function shiftDay(dateStr, daysDelta) {
@@ -41,7 +45,7 @@ function shiftDay(dateStr, daysDelta) {
 }
 
 async function append(chatId, entry) {
-  const dateStr = todayStr();
+  const dateStr = todayStr(await effectiveTz());
   const file = fileFor(chatId, dateStr);
   await fse.ensureDir(dirFor(chatId));
   const record = {

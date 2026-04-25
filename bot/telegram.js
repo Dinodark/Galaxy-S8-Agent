@@ -11,11 +11,10 @@ const memory = require('../core/memory');
 const reminders = require('../core/reminders');
 const journal = require('../core/journal');
 const modes = require('../core/modes');
+const settings = require('../core/settings');
+const runtime = require('../core/runtime');
 const { startBatteryWatcher } = require('../core/watchers/battery');
-const {
-  startDailyReviewer,
-  runReview,
-} = require('../core/watchers/daily_review');
+const { runReview } = require('../core/watchers/daily_review');
 const { isAllowed } = require('./auth');
 
 const SILENT_REACTION = '✍';
@@ -38,6 +37,7 @@ async function setReaction(chatId, messageId, emoji) {
 
 function start() {
   const bot = new TelegramBot(config.telegram.token, { polling: true });
+  let dailyReviewController = null;
 
   bot.on('polling_error', (err) => {
     console.error('[telegram] polling_error:', err.message);
@@ -46,24 +46,20 @@ function start() {
   bot.onText(/^\/start$/, async (msg) => {
     const id = msg.from && msg.from.id;
     if (!isAllowed(id)) return replyUnauthorized(bot, msg);
-    const mode = await modes.getMode(msg.chat.id);
+    const status = await runtime.buildStatus(msg.chat.id);
     await bot.sendMessage(
       msg.chat.id,
-      `Galaxy S8 Agent online.\nYour id: ${id}\nMode: ${mode}\nModel: ${config.openrouter.model}\nShell: ${
+      `Galaxy S8 Agent online.\nYour id: ${id}\nMode: ${status.mode}\nModel: ${config.openrouter.model}\nShell: ${
         config.safety.allowShell ? 'enabled' : 'disabled'
       }\nBattery watch: ${
         config.battery.enabled
           ? `on (<${config.battery.lowThreshold}%)`
           : 'off'
-      }\nSTT: ${
-        stt.isEnabled() ? `on (${config.groq.sttModel})` : `off (${stt.whyDisabled()})`
-      }\nReminders: on (poll ${Math.round(config.reminders.pollIntervalMs / 1000)}s)\nDaily review: ${
-        config.dailyReview.enabled
-          ? `on (cron "${config.dailyReview.cron}", tz=${
-              config.dailyReview.tz || journal.systemTz()
-            })`
+      }\nSTT: ${status.stt.enabled ? `on (${config.groq.sttModel})` : 'off'}\nReminders: on (poll ${Math.round(config.reminders.pollIntervalMs / 1000)}s)\nDaily review: ${
+        status.dailyReview.enabled
+          ? `on (cron "${status.dailyReview.cron}", tz=${status.dailyReview.tz})`
           : 'off'
-      }\n\nCommands:\n/ping — liveness check\n/diag — OpenRouter key status\n/battery — phone battery status\n/reminders — list pending reminders\n/summary — generate today's evening review now\n/silent — capture only, no replies (auto-exits at evening review)\n/chat — normal conversational mode\n/reset — wipe this chat's history`
+      }\n\nCommands:\n/status — runtime status\n/settings — Settings Center buttons\n/set — change a setting by name\n/ping — liveness check\n/diag — OpenRouter key status\n/battery — phone battery status\n/reminders — list pending reminders\n/summary — generate today's evening review now\n/silent — capture only, no replies (auto-exits at evening review)\n/chat — normal conversational mode\n/reset — wipe this chat's history`
     );
   });
 
@@ -126,9 +122,131 @@ function start() {
     }
   });
 
+  bot.onText(/^\/status$/, async (msg) => {
+    if (!isAllowed(msg.from && msg.from.id)) return replyUnauthorized(bot, msg);
+    try {
+      const status = await runtime.buildStatus(msg.chat.id);
+      await bot.sendMessage(msg.chat.id, '```\n' + runtime.formatStatus(status) + '\n```', {
+        parse_mode: 'Markdown',
+      });
+    } catch (err) {
+      await bot.sendMessage(msg.chat.id, 'status error: ' + err.message);
+    }
+  });
+
+  bot.onText(/^\/settings$/, async (msg) => {
+    if (!isAllowed(msg.from && msg.from.id)) return replyUnauthorized(bot, msg);
+    try {
+      await sendSettingsMenu(bot, msg.chat.id);
+    } catch (err) {
+      await bot.sendMessage(msg.chat.id, 'settings error: ' + err.message);
+    }
+  });
+
+  bot.onText(/^\/set(?:\s+(\S+)\s+(.+))?$/, async (msg, match) => {
+    if (!isAllowed(msg.from && msg.from.id)) return replyUnauthorized(bot, msg);
+    const key = match && match[1];
+    const value = match && match[2];
+    if (!key || value == null) {
+      await bot.sendMessage(
+        msg.chat.id,
+        [
+          'Usage:',
+          '/set daily_review_time 22:30',
+          '/set daily_review_tz Europe/Moscow',
+          '/set daily_review_min_messages 1',
+          '/set daily_review_model qwen/qwen-2.5-72b-instruct',
+          '/set stt_enabled false',
+          '/set stt_language ru',
+        ].join('\n')
+      );
+      return;
+    }
+    try {
+      const updated = await settings.setAlias(key, value, actorFromMsg(msg));
+      if (key.startsWith('daily_review') && dailyReviewController) {
+        dailyReviewController.restart();
+      }
+      await bot.sendMessage(
+        msg.chat.id,
+        `Updated ${key}: ${updated === '' ? '(empty)' : String(updated)}`
+      );
+    } catch (err) {
+      await bot.sendMessage(msg.chat.id, 'set error: ' + err.message);
+    }
+  });
+
+  bot.on('callback_query', async (query) => {
+    const userId = query.from && query.from.id;
+    const msg = query.message;
+    if (!msg || !query.data || !query.data.startsWith('settings:')) return;
+    if (!isAllowed(userId)) {
+      await bot.answerCallbackQuery(query.id, { text: 'Unauthorized' });
+      return;
+    }
+
+    const action = query.data.slice('settings:'.length);
+    try {
+      if (action === 'toggle_mode') {
+        const current = await modes.getMode(msg.chat.id);
+        const next = current === 'silent' ? 'chat' : 'silent';
+        await modes.setMode(msg.chat.id, next, actorFromCallback(query));
+        await bot.answerCallbackQuery(query.id, { text: `Mode: ${next}` });
+      } else if (action === 'toggle_stt') {
+        const current = await settings.get('stt.enabled');
+        await settings.set('stt.enabled', !current, actorFromCallback(query));
+        await bot.answerCallbackQuery(query.id, {
+          text: `STT: ${!current ? 'on' : 'off'}`,
+        });
+      } else if (action === 'toggle_daily') {
+        const current = await settings.get('dailyReview.enabled');
+        await settings.set('dailyReview.enabled', !current, actorFromCallback(query));
+        if (dailyReviewController) dailyReviewController.restart();
+        await bot.answerCallbackQuery(query.id, {
+          text: `Daily review: ${!current ? 'on' : 'off'}`,
+        });
+      } else if (action === 'summary_now') {
+        await bot.answerCallbackQuery(query.id, { text: 'Generating summary...' });
+        await bot.sendChatAction(msg.chat.id, 'typing');
+        const result = await runReview(msg.chat.id, { force: true });
+        if (result.skipped) {
+          await bot.sendMessage(msg.chat.id, `Nothing to summarize yet (${result.reason}).`);
+        } else {
+          await bot.sendMessage(
+            msg.chat.id,
+            `🌙 Вечерняя сводка — ${result.today} (${result.entries} сообщений, ${result.model})`
+          );
+          await bot.sendDocument(msg.chat.id, result.file);
+        }
+      } else if (action === 'status') {
+        await bot.answerCallbackQuery(query.id);
+        const status = await runtime.buildStatus(msg.chat.id);
+        await bot.sendMessage(msg.chat.id, '```\n' + runtime.formatStatus(status) + '\n```', {
+          parse_mode: 'Markdown',
+        });
+      } else if (action === 'hint_time') {
+        await bot.answerCallbackQuery(query.id, { text: 'Use /set daily_review_time 22:30' });
+        await bot.sendMessage(
+          msg.chat.id,
+          'Чтобы поменять время вечерней сводки, напиши: `/set daily_review_time 22:30`',
+          { parse_mode: 'Markdown' }
+        );
+      } else {
+        await bot.answerCallbackQuery(query.id, { text: 'Unknown action' });
+      }
+
+      if (action !== 'summary_now' && action !== 'status' && action !== 'hint_time') {
+        await editSettingsMenu(bot, msg);
+      }
+    } catch (err) {
+      console.warn('[settings] callback error:', err.message);
+      await bot.answerCallbackQuery(query.id, { text: err.message.slice(0, 200) });
+    }
+  });
+
   bot.onText(/^\/silent$/, async (msg) => {
     if (!isAllowed(msg.from && msg.from.id)) return replyUnauthorized(bot, msg);
-    await modes.setMode(msg.chat.id, 'silent');
+    await modes.setMode(msg.chat.id, 'silent', actorFromMsg(msg));
     await bot.sendMessage(
       msg.chat.id,
       'Silent mode on. Пиши спокойно — ничего не отвечаю, всё уйдёт в журнал. До вечернего ревью или /chat.'
@@ -137,7 +255,7 @@ function start() {
 
   bot.onText(/^\/chat$/, async (msg) => {
     if (!isAllowed(msg.from && msg.from.id)) return replyUnauthorized(bot, msg);
-    await modes.setMode(msg.chat.id, 'chat');
+    await modes.setMode(msg.chat.id, 'chat', actorFromMsg(msg));
     await bot.sendMessage(msg.chat.id, 'Chat mode on.');
   });
 
@@ -189,7 +307,8 @@ function start() {
       .append(chatId, { source: 'user', text: userMessage, via })
       .catch((e) => console.warn('[journal] append user failed:', e.message));
     if (messageId) {
-      await setReaction(chatId, messageId, SILENT_REACTION);
+      const reaction = (await settings.get('silent.reaction')) || SILENT_REACTION;
+      await setReaction(chatId, messageId, reaction);
     }
   }
 
@@ -262,18 +381,19 @@ function start() {
 
     const chatId = msg.chat.id;
 
-    if (!stt.isEnabled()) {
+    if (!(await stt.isEnabled())) {
       await bot.sendMessage(
         chatId,
-        `🎙 Received ${kind}, but STT is off: ${stt.whyDisabled()}`
+        `🎙 Received ${kind}, but STT is off: ${await stt.whyDisabled()}`
       );
       return;
     }
 
-    if (duration && duration > config.stt.maxDurationSec) {
+    const maxDurationSec = await settings.get('stt.maxDurationSec');
+    if (duration && duration > maxDurationSec) {
       await bot.sendMessage(
         chatId,
-        `🎙 ${kind} is ${duration}s — longer than STT_MAX_DURATION_SEC=${config.stt.maxDurationSec}. Ignored.`
+        `🎙 ${kind} is ${duration}s — longer than stt.maxDurationSec=${maxDurationSec}. Ignored.`
       );
       return;
     }
@@ -383,18 +503,21 @@ function start() {
     },
   });
 
-  startDailyReviewer({
+  dailyReviewController = runtime.createDailyReviewController({
     chatIds: config.telegram.allowedUserIds,
     onReview: async (chatId, result) => {
       try {
         const wasSilent = (await modes.getMode(chatId)) === 'silent';
-        if (wasSilent) await modes.setMode(chatId, 'chat');
+        const autoExit = await settings.get('silent.autoExitOnDailyReview');
+        if (wasSilent && autoExit) {
+          await modes.setMode(chatId, 'chat', { type: 'daily-review' });
+        }
         await bot.sendMessage(
           chatId,
           `🌙 Вечерняя сводка — ${result.today} (${result.entries} сообщений, ${result.model})`
         );
         await bot.sendDocument(chatId, result.file);
-        if (wasSilent) {
+        if (wasSilent && autoExit) {
           await bot.sendMessage(
             chatId,
             'Silent mode off. Давай обсудим — что зацепило или с чем поспорить?'
@@ -408,11 +531,89 @@ function start() {
       }
     },
   });
+  dailyReviewController.start();
 
   console.log(
     `[bot] Galaxy S8 Agent started. Model=${config.openrouter.model} AllowShell=${config.safety.allowShell}`
   );
   return bot;
+}
+
+function actorFromMsg(msg) {
+  return {
+    type: 'telegram',
+    userId: msg.from && msg.from.id,
+    username: msg.from && msg.from.username,
+    chatId: msg.chat && msg.chat.id,
+  };
+}
+
+function actorFromCallback(query) {
+  return {
+    type: 'telegram_callback',
+    userId: query.from && query.from.id,
+    username: query.from && query.from.username,
+    chatId: query.message && query.message.chat && query.message.chat.id,
+  };
+}
+
+async function settingsKeyboard(chatId) {
+  const s = await runtime.buildStatus(chatId);
+  return {
+    inline_keyboard: [
+      [
+        {
+          text: s.mode === 'silent' ? 'Mode: silent' : 'Mode: chat',
+          callback_data: 'settings:toggle_mode',
+        },
+      ],
+      [
+        {
+          text: `STT: ${s.stt.configured ? 'on' : 'off'}`,
+          callback_data: 'settings:toggle_stt',
+        },
+        {
+          text: `Daily: ${s.dailyReview.enabled ? 'on' : 'off'}`,
+          callback_data: 'settings:toggle_daily',
+        },
+      ],
+      [
+        { text: 'Summary now', callback_data: 'settings:summary_now' },
+        { text: 'Status', callback_data: 'settings:status' },
+      ],
+      [{ text: 'Set review time', callback_data: 'settings:hint_time' }],
+    ],
+  };
+}
+
+async function settingsMenuText(chatId) {
+  const s = await runtime.buildStatus(chatId);
+  const next = s.dailyReview.next ? s.dailyReview.next.local : 'disabled';
+  return [
+    'Settings Center',
+    '',
+    `Mode: ${s.mode}`,
+    `STT: ${s.stt.configured ? 'on' : 'off'} (${s.stt.language})`,
+    `Daily review: ${s.dailyReview.enabled ? 'on' : 'off'}`,
+    `Review time: ${s.dailyReview.cron} (${s.dailyReview.tz})`,
+    `Next: ${next}`,
+    '',
+    'Точные правки: `/set daily_review_time 22:30`',
+  ].join('\n');
+}
+
+async function sendSettingsMenu(bot, chatId) {
+  await bot.sendMessage(chatId, await settingsMenuText(chatId), {
+    reply_markup: await settingsKeyboard(chatId),
+  });
+}
+
+async function editSettingsMenu(bot, msg) {
+  await bot.editMessageText(await settingsMenuText(msg.chat.id), {
+    chat_id: msg.chat.id,
+    message_id: msg.message_id,
+    reply_markup: await settingsKeyboard(msg.chat.id),
+  });
 }
 
 async function replyUnauthorized(bot, msg) {

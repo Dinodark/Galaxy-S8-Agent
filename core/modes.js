@@ -1,6 +1,7 @@
 const path = require('path');
 const fse = require('fs-extra');
 const config = require('../config');
+const settings = require('./settings');
 
 const FILE = path.join(config.paths.memoryDir, 'modes.json');
 const VALID_MODES = new Set(['chat', 'silent']);
@@ -30,15 +31,20 @@ async function persist() {
 }
 
 async function getMode(chatId) {
+  if (await settings.has(`chats.${chatId}.mode`)) {
+    return settings.getChatMode(chatId);
+  }
+
   await load();
   const entry = cache.chatIds[String(chatId)];
   return (entry && entry.mode) || DEFAULT_MODE;
 }
 
-async function setMode(chatId, mode) {
+async function setMode(chatId, mode, actor = {}) {
   if (!VALID_MODES.has(mode)) {
     throw new Error(`unknown mode: ${mode}`);
   }
+  await settings.setChatMode(chatId, mode, actor);
   await load();
   cache.chatIds[String(chatId)] = {
     mode,

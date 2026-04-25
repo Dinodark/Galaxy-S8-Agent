@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const config = require('../config');
+const settings = require('./settings');
 
 class STTError extends Error {
   constructor(message, { status, raw } = {}) {
@@ -11,12 +12,12 @@ class STTError extends Error {
   }
 }
 
-function isEnabled() {
-  return config.stt.enabled && !!config.groq.apiKey;
+async function isEnabled() {
+  return !!(await settings.get('stt.enabled')) && !!config.groq.apiKey;
 }
 
-function whyDisabled() {
-  if (!config.stt.enabled) return 'STT_ENABLED is false in .env';
+async function whyDisabled() {
+  if (!(await settings.get('stt.enabled'))) return 'STT is disabled in settings';
   if (!config.groq.apiKey) return 'GROQ_API_KEY is not set in .env';
   return null;
 }
@@ -47,8 +48,8 @@ function normalizeFilename(filePath) {
 }
 
 async function transcribeFile(filePath, { language } = {}) {
-  if (!isEnabled()) {
-    throw new STTError(`STT disabled: ${whyDisabled()}`);
+  if (!(await isEnabled())) {
+    throw new STTError(`STT disabled: ${await whyDisabled()}`);
   }
 
   if (typeof fetch !== 'function' || typeof FormData !== 'function' || typeof Blob !== 'function') {
@@ -62,7 +63,7 @@ async function transcribeFile(filePath, { language } = {}) {
   form.append('file', new Blob([buf]), normalizeFilename(filePath));
   form.append('model', config.groq.sttModel);
   form.append('response_format', 'json');
-  const lang = language || config.stt.language;
+  const lang = language || (await settings.get('stt.language'));
   if (lang) form.append('language', lang);
 
   let res;

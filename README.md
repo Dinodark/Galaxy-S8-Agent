@@ -21,14 +21,16 @@ index.js
    │     └─ memory.js     list_notes / read_note / write_note
    ├─ core/reminders.js   persistent time-based reminders + scheduler
    ├─ core/journal.js     raw per-chat per-day conversation log (jsonl)
+   ├─ core/settings.js    Settings Center (memory/settings.json + audit)
+   ├─ core/runtime.js     shared status + watcher controllers (web-ready)
    ├─ core/modes.js       per-chat mode (chat | silent) persisted
    └─ core/watchers/      proactive background tasks
       ├─ battery.js       low-battery DM alert
       └─ daily_review.js  end-of-day reflective summary (cron-scheduled)
 ```
 
-Runtime data lives under `memory/` (chat histories + long-term notes) and
-`logs/`. Both are gitignored.
+Runtime data lives under `memory/` (chat histories, long-term notes,
+settings, audit logs) and `logs/`. Both are gitignored.
 
 ## Setup (dev machine)
 
@@ -96,9 +98,12 @@ If `GROQ_API_KEY` is set, the bot accepts:
 Flow: Telegram → download to `memory/tmp/` → Groq Whisper
 (`whisper-large-v3-turbo` by default) → bot echoes the transcription
 back as `🎙 <text>` → feeds it into the agent as a normal user
-message. Temp files are auto-deleted after transcription.
+message. In `/silent` mode, the transcription echo is skipped and only
+a reaction is added to the original Telegram message. Temp files are
+auto-deleted after transcription.
 
-Tunables (`.env`):
+Tunables (prefer `/settings` or `/set`; `.env` is only first-boot
+fallback):
 
 - `GROQ_STT_MODEL` — default `whisper-large-v3-turbo`. Use
   `whisper-large-v3` for slightly better quality at ~3x the latency.
@@ -112,9 +117,44 @@ Tunables (`.env`):
 Set `GROQ_API_KEY=` (empty) to disable entirely; the bot will politely
 say STT is off when you send a voice note.
 
+## Settings Center
+
+Secrets and bootstrap values stay in `.env`:
+
+- `TELEGRAM_BOT_TOKEN`
+- `OPENROUTER_API_KEY`
+- `GROQ_API_KEY`
+- `ALLOWED_TELEGRAM_USER_IDS`
+- `ALLOW_SHELL`
+
+Behavior is controlled by the Settings Center and persisted to
+`memory/settings.json`. Every change is appended to
+`memory/settings_audit.jsonl`. This gives the Telegram UI and a future
+web UI the same backend: both can call the same core settings/runtime
+helpers.
+
+Useful commands:
+
+- `/settings` — inline buttons for common toggles (mode, STT, daily
+  review, status, summary now).
+- `/status` — full runtime status: mode, STT, next daily review,
+  journal entries today, reminders, battery watcher.
+- `/set daily_review_time 22:30` — set the daily review time.
+- `/set daily_review_tz Europe/Moscow` — set timezone.
+- `/set daily_review_min_messages 1` — change skip threshold.
+- `/set daily_review_model qwen/qwen-2.5-72b-instruct` — use a model
+  just for evening reviews.
+- `/set stt_enabled false` and `/set stt_language ru` — STT behavior.
+
+Changing daily-review settings through `/settings` or `/set` restarts
+the scheduler in-process; no Termux restart is needed.
+
 ## Commands in Telegram
 
 - `/start` — status + your Telegram id
+- `/status` — full runtime status
+- `/settings` — Settings Center buttons
+- `/set ...` — change supported settings by name
 - `/ping` — liveness check
 - `/diag` — check OpenRouter key status (credits, limits)
 - `/battery` — current phone battery (Termux only)
@@ -160,9 +200,9 @@ self-disabling when its prerequisites are missing (e.g. no `termux-api`).
   1. Load today's journal (`memory/journal/<chatId>/YYYY-MM-DD.jsonl`) —
      every user and agent message timestamped, incl. transcribed voice.
   2. Load long-term notes from `memory/notes/` (diary, ideas, work, …).
-  3. Load the last `DAILY_REVIEW_PREV_DAYS` evening summaries for
+  3. Load the last configured number of evening summaries for
      continuity.
-  4. Ask the LLM (optionally a stronger model via `DAILY_REVIEW_MODEL`)
+  4. Ask the LLM (optionally a stronger model via Settings Center)
      for a reflective markdown summary: `Главное за день`, `Связи`,
      `Мои мысли`, `На завтра`.
   5. Save to `memory/notes/summary-YYYY-MM-DD.md` (so the agent sees it
@@ -170,8 +210,9 @@ self-disabling when its prerequisites are missing (e.g. no `termux-api`).
 
   Tweak the tone/structure by editing `core/prompts/daily_review.md`.
   Trigger an early summary any time with `/summary`. Days with fewer
-  than `DAILY_REVIEW_MIN_MESSAGES` journal entries are skipped silently
-  so empty days don't spam.
+  than the configured `dailyReview.minMessages` journal entries are
+  skipped silently so empty days don't spam. Use `/set daily_review_time
+  22:30` or `/settings` to change the schedule without restarting.
 
 Anything else goes through the agent.
 
