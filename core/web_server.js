@@ -9,6 +9,24 @@ const atlas = require('./memory_atlas');
 const memory = require('./memory');
 const journal = require('./journal');
 
+function debugLog(runId, hypothesisId, location, message, data = {}) {
+  const safeData = { ...data };
+  if (safeData.token) safeData.token = '[redacted]';
+  const payload = {
+    sessionId: '047796',
+    runId,
+    hypothesisId,
+    location,
+    message,
+    data: safeData,
+    timestamp: Date.now(),
+  };
+  // #region agent log
+  fetch('http://127.0.0.1:7933/ingest/05d097ed-198e-47e6-8b77-1f7ddf4809a1',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'047796'},body:JSON.stringify(payload)}).catch(()=>{});
+  // #endregion
+  console.log('[debug:047796]', message, JSON.stringify(safeData));
+}
+
 function json(res, status, data) {
   const body = JSON.stringify(data, null, 2);
   res.writeHead(status, {
@@ -75,6 +93,10 @@ async function listNotesDetailed() {
 async function handleApi(req, res, url) {
   const pathname = url.pathname;
   const chatId = firstOwnerChatId();
+  debugLog('pre-fix-1', 'H5', 'core/web_server.js:handleApi', 'api route start', {
+    pathname,
+    hasChatId: !!chatId,
+  });
 
   if (pathname === '/api/status') {
     return json(res, 200, await runtime.buildStatus(chatId));
@@ -82,6 +104,15 @@ async function handleApi(req, res, url) {
 
   if (pathname === '/api/settings') {
     return json(res, 200, await settings.getPublicSettings());
+  }
+
+  if (pathname === '/api/debug-client') {
+    const event = url.searchParams.get('event') || 'unknown';
+    debugLog('pre-fix-1', 'H3', 'core/web_server.js:client-debug', 'client event', {
+      event,
+      ua: req.headers['user-agent'],
+    });
+    return json(res, 200, { ok: true });
   }
 
   if (pathname === '/api/atlas') {
@@ -138,6 +169,14 @@ h1{font-size:17px;margin:0 0 16px}.nav button{display:block;width:100%;text-alig
 <button onclick="showSettings()">Settings</button>
 </div><p class="muted">Read-only local UI. Keep this URL private.</p></aside><main class="main"><div class="top"><strong id="title">Status</strong><span class="muted" id="state"></span></div><div class="content" id="content"></div></main></div>
 <script>
+(function(){
+  function ping(event){try{fetch('/api/debug-client?event='+encodeURIComponent(event)+'&token='+encodeURIComponent(new URL(location.href).searchParams.get('token')||''),{cache:'no-store'}).catch(function(){});}catch(e){}}
+  window.onerror=function(message,source,line,column){ping('error:'+String(message).slice(0,80)+':'+line+':'+column);};
+  window.onunhandledrejection=function(event){ping('rejection:'+String(event.reason&&event.reason.message||event.reason||'unknown').slice(0,80));};
+  ping('bootstrap');
+})();
+</script>
+<script>
 const token=new URL(location.href).searchParams.get('token')||'';
 const api=(p)=>fetch(p+(p.includes('?')?'&':'?')+'token='+encodeURIComponent(token)).then(r=>{if(!r.ok)throw new Error(r.status+' '+r.statusText);return r.json()});
 const title=t=>document.getElementById('title').textContent=t;
@@ -170,6 +209,21 @@ async function startServer() {
   const s = await settings.getSettings();
   const host = s.web.host || '0.0.0.0';
   const port = s.web.port || 8787;
+  debugLog('pre-fix-1', 'H1,H2', 'core/web_server.js:startServer', 'server settings loaded', {
+    enabled: !!s.web.enabled,
+    host,
+    port,
+    hasToken: !!s.web.token,
+    localIp: localIp(),
+    interfaces: Object.fromEntries(
+      Object.entries(os.networkInterfaces()).map(([name, entries]) => [
+        name,
+        (entries || [])
+          .filter((n) => n.family === 'IPv4')
+          .map((n) => ({ address: n.address, internal: n.internal })),
+      ])
+    ),
+  });
   if (!s.web.enabled) {
     console.log('[web] disabled in settings');
     return null;
@@ -181,14 +235,38 @@ async function startServer() {
   const server = http.createServer(async (req, res) => {
     try {
       const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
-      if (!(await authorize(req, url, s))) {
+      debugLog('pre-fix-1', 'H1,H2,H4,H5', 'core/web_server.js:request', 'request received', {
+        method: req.method,
+        pathname: url.pathname,
+        host: req.headers.host,
+        remoteAddress: req.socket && req.socket.remoteAddress,
+        hasQueryToken: url.searchParams.has('token'),
+        hasHeaderToken: !!req.headers['x-agent-token'],
+        ua: req.headers['user-agent'],
+      });
+      const authed = await authorize(req, url, s);
+      debugLog('pre-fix-1', 'H4', 'core/web_server.js:authorize', 'auth result', {
+        pathname: url.pathname,
+        authed,
+      });
+      if (!authed) {
         return text(res, 401, 'Unauthorized');
       }
-      if (url.pathname === '/') return html(res, appHtml());
+      if (url.pathname === '/') {
+        debugLog('pre-fix-1', 'H3', 'core/web_server.js:root', 'serving app html', {
+          htmlLength: appHtml().length,
+        });
+        return html(res, appHtml());
+      }
       if (url.pathname === '/atlas.html') return serveAtlasHtml(res);
       if (url.pathname.startsWith('/api/')) return handleApi(req, res, url);
       return text(res, 404, 'Not found');
     } catch (err) {
+      debugLog('pre-fix-1', 'H5', 'core/web_server.js:request-error', 'request error', {
+        name: err.name,
+        message: err.message,
+        stack: String(err.stack || '').slice(0, 500),
+      });
       console.error('[web] request error:', err);
       return json(res, 500, { error: err.message });
     }
@@ -196,6 +274,11 @@ async function startServer() {
 
   await new Promise((resolve) => server.listen(port, host, resolve));
   const ip = localIp() || 'PHONE_IP';
+  debugLog('pre-fix-1', 'H1,H2', 'core/web_server.js:listening', 'server listening', {
+    host,
+    port,
+    ip,
+  });
   console.log(`[web] listening on http://${ip}:${port}/?token=${s.web.token}`);
   return server;
 }

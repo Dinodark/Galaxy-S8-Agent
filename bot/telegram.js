@@ -21,6 +21,24 @@ const { isAllowed } = require('./auth');
 
 const SILENT_REACTION = '✍';
 
+function debugLog(runId, hypothesisId, location, message, data = {}) {
+  const safeData = { ...data };
+  if (safeData.token) safeData.token = '[redacted]';
+  const payload = {
+    sessionId: '047796',
+    runId,
+    hypothesisId,
+    location,
+    message,
+    data: safeData,
+    timestamp: Date.now(),
+  };
+  // #region agent log
+  fetch('http://127.0.0.1:7933/ingest/05d097ed-198e-47e6-8b77-1f7ddf4809a1',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'047796'},body:JSON.stringify(payload)}).catch(()=>{});
+  // #endregion
+  console.log('[debug:047796]', message, JSON.stringify(safeData));
+}
+
 async function setReaction(chatId, messageId, emoji) {
   try {
     await axios.post(
@@ -165,6 +183,13 @@ function start() {
       const s = await settings.getSettings();
       const ip = localIp();
       const host = ip || 'PHONE_IP';
+      debugLog('pre-fix-1', 'H2,H4', 'bot/telegram.js:/web', 'web command url generated', {
+        chatType: msg.chat.type,
+        ip,
+        port: s.web.port || 8787,
+        webEnabled: !!s.web.enabled,
+        hasToken: !!s.web.token,
+      });
       const url = `http://${host}:${s.web.port || 8787}/?token=${s.web.token}`;
       const lines = [
         'Local web UI:',
