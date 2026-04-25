@@ -16,6 +16,16 @@ async function getSystemPrompt() {
 async function ensureHistorySeeded(chatId) {
   const history = await memory.loadHistory(chatId);
   const sys = await getSystemPrompt();
+  console.log('[debug:047796] current system prompt file', {
+    chatId,
+    chars: sys.length,
+    reminderAddIndex: sys.indexOf('reminder_add'),
+    reminderListIndex: sys.indexOf('reminder_list'),
+    reminderSnippet: sys.slice(
+      Math.max(0, sys.indexOf('reminder') - 80),
+      sys.indexOf('reminder') < 0 ? 0 : sys.indexOf('reminder') + 180
+    ),
+  });
   const existingSystem = history[0] && history[0].role === 'system'
     ? history[0].content || ''
     : '';
@@ -103,6 +113,14 @@ async function runAgent({ chatId, userMessage }) {
   let history = await memory.appendToHistory(chatId, newMessages);
 
   const toolSchemas = tools.listSchemas();
+  console.log('[debug:047796] tool schemas before LLM', {
+    chatId,
+    toolCount: toolSchemas.length,
+    hasReminderAdd: toolSchemas.some((t) => t.function && t.function.name === 'reminder_add'),
+    reminderTools: toolSchemas
+      .map((t) => t.function && t.function.name)
+      .filter((name) => name && name.startsWith('reminder_')),
+  });
   const transcript = [];
   const toolCtx = { chatId };
 
@@ -110,6 +128,14 @@ async function runAgent({ chatId, userMessage }) {
     const assistantMsg = await chatCompletion({
       messages: withRuntimeContext(history),
       tools: toolSchemas,
+    });
+    console.log('[debug:047796] LLM response', {
+      chatId,
+      step,
+      hasToolCalls: !!(assistantMsg.tool_calls && assistantMsg.tool_calls.length),
+      toolCallNames: (assistantMsg.tool_calls || []).map((c) => c.function && c.function.name),
+      contentLooksLikeJson: String(assistantMsg.content || '').trim().startsWith('```json'),
+      contentPreview: String(assistantMsg.content || '').slice(0, 260),
     });
     // #region agent log
     fetch('http://127.0.0.1:7933/ingest/05d097ed-198e-47e6-8b77-1f7ddf4809a1',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'047796'},body:JSON.stringify({sessionId:'047796',runId:'pre-fix',hypothesisId:'H1,H2',location:'core/agent.js:after-chatCompletion',message:'assistant response from LLM',data:{chatId,step,hasToolCalls:!!(assistantMsg.tool_calls&&assistantMsg.tool_calls.length),toolCallNames:(assistantMsg.tool_calls||[]).map((c)=>c.function&&c.function.name),contentPreview:String(assistantMsg.content||'').slice(0,500)},timestamp:Date.now()})}).catch(()=>{});
