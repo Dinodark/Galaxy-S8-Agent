@@ -61,15 +61,21 @@ curl -fsSL https://raw.githubusercontent.com/Dinodark/Galaxy-S8-Agent/main/insta
 ```
 
 The installer will install packages, clone/update the repo, run `npm install`,
-ask for keys, create `.env`, write `memory/settings.json`, and create helper
-commands:
+ask for keys, create `.env`, write `memory/settings.json`, create helper
+commands, and start both the bot and web UI:
 
+- `agent-up` — start the bot and web UI together
+- `agent-down` — stop the bot and web UI together
 - `agent-start` — start the bot in tmux
 - `agent-stop` — stop the bot
 - `agent-logs` — attach to logs
-- `agent-update` — pull updates and reinstall dependencies
+- `agent-update` — pull updates, install dependencies, run doctor, restart bot/web
 - `agent-doctor` — run environment checks
 - `agent-web` — start the local web UI in tmux
+
+After setup, send `/web` to the bot to get the dashboard URL for your local
+Wi-Fi/VPN network. If you need to start everything again later, run `agent-up`.
+To install without auto-starting, run with `GALAXY_AGENT_AUTO_START=0`.
 
 Prepare these values before running setup:
 

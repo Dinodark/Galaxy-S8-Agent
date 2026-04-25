@@ -4,6 +4,7 @@ set -eu
 REPO_URL="${GALAXY_AGENT_REPO_URL:-https://github.com/Dinodark/Galaxy-S8-Agent.git}"
 APP_DIR="${GALAXY_AGENT_DIR:-$HOME/Galaxy-S8-Agent}"
 SESSION_NAME="${GALAXY_AGENT_SESSION:-galaxy-agent}"
+AUTO_START="${GALAXY_AGENT_AUTO_START:-1}"
 
 info() { printf '\033[1;34m[agent-install]\033[0m %s\n' "$*"; }
 warn() { printf '\033[1;33m[agent-install]\033[0m %s\n' "$*"; }
@@ -39,10 +40,20 @@ cat > "$PREFIX/bin/agent-start" <<EOF
 cd "$APP_DIR"
 GALAXY_AGENT_SESSION="$SESSION_NAME" sh scripts/start.sh "\$@"
 EOF
+cat > "$PREFIX/bin/agent-up" <<EOF
+#!/data/data/com.termux/files/usr/bin/sh
+cd "$APP_DIR"
+GALAXY_AGENT_SESSION="$SESSION_NAME" GALAXY_AGENT_WEB_SESSION="galaxy-agent-web" sh scripts/start_all.sh "\$@"
+EOF
 cat > "$PREFIX/bin/agent-stop" <<EOF
 #!/data/data/com.termux/files/usr/bin/sh
 cd "$APP_DIR"
 GALAXY_AGENT_SESSION="$SESSION_NAME" sh scripts/stop.sh "\$@"
+EOF
+cat > "$PREFIX/bin/agent-down" <<EOF
+#!/data/data/com.termux/files/usr/bin/sh
+cd "$APP_DIR"
+GALAXY_AGENT_SESSION="$SESSION_NAME" GALAXY_AGENT_WEB_SESSION="galaxy-agent-web" sh scripts/stop_all.sh "\$@"
 EOF
 cat > "$PREFIX/bin/agent-logs" <<EOF
 #!/data/data/com.termux/files/usr/bin/sh
@@ -52,7 +63,7 @@ EOF
 cat > "$PREFIX/bin/agent-update" <<EOF
 #!/data/data/com.termux/files/usr/bin/sh
 cd "$APP_DIR"
-GALAXY_AGENT_SESSION="$SESSION_NAME" sh scripts/update.sh "\$@"
+GALAXY_AGENT_SESSION="$SESSION_NAME" GALAXY_AGENT_WEB_SESSION="galaxy-agent-web" sh scripts/update_restart.sh "\$@"
 EOF
 cat > "$PREFIX/bin/agent-doctor" <<EOF
 #!/data/data/com.termux/files/usr/bin/sh
@@ -64,7 +75,7 @@ cat > "$PREFIX/bin/agent-web" <<EOF
 cd "$APP_DIR"
 GALAXY_AGENT_WEB_SESSION="galaxy-agent-web" sh scripts/web.sh "\$@"
 EOF
-chmod +x "$PREFIX/bin/agent-start" "$PREFIX/bin/agent-stop" "$PREFIX/bin/agent-logs" "$PREFIX/bin/agent-update" "$PREFIX/bin/agent-doctor" "$PREFIX/bin/agent-web"
+chmod +x "$PREFIX/bin/agent-start" "$PREFIX/bin/agent-up" "$PREFIX/bin/agent-stop" "$PREFIX/bin/agent-down" "$PREFIX/bin/agent-logs" "$PREFIX/bin/agent-update" "$PREFIX/bin/agent-doctor" "$PREFIX/bin/agent-web"
 
 if [ ! -f "$APP_DIR/.env" ]; then
   info "Running first-time setup..."
@@ -76,8 +87,18 @@ fi
 info "Running doctor..."
 (cd "$APP_DIR" && npm run doctor || true)
 
+if [ "$AUTO_START" = "1" ]; then
+  info "Starting bot and web UI..."
+  (cd "$APP_DIR" && GALAXY_AGENT_SESSION="$SESSION_NAME" GALAXY_AGENT_WEB_SESSION="galaxy-agent-web" sh scripts/start_all.sh || true)
+else
+  warn "Auto-start is disabled. Run 'agent-up' when you are ready."
+fi
+
 info "Done."
-info "Start the bot with: agent-start"
-info "Start web UI with: agent-web"
+info "Start everything with: agent-up"
+info "Stop everything with:  agent-down"
+info "Bot only:            agent-start"
+info "Web UI only:         agent-web"
 info "Watch logs with:  agent-logs"
-info "Update later with: agent-update"
+info "Update later with: agent-update  (or use Update in the web panel)"
+info "Then send /web to the bot to get the dashboard URL."

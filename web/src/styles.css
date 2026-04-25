@@ -407,6 +407,19 @@ h1 {
   min-height: calc(100vh - 84px);
 }
 
+.split-page {
+  display: grid;
+  grid-template-columns: 300px minmax(0, 1fr);
+  gap: 14px;
+  min-height: calc(100vh - 84px);
+}
+
+.split-page .list-page {
+  min-height: 0;
+  max-height: calc(100vh - 84px);
+  overflow: auto;
+}
+
 .item {
   display: block;
   width: 100%;
@@ -424,6 +437,10 @@ h1 {
 }
 
 .item:hover {
+  background: var(--color-surface-hover);
+}
+
+.item.active {
   background: var(--color-surface-hover);
 }
 
@@ -509,6 +526,56 @@ iframe {
   color: var(--text);
   font-size: 14px;
   line-height: 1.5;
+}
+
+.desktop-reader {
+  min-width: 0;
+}
+
+.reader-pane,
+.reader-empty {
+  min-height: calc(100vh - 84px);
+}
+
+.reader-pane {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  padding: 0;
+  overflow: hidden;
+}
+
+.reader-pane-top {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 14px 16px;
+  background: var(--color-surface);
+}
+
+.reader-pane-top span {
+  color: var(--color-muted);
+  font-size: 12px;
+}
+
+.reader-pane-body {
+  overflow: auto;
+  padding: 18px;
+}
+
+.reader-pane-body pre {
+  max-width: 920px;
+  margin: 0 auto;
+  font-size: 15px;
+  line-height: 1.65;
+}
+
+.reader-pane-body .journal {
+  max-width: 920px;
+  margin: 0 auto;
+}
+
+.modal-backdrop.mobile-reader {
+  display: none;
 }
 
 .modal-backdrop {
@@ -629,6 +696,23 @@ iframe {
 
   .list-page {
     min-height: auto;
+  }
+
+  .split-page {
+    display: block;
+    min-height: auto;
+  }
+
+  .split-page .list-page {
+    max-height: none;
+  }
+
+  .desktop-reader {
+    display: none;
+  }
+
+  .modal-backdrop.mobile-reader {
+    display: block;
   }
 
   .hero {

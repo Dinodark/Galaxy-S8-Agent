@@ -30,18 +30,22 @@ curl -fsSL https://raw.githubusercontent.com/Dinodark/Galaxy-S8-Agent/main/insta
 ```
 
 Answer the setup questions. Secrets are saved to `.env`; behavior settings
-are saved to `memory/settings.json`.
+are saved to `memory/settings.json`. At the end, the installer starts both the
+Telegram bot and the local web panel.
 
 ## 4. Start and update
 
 ```sh
-agent-start
+agent-up
 agent-logs
-agent-stop
+agent-down
 agent-update
 agent-doctor
-agent-web
 ```
+
+`agent-up` starts both the Telegram bot and the local web panel. `agent-down`
+stops both. `agent-start` and `agent-web` are still available if you want to
+start only one process.
 
 Detach from logs with `Ctrl-b`, then `d`.
 
@@ -70,7 +74,8 @@ Useful commands:
 
 ## 6. Open the local web UI
 
-Start the read-only dashboard on the phone:
+If you used `agent-up`, the dashboard server is already running. If you only
+started the bot, start the dashboard on the phone:
 
 ```sh
 agent-web

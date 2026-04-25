@@ -13,7 +13,7 @@ const navItems = [
   ['update', 'Update'],
 ];
 
-const PALETTE_STORAGE_KEY = 'galaxy-dashboard-palette';
+const PALETTE_STORAGE_KEY = 'galaxy-dashboard-palette-v2';
 const PALETTE_PRESETS_KEY = 'galaxy-dashboard-palette-presets';
 
 const basePalette = {
@@ -142,9 +142,9 @@ function JsonCard({ data }) {
   );
 }
 
-function ReaderModal({ title, meta, onClose, children }) {
+function ReaderModal({ title, meta, onClose, children, className = '' }) {
   return (
-    <div className="modal-backdrop" role="dialog" aria-modal="true">
+    <div className={'modal-backdrop ' + className} role="dialog" aria-modal="true">
       <section className="reader-modal">
         <header className="reader-top">
           <button className="back-button" onClick={onClose}>Назад</button>
@@ -156,6 +156,18 @@ function ReaderModal({ title, meta, onClose, children }) {
         <div className="reader-body">{children}</div>
       </section>
     </div>
+  );
+}
+
+function ReaderPane({ title, meta, children }) {
+  return (
+    <section className="card reader-pane">
+      <header className="reader-pane-top">
+        <strong>{title}</strong>
+        {meta && <span>{meta}</span>}
+      </header>
+      <div className="reader-pane-body">{children}</div>
+    </section>
   );
 }
 
@@ -354,7 +366,7 @@ function Home({ api, setStateText, setView }) {
   );
 }
 
-function FileBrowser({ kind, api }) {
+function FileBrowser({ kind, api, desktopDetail = false }) {
   const [notes, setNotes] = useState([]);
   const [selected, setSelected] = useState(null);
   const [content, setContent] = useState('');
@@ -372,22 +384,62 @@ function FileBrowser({ kind, api }) {
   }
 
   return (
-    <>
+    <div className={desktopDetail ? 'split-page' : ''}>
       <div className="card list-page">
         {notes.map((note) => (
-          <button className="item" key={note.name} onClick={() => openNote(note.name)}>
+          <button
+            className={'item ' + (selected === note.name ? 'active' : '')}
+            key={note.name}
+            onClick={() => openNote(note.name)}
+          >
             <strong>{note.name}</strong>
             <span className="muted">{note.mtime || ''}</span>
           </button>
         ))}
         {notes.length === 0 && <p className="muted">Файлов пока нет.</p>}
       </div>
+      {desktopDetail && (
+        <div className="desktop-reader">
+          {selected ? (
+            <ReaderPane title={selected} meta={kind}>
+              <pre>{content}</pre>
+            </ReaderPane>
+          ) : (
+            <div className="card reader-empty">
+              <p className="muted">Выбери сводку слева, чтобы открыть текст здесь.</p>
+            </div>
+          )}
+        </div>
+      )}
       {selected && (
-        <ReaderModal title={selected} meta={kind} onClose={() => setSelected(null)}>
+        <ReaderModal
+          className={desktopDetail ? 'mobile-reader' : ''}
+          title={selected}
+          meta={kind}
+          onClose={() => setSelected(null)}
+        >
           <pre>{content}</pre>
         </ReaderModal>
       )}
-    </>
+    </div>
+  );
+}
+
+function JournalEntries({ entries }) {
+  if (entries.length === 0) return <p className="muted">No entries for this day.</p>;
+  return (
+    <div className="journal">
+      {entries.map((entry, index) => (
+        <article className={'entry ' + (entry.source || 'user')} key={index}>
+          <div className="entry-meta">
+            <span className="badge">{sourceLabel(entry.source)}</span>
+            <span>{fmtTime(entry.ts)}</span>
+            <span>{viaLabel(entry.via)}</span>
+          </div>
+          <div className="entry-text">{entry.text}</div>
+        </article>
+      ))}
+    </div>
   );
 }
 
@@ -407,17 +459,33 @@ function Journal({ api }) {
   }
 
   return (
-    <>
+    <div className="split-page">
       <div className="card list-page">
         {days.map((day) => (
-          <button className="item" key={day} onClick={() => openDay(day)}>
+          <button
+            className={'item ' + (selectedDay === day ? 'active' : '')}
+            key={day}
+            onClick={() => openDay(day)}
+          >
             {day}
           </button>
         ))}
         {days.length === 0 && <p className="muted">Журнал пока пуст.</p>}
       </div>
+      <div className="desktop-reader">
+        {entries ? (
+          <ReaderPane title={selectedDay} meta={entries.length + ' entries'}>
+            <JournalEntries entries={entries} />
+          </ReaderPane>
+        ) : (
+          <div className="card reader-empty">
+            <p className="muted">Выбери день слева, чтобы открыть историю здесь.</p>
+          </div>
+        )}
+      </div>
       {entries && (
         <ReaderModal
+          className="mobile-reader"
           title={selectedDay}
           meta={entries.length + ' entries'}
           onClose={() => {
@@ -425,24 +493,10 @@ function Journal({ api }) {
             setSelectedDay('');
           }}
         >
-          {entries.length === 0 && <p className="muted">No entries for this day.</p>}
-          {entries.length > 0 && (
-          <div className="journal">
-            {entries.map((entry, index) => (
-              <article className={'entry ' + (entry.source || 'user')} key={index}>
-                <div className="entry-meta">
-                  <span className="badge">{sourceLabel(entry.source)}</span>
-                  <span>{fmtTime(entry.ts)}</span>
-                  <span>{viaLabel(entry.via)}</span>
-                </div>
-                <div className="entry-text">{entry.text}</div>
-              </article>
-            ))}
-          </div>
-          )}
+          <JournalEntries entries={entries} />
         </ReaderModal>
       )}
-    </>
+    </div>
   );
 }
 
@@ -664,7 +718,7 @@ function App() {
           {!error && view === 'settings' && data && <JsonCard data={data} />}
           {view === 'atlas' && <Atlas api={api} token={api.token} setStateText={setStateText} />}
           {view === 'notes' && <FileBrowser api={api} kind="note" />}
-          {view === 'summaries' && <FileBrowser api={api} kind="summary" />}
+          {view === 'summaries' && <FileBrowser api={api} kind="summary" desktopDetail />}
           {view === 'journal' && <Journal api={api} />}
           {view === 'update' && <UpdatePanel api={api} />}
         </div>
