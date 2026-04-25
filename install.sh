@@ -59,7 +59,12 @@ cat > "$PREFIX/bin/agent-doctor" <<EOF
 cd "$APP_DIR"
 npm run doctor
 EOF
-chmod +x "$PREFIX/bin/agent-start" "$PREFIX/bin/agent-stop" "$PREFIX/bin/agent-logs" "$PREFIX/bin/agent-update" "$PREFIX/bin/agent-doctor"
+cat > "$PREFIX/bin/agent-web" <<EOF
+#!/data/data/com.termux/files/usr/bin/sh
+cd "$APP_DIR"
+GALAXY_AGENT_WEB_SESSION="galaxy-agent-web" sh scripts/web.sh "\$@"
+EOF
+chmod +x "$PREFIX/bin/agent-start" "$PREFIX/bin/agent-stop" "$PREFIX/bin/agent-logs" "$PREFIX/bin/agent-update" "$PREFIX/bin/agent-doctor" "$PREFIX/bin/agent-web"
 
 if [ ! -f "$APP_DIR/.env" ]; then
   info "Running first-time setup..."
@@ -73,5 +78,6 @@ info "Running doctor..."
 
 info "Done."
 info "Start the bot with: agent-start"
+info "Start web UI with: agent-web"
 info "Watch logs with:  agent-logs"
 info "Update later with: agent-update"

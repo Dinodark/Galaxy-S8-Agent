@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 const readline = require('readline');
 const fse = require('fs-extra');
 
@@ -43,6 +44,10 @@ function validateTz(tz) {
   return tz;
 }
 
+function generateToken() {
+  return crypto.randomBytes(24).toString('base64url');
+}
+
 function envLine(key, value) {
   return `${key}=${String(value || '').replace(/\r?\n/g, '')}`;
 }
@@ -64,6 +69,10 @@ async function main() {
 
   const ask = askFactory();
   try {
+    let existingSettings = {};
+    if (await fse.pathExists(SETTINGS_FILE)) {
+      existingSettings = await fse.readJson(SETTINGS_FILE).catch(() => ({}));
+    }
     const telegramToken = clean(await ask('Telegram bot token: '));
     const openrouterKey = clean(await ask('OpenRouter API key: '));
     const userIds = clean(await ask('Your Telegram user id (comma-separated if multiple): '));
@@ -108,6 +117,14 @@ async function main() {
       silent: {
         reaction: '✍',
         autoExitOnDailyReview: true,
+      },
+      web: {
+        enabled: true,
+        host: '0.0.0.0',
+        port: 8787,
+        token: existingSettings.web && existingSettings.web.token
+          ? existingSettings.web.token
+          : generateToken(),
       },
       chats: {},
     };

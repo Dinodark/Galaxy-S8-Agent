@@ -14,6 +14,7 @@ const modes = require('../core/modes');
 const settings = require('../core/settings');
 const runtime = require('../core/runtime');
 const atlas = require('../core/memory_atlas');
+const { localIp } = require('../core/web_server');
 const { startBatteryWatcher } = require('../core/watchers/battery');
 const { runReview } = require('../core/watchers/daily_review');
 const { isAllowed } = require('./auth');
@@ -60,7 +61,7 @@ function start() {
         status.dailyReview.enabled
           ? `on (cron "${status.dailyReview.cron}", tz=${status.dailyReview.tz})`
           : 'off'
-      }\n\nCommands:\n/status — runtime status\n/settings — Settings Center buttons\n/set — change a setting by name\n/atlas — build and send memory mindmap\n/atlas_status — memory atlas stats\n/ping — liveness check\n/diag — OpenRouter key status\n/battery — phone battery status\n/reminders — list pending reminders\n/summary — generate today's evening review now\n/silent — capture only, no replies (auto-exits at evening review)\n/chat — normal conversational mode\n/reset — wipe this chat's history`
+      }\n\nCommands:\n/status — runtime status\n/settings — Settings Center buttons\n/set — change a setting by name\n/web — local web UI URL\n/atlas — build and send memory mindmap\n/atlas_status — memory atlas stats\n/ping — liveness check\n/diag — OpenRouter key status\n/battery — phone battery status\n/reminders — list pending reminders\n/summary — generate today's evening review now\n/silent — capture only, no replies (auto-exits at evening review)\n/chat — normal conversational mode\n/reset — wipe this chat's history`
     );
   });
 
@@ -148,6 +149,36 @@ function start() {
     } catch (err) {
       console.error('[atlas] error:', err);
       await bot.sendMessage(msg.chat.id, 'atlas error: ' + err.message);
+    }
+  });
+
+  bot.onText(/^\/web$/, async (msg) => {
+    if (!isAllowed(msg.from && msg.from.id)) return replyUnauthorized(bot, msg);
+    try {
+      if (msg.chat.type && msg.chat.type !== 'private') {
+        await bot.sendMessage(
+          msg.chat.id,
+          'Local web UI URL contains a private token. Send /web in a private chat with the bot.'
+        );
+        return;
+      }
+      const s = await settings.getSettings();
+      const ip = localIp();
+      const host = ip || 'PHONE_IP';
+      const url = `http://${host}:${s.web.port || 8787}/?token=${s.web.token}`;
+      const lines = [
+        'Local web UI:',
+        url,
+        '',
+        'Start it on the phone with: agent-web',
+      ];
+      if (!ip) {
+        lines.push('Could not detect phone IP. Replace PHONE_IP with the Wi-Fi address from: ip addr');
+      }
+      lines.push('Security note: open this only in a trusted Wi-Fi/VPN network.');
+      await bot.sendMessage(msg.chat.id, lines.join('\n'), { disable_web_page_preview: true });
+    } catch (err) {
+      await bot.sendMessage(msg.chat.id, 'web error: ' + err.message);
     }
   });
 

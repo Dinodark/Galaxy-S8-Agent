@@ -90,6 +90,22 @@ function checkEnv() {
   }
 }
 
+function checkSettings() {
+  const settingsPath = path.join(ROOT, 'memory', 'settings.json');
+  if (!fs.existsSync(settingsPath)) {
+    warn('settings', 'memory/settings.json missing; defaults will be used');
+    return;
+  }
+  try {
+    const s = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
+    if (s.web && s.web.token) ok('web token', 'configured');
+    else warn('web token', 'missing; it will be generated on next settings load');
+    if (s.web && s.web.port) ok('web port', String(s.web.port));
+  } catch (err) {
+    warn('settings', `cannot parse memory/settings.json: ${err.message}`);
+  }
+}
+
 function checkTermux() {
   if (process.env.PREFIX && process.env.PREFIX.includes('com.termux')) {
     ok('Termux', process.env.PREFIX);
@@ -110,6 +126,7 @@ function checkTermux() {
 async function main() {
   checkNode();
   checkEnv();
+  checkSettings();
   checkTermux();
   await checkOpenRouter();
   await checkGroq();

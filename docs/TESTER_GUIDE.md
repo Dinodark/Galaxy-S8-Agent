@@ -40,6 +40,7 @@ agent-logs
 agent-stop
 agent-update
 agent-doctor
+agent-web
 ```
 
 Detach from logs with `Ctrl-b`, then `d`.
@@ -52,6 +53,7 @@ Send:
 /start
 /settings
 /status
+/web
 напомни через 2 минуты проверить чай
 ```
 
@@ -63,7 +65,21 @@ Useful commands:
 - `/chat` — normal mode
 - `/summary` — generate today's evening summary now
 - `/atlas` — build and send the memory mindmap
+- `/web` — get the local web UI URL
 - `/reminders` — list pending reminders
+
+## 6. Open the local web UI
+
+Start the read-only dashboard on the phone:
+
+```sh
+agent-web
+```
+
+Then send `/web` to the bot in a private Telegram chat and open the returned
+URL from a browser on the same Wi-Fi/VPN network. The URL contains a private
+token; do not post it in group chats. The web UI shows status, memory atlas,
+notes, summaries, journal days, and sanitized settings.
 
 ## Troubleshooting
 

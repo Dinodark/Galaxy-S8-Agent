@@ -22,7 +22,8 @@ index.js
    ├─ core/reminders.js   persistent time-based reminders + scheduler
    ├─ core/journal.js     raw per-chat per-day conversation log (jsonl)
    ├─ core/settings.js    Settings Center (memory/settings.json + audit)
-   ├─ core/runtime.js     shared status + watcher controllers (web-ready)
+   ├─ core/runtime.js     shared status + watcher controllers
+   ├─ core/web_server.js  local token-protected read-only web UI
    ├─ core/modes.js       per-chat mode (chat | silent) persisted
    └─ core/watchers/      proactive background tasks
       ├─ battery.js       low-battery DM alert
@@ -68,6 +69,7 @@ commands:
 - `agent-logs` — attach to logs
 - `agent-update` — pull updates and reinstall dependencies
 - `agent-doctor` — run environment checks
+- `agent-web` — start the local web UI in tmux
 
 Prepare these values before running setup:
 
@@ -171,6 +173,7 @@ Useful commands:
 - `/set daily_review_model qwen/qwen-2.5-72b-instruct` — use a model
   just for evening reviews.
 - `/set stt_enabled false` and `/set stt_language ru` — STT behavior.
+- `/web` — show the local web UI URL with its private token.
 
 Changing daily-review settings through `/settings` or `/set` restarts
 the scheduler in-process; no Termux restart is needed.
@@ -181,6 +184,7 @@ the scheduler in-process; no Termux restart is needed.
 - `/status` — full runtime status
 - `/settings` — Settings Center buttons
 - `/set ...` — change supported settings by name
+- `/web` — show the local web UI URL for the phone's Wi-Fi IP
 - `/atlas` — build and send an interactive HTML memory mindmap
 - `/atlas_status` — show mindmap stats
 - `/ping` — liveness check
@@ -257,6 +261,27 @@ The first MVP does not call an LLM, so it is fast and cheap. It extracts
 headings, keywords, note files, daily summaries, and shared topics, then
 renders a draggable graph with a side panel for details. The cached index
 lives in `memory/memory_index.json`.
+
+## Local web UI
+
+The agent can also serve a read-only web dashboard from the phone for devices
+on the same trusted Wi-Fi/VPN network:
+
+```sh
+agent-web
+```
+
+Then send `/web` in a private Telegram chat with the bot. It returns a URL like
+`http://PHONE_IP:8787/?token=...`. The dashboard includes runtime status,
+the memory atlas, markdown notes, daily summaries, journal days, and sanitized
+settings. All endpoints require the token, and the MVP does not expose write
+actions or secrets.
+
+For local development you can run:
+
+```sh
+npm run web
+```
 
 ## Troubleshooting
 

@@ -1,4 +1,5 @@
 const path = require('path');
+const crypto = require('crypto');
 const fse = require('fs-extra');
 const { CronExpressionParser } = require('cron-parser');
 const config = require('../config');
@@ -27,6 +28,12 @@ function defaults() {
     silent: {
       reaction: '✍',
       autoExitOnDailyReview: true,
+    },
+    web: {
+      enabled: true,
+      host: '0.0.0.0',
+      port: 8787,
+      token: '',
     },
     chats: {},
   };
@@ -161,6 +168,10 @@ function parseIntInRange(value, min, max, name) {
   return n;
 }
 
+function generateToken() {
+  return crypto.randomBytes(24).toString('base64url');
+}
+
 function normalizeReviewTime(value) {
   const raw = String(value).trim();
   const m = raw.match(/^(\d{1,2}):(\d{2})$/);
@@ -209,6 +220,23 @@ function validatePathValue(settingPath, value, mergedSettings) {
   }
   if (settingPath === 'silent.autoExitOnDailyReview') return parseBool(value);
 
+  if (settingPath === 'web.enabled') return parseBool(value);
+  if (settingPath === 'web.host') {
+    const host = String(value || '').trim();
+    if (!host) throw new Error('web.host cannot be empty.');
+    return host;
+  }
+  if (settingPath === 'web.port') {
+    return parseIntInRange(value, 1024, 65535, 'web.port');
+  }
+  if (settingPath === 'web.token') {
+    const token = String(value || '').trim();
+    if (token.length < 16) {
+      throw new Error('web.token must be at least 16 characters.');
+    }
+    return token;
+  }
+
   const modeMatch = settingPath.match(/^chats\.(-?\d+)\.mode$/);
   if (modeMatch) {
     const mode = String(value || '').trim();
@@ -238,6 +266,10 @@ function aliasToPath(alias, rawValue) {
     stt_max_duration_sec: 'stt.maxDurationSec',
     silent_reaction: 'silent.reaction',
     silent_auto_exit: 'silent.autoExitOnDailyReview',
+    web_enabled: 'web.enabled',
+    web_host: 'web.host',
+    web_port: 'web.port',
+    web_token: 'web.token',
   };
   if (key === 'daily_review_time' || key === 'review_time') {
     return { path: 'dailyReview.cron', value: normalizeReviewTime(rawValue) };
@@ -250,7 +282,21 @@ function aliasToPath(alias, rawValue) {
 
 async function getSettings() {
   const overrides = await loadOverrides();
-  return mergeDeep(defaults(), overrides);
+  const merged = mergeDeep(defaults(), overrides);
+  if (!merged.web.token) {
+    merged.web.token = generateToken();
+    setAt(overrides, 'web.token', merged.web.token);
+    overridesCache = overrides;
+    await persistOverrides();
+    await audit({
+      action: 'set',
+      actor: { type: 'settings-auto' },
+      path: 'web.token',
+      before: '',
+      after: '[generated]',
+    });
+  }
+  return merged;
 }
 
 async function get(settingPath) {
@@ -306,7 +352,15 @@ async function setChatMode(chatId, mode, actor = {}) {
 }
 
 async function getPublicSettings() {
-  return getSettings();
+  const s = await getSettings();
+  const publicSettings = clone(s);
+  if (publicSettings.web) {
+    publicSettings.web = {
+      ...publicSettings.web,
+      token: publicSettings.web.token ? '[hidden]' : '',
+    };
+  }
+  return publicSettings;
 }
 
 async function reload() {
@@ -327,6 +381,7 @@ module.exports = {
   getChatMode,
   setChatMode,
   reload,
+  generateToken,
   normalizeReviewTime,
   validateTimezone,
   validateCron,
