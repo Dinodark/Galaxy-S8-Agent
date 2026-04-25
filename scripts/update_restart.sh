@@ -64,8 +64,12 @@ run npm install
 log "Running doctor..."
 npm run doctor >> "$LOG_FILE" 2>&1 || log "Doctor finished with warnings."
 
-log "Building web dashboard..."
-run npm run web:build
+if [ "${GALAXY_AGENT_BUILD_WEB_ON_DEVICE:-false}" = "true" ]; then
+  log "Building web dashboard on device..."
+  run npm run web:build
+else
+  log "Skipping web dashboard build on device; using committed web/dist assets."
+fi
 
 stop_session "$BOT_SESSION" "bot"
 stop_session "$WEB_SESSION" "web"

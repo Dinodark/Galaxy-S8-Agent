@@ -265,11 +265,10 @@ lives in `memory/memory_index.json`.
 ## Local web UI
 
 The agent can also serve a React/Vite web dashboard from the phone for devices
-on the same trusted Wi-Fi/VPN network. On the phone, build the dashboard and
-start the web server:
+on the same trusted Wi-Fi/VPN network. The production dashboard build is
+committed under `web/dist`, so the phone does not need to run Vite build:
 
 ```sh
-npm run web:build
 agent-web
 ```
 
@@ -282,9 +281,10 @@ actions or secrets.
 The `Update` panel includes a guarded **Update & restart** action. It does not
 run arbitrary shell commands: it only runs the fixed `scripts/update_restart.sh`
 workflow (`git pull --ff-only`, `npm install`, `npm run doctor`, restart bot
-and web tmux sessions). The browser page can disconnect for a few seconds while
-the web session restarts; reopen `/web` if needed. Use this only on a trusted
-Wi-Fi/VPN network.
+and web tmux sessions). It uses the committed dashboard build by default to
+avoid native build-tool issues on older phones. The browser page can disconnect
+for a few seconds while the web session restarts; reopen `/web` if needed. Use
+this only on a trusted Wi-Fi/VPN network.
 
 For local development you can run:
 

@@ -10,8 +10,7 @@ logs/
 # deps
 node_modules/
 
-# web build
-web/dist/
+# old web build location
 core/web_dist/
 
 # OS / editor

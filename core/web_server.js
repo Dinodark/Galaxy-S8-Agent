@@ -198,7 +198,7 @@ async function handleApi(req, res, url) {
 async function serveWebApp(res, token) {
   const file = path.join(WEB_DIST_DIR, 'index.html');
   if (!(await fse.pathExists(file))) {
-    return text(res, 503, 'Dashboard build missing. Run: npm run web:build');
+    return text(res, 503, 'Dashboard build missing. Pull latest web/dist assets or build on a dev machine with npm run web:build.');
   }
   const raw = await fse.readFile(file, 'utf8');
   const tokenParam = `token=${encodeURIComponent(token || '')}`;

@@ -73,7 +73,6 @@ Useful commands:
 Start the read-only dashboard on the phone:
 
 ```sh
-npm run web:build
 agent-web
 ```
 
@@ -84,8 +83,9 @@ notes, summaries, journal days, and sanitized settings.
 
 The `Update` panel has an **Update & restart** button. It pulls the latest
 code, installs npm dependencies, runs doctor, and restarts both bot and web
-tmux sessions. It can briefly disconnect the page because the web server
-restarts itself. Use it only from a trusted Wi-Fi/VPN network.
+tmux sessions. It uses the committed dashboard build, so the phone does not
+need to run `npm run web:build`. It can briefly disconnect the page because
+the web server restarts itself. Use it only from a trusted Wi-Fi/VPN network.
 
 ## Troubleshooting
 
