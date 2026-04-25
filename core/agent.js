@@ -106,6 +106,50 @@ function withRuntimeContext(history) {
   return [ctx, ...history];
 }
 
+function userAskedForReminder(text) {
+  return /\bremind\b|напомни|напомин/i.test(String(text || ''));
+}
+
+function extractJsonObjectFromMarkdown(text) {
+  const s = String(text || '').trim();
+  const fenced = s.match(/^```(?:json)?\s*([\s\S]*?)\s*```/i);
+  const raw = fenced ? fenced[1] : s;
+  try {
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+      ? parsed
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+function recoverReminderArgs(userMessage, assistantContent) {
+  if (!userAskedForReminder(userMessage)) return null;
+  const obj = extractJsonObjectFromMarkdown(assistantContent);
+  if (!obj || typeof obj.text !== 'string') return null;
+  if (!obj.fire_at && !obj.cron) return null;
+  return {
+    text: obj.text,
+    fire_at: obj.fire_at || null,
+    cron: obj.cron || null,
+    tz: obj.tz || null,
+    until: obj.until || null,
+    max_count: obj.max_count == null ? null : obj.max_count,
+  };
+}
+
+function recoveredReminderReply(result) {
+  if (!result || !result.ok || !result.result) {
+    return 'Не смог поставить напоминание: ' + (result && result.error ? result.error : 'unknown error');
+  }
+  const r = result.result;
+  const when = new Date(r.fire_at).toLocaleString('ru-RU', {
+    hour12: false,
+  });
+  return `Напоминание установлено: ${r.text}\nКогда: ${when}\nID: ${r.id}`;
+}
+
 async function runAgent({ chatId, userMessage }) {
   await ensureHistorySeeded(chatId);
 
@@ -178,6 +222,41 @@ async function runAgent({ chatId, userMessage }) {
 
       history = await memory.appendToHistory(chatId, pushed);
       continue;
+    }
+
+    const recoveredReminder = recoverReminderArgs(userMessage, assistantMsg.content);
+    if (recoveredReminder) {
+      console.log('[debug:047796] recovering fake reminder JSON', {
+        chatId,
+        step,
+        args: recoveredReminder,
+      });
+      // #region agent log
+      fetch('http://127.0.0.1:7933/ingest/05d097ed-198e-47e6-8b77-1f7ddf4809a1',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'047796'},body:JSON.stringify({sessionId:'047796',runId:'post-fix',hypothesisId:'H7',location:'core/agent.js:recoverReminderArgs',message:'recovering content-only reminder JSON as real tool call',data:{chatId,step,args:recoveredReminder},timestamp:Date.now()})}).catch(()=>{});
+      // #endregion
+      const result = await tools.execute('reminder_add', recoveredReminder, toolCtx);
+      console.log('[debug:047796] recovered reminder_add result', {
+        chatId,
+        step,
+        ok: result && result.ok,
+        result,
+      });
+      // #region agent log
+      fetch('http://127.0.0.1:7933/ingest/05d097ed-198e-47e6-8b77-1f7ddf4809a1',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'047796'},body:JSON.stringify({sessionId:'047796',runId:'post-fix',hypothesisId:'H7,H3',location:'core/agent.js:recoverReminderResult',message:'fake reminder JSON recovery result',data:{chatId,step,result},timestamp:Date.now()})}).catch(()=>{});
+      // #endregion
+      transcript.push({
+        tool: 'reminder_add',
+        args: recoveredReminder,
+        result,
+        recovered: true,
+      });
+      const reply = recoveredReminderReply(result);
+      history = await memory.appendToHistory(chatId, [{ role: 'assistant', content: reply }]);
+      return {
+        reply,
+        toolCalls: transcript,
+        steps: step + 1,
+      };
     }
 
     history = await memory.appendToHistory(chatId, pushed);
