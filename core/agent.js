@@ -16,62 +16,17 @@ async function getSystemPrompt() {
 async function ensureHistorySeeded(chatId) {
   const history = await memory.loadHistory(chatId);
   const sys = await getSystemPrompt();
-  console.log('[debug:047796] current system prompt file', {
-    chatId,
-    chars: sys.length,
-    reminderAddIndex: sys.indexOf('reminder_add'),
-    reminderListIndex: sys.indexOf('reminder_list'),
-    reminderSnippet: sys.slice(
-      Math.max(0, sys.indexOf('reminder') - 80),
-      sys.indexOf('reminder') < 0 ? 0 : sys.indexOf('reminder') + 180
-    ),
-  });
   const existingSystem = history[0] && history[0].role === 'system'
     ? history[0].content || ''
     : '';
-  // #region agent log
-  fetch('http://127.0.0.1:7933/ingest/05d097ed-198e-47e6-8b77-1f7ddf4809a1',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'047796'},body:JSON.stringify({sessionId:'047796',runId:'pre-fix',hypothesisId:'H6',location:'core/agent.js:ensureHistorySeeded',message:'loaded chat history system prompt state',data:{chatId,historyLength:history.length,hasSystem:!!existingSystem,systemHasReminderAdd:existingSystem.includes('reminder_add'),systemHasSettingsCenter:existingSystem.includes('Settings Center'),systemChars:existingSystem.length},timestamp:Date.now()})}).catch(()=>{});
-  // #endregion
-  if (existingSystem) {
-    console.log('[debug:047796] history system prompt', {
-      chatId,
-      historyLength: history.length,
-      systemHasReminderAdd: existingSystem.includes('reminder_add'),
-      systemHasSettingsCenter: existingSystem.includes('Settings Center'),
-      systemChars: existingSystem.length,
-    });
-  }
   if (history.length === 0 || history[0].role !== 'system') {
     const seeded = [{ role: 'system', content: sys }, ...history];
     await memory.saveHistory(chatId, seeded);
-    // #region agent log
-    fetch('http://127.0.0.1:7933/ingest/05d097ed-198e-47e6-8b77-1f7ddf4809a1',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'047796'},body:JSON.stringify({sessionId:'047796',runId:'post-fix',hypothesisId:'H6',location:'core/agent.js:ensureHistorySeeded.seed',message:'seeded current system prompt into history',data:{chatId,historyLength:seeded.length,systemHasReminderAdd:sys.includes('reminder_add'),systemHasSettingsCenter:sys.includes('Settings Center'),systemChars:sys.length},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
-    console.log('[debug:047796] seeded current system prompt', {
-      chatId,
-      historyLength: seeded.length,
-      systemHasReminderAdd: sys.includes('reminder_add'),
-      systemHasSettingsCenter: sys.includes('Settings Center'),
-      systemChars: sys.length,
-    });
     return seeded;
   }
   if (existingSystem !== sys) {
     const updated = [{ role: 'system', content: sys }, ...history.slice(1)];
     await memory.saveHistory(chatId, updated);
-    // #region agent log
-    fetch('http://127.0.0.1:7933/ingest/05d097ed-198e-47e6-8b77-1f7ddf4809a1',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'047796'},body:JSON.stringify({sessionId:'047796',runId:'post-fix',hypothesisId:'H6',location:'core/agent.js:ensureHistorySeeded.refresh',message:'refreshed stale system prompt in history',data:{chatId,historyLength:updated.length,beforeHasReminderAdd:existingSystem.includes('reminder_add'),afterHasReminderAdd:sys.includes('reminder_add'),beforeHasSettingsCenter:existingSystem.includes('Settings Center'),afterHasSettingsCenter:sys.includes('Settings Center'),beforeChars:existingSystem.length,afterChars:sys.length},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
-    console.log('[debug:047796] refreshed system prompt', {
-      chatId,
-      historyLength: updated.length,
-      beforeHasReminderAdd: existingSystem.includes('reminder_add'),
-      afterHasReminderAdd: sys.includes('reminder_add'),
-      beforeHasSettingsCenter: existingSystem.includes('Settings Center'),
-      afterHasSettingsCenter: sys.includes('Settings Center'),
-      beforeChars: existingSystem.length,
-      afterChars: sys.length,
-    });
     return updated;
   }
   return history;
@@ -157,14 +112,6 @@ async function runAgent({ chatId, userMessage }) {
   let history = await memory.appendToHistory(chatId, newMessages);
 
   const toolSchemas = tools.listSchemas();
-  console.log('[debug:047796] tool schemas before LLM', {
-    chatId,
-    toolCount: toolSchemas.length,
-    hasReminderAdd: toolSchemas.some((t) => t.function && t.function.name === 'reminder_add'),
-    reminderTools: toolSchemas
-      .map((t) => t.function && t.function.name)
-      .filter((name) => name && name.startsWith('reminder_')),
-  });
   const transcript = [];
   const toolCtx = { chatId };
 
@@ -173,17 +120,6 @@ async function runAgent({ chatId, userMessage }) {
       messages: withRuntimeContext(history),
       tools: toolSchemas,
     });
-    console.log('[debug:047796] LLM response', {
-      chatId,
-      step,
-      hasToolCalls: !!(assistantMsg.tool_calls && assistantMsg.tool_calls.length),
-      toolCallNames: (assistantMsg.tool_calls || []).map((c) => c.function && c.function.name),
-      contentLooksLikeJson: String(assistantMsg.content || '').trim().startsWith('```json'),
-      contentPreview: String(assistantMsg.content || '').slice(0, 260),
-    });
-    // #region agent log
-    fetch('http://127.0.0.1:7933/ingest/05d097ed-198e-47e6-8b77-1f7ddf4809a1',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'047796'},body:JSON.stringify({sessionId:'047796',runId:'pre-fix',hypothesisId:'H1,H2',location:'core/agent.js:after-chatCompletion',message:'assistant response from LLM',data:{chatId,step,hasToolCalls:!!(assistantMsg.tool_calls&&assistantMsg.tool_calls.length),toolCallNames:(assistantMsg.tool_calls||[]).map((c)=>c.function&&c.function.name),contentPreview:String(assistantMsg.content||'').slice(0,500)},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
 
     const pushed = [assistantMsg];
 
@@ -199,17 +135,7 @@ async function runAgent({ chatId, userMessage }) {
           args = {};
         }
 
-        if (name && name.startsWith('reminder_')) {
-          // #region agent log
-          fetch('http://127.0.0.1:7933/ingest/05d097ed-198e-47e6-8b77-1f7ddf4809a1',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'047796'},body:JSON.stringify({sessionId:'047796',runId:'pre-fix',hypothesisId:'H1,H2,H5',location:'core/agent.js:before-tools.execute',message:'agent requested reminder tool',data:{chatId,tool:name,args},timestamp:Date.now()})}).catch(()=>{});
-          // #endregion
-        }
         const result = await tools.execute(name, args, toolCtx);
-        if (name && name.startsWith('reminder_')) {
-          // #region agent log
-          fetch('http://127.0.0.1:7933/ingest/05d097ed-198e-47e6-8b77-1f7ddf4809a1',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'047796'},body:JSON.stringify({sessionId:'047796',runId:'pre-fix',hypothesisId:'H1,H2,H5',location:'core/agent.js:after-tools.execute',message:'reminder tool result returned to agent',data:{chatId,tool:name,result},timestamp:Date.now()})}).catch(()=>{});
-          // #endregion
-        }
         transcript.push({ tool: name, args, result });
 
         pushed.push({
@@ -226,24 +152,7 @@ async function runAgent({ chatId, userMessage }) {
 
     const recoveredReminder = recoverReminderArgs(userMessage, assistantMsg.content);
     if (recoveredReminder) {
-      console.log('[debug:047796] recovering fake reminder JSON', {
-        chatId,
-        step,
-        args: recoveredReminder,
-      });
-      // #region agent log
-      fetch('http://127.0.0.1:7933/ingest/05d097ed-198e-47e6-8b77-1f7ddf4809a1',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'047796'},body:JSON.stringify({sessionId:'047796',runId:'post-fix',hypothesisId:'H7',location:'core/agent.js:recoverReminderArgs',message:'recovering content-only reminder JSON as real tool call',data:{chatId,step,args:recoveredReminder},timestamp:Date.now()})}).catch(()=>{});
-      // #endregion
       const result = await tools.execute('reminder_add', recoveredReminder, toolCtx);
-      console.log('[debug:047796] recovered reminder_add result', {
-        chatId,
-        step,
-        ok: result && result.ok,
-        result,
-      });
-      // #region agent log
-      fetch('http://127.0.0.1:7933/ingest/05d097ed-198e-47e6-8b77-1f7ddf4809a1',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'047796'},body:JSON.stringify({sessionId:'047796',runId:'post-fix',hypothesisId:'H7,H3',location:'core/agent.js:recoverReminderResult',message:'fake reminder JSON recovery result',data:{chatId,step,result},timestamp:Date.now()})}).catch(()=>{});
-      // #endregion
       transcript.push({
         tool: 'reminder_add',
         args: recoveredReminder,

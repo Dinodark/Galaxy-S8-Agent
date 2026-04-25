@@ -81,9 +81,6 @@ async function add({
   until = null,
   maxCount = null,
 }) {
-  // #region agent log
-  fetch('http://127.0.0.1:7933/ingest/05d097ed-198e-47e6-8b77-1f7ddf4809a1',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'047796'},body:JSON.stringify({sessionId:'047796',runId:'pre-fix',hypothesisId:'H2,H3,H4,H5',location:'core/reminders.js:add.entry',message:'reminders.add called',data:{chatId,text,fireAt,cron,tz,until,maxCount},timestamp:Date.now()})}).catch(()=>{});
-  // #endregion
   const list = await load();
 
   let recurrence = null;
@@ -133,9 +130,6 @@ async function add({
 
   list.push(rec);
   await persist();
-  // #region agent log
-  fetch('http://127.0.0.1:7933/ingest/05d097ed-198e-47e6-8b77-1f7ddf4809a1',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'047796'},body:JSON.stringify({sessionId:'047796',runId:'pre-fix',hypothesisId:'H3,H4,H5',location:'core/reminders.js:add.persisted',message:'reminder persisted',data:{storeFile:STORE_FILE,total:list.length,record:{id:rec.id,chatId:rec.chatId,text:rec.text,fireAt:rec.fireAt,recurrence:rec.recurrence}},timestamp:Date.now()})}).catch(()=>{});
-  // #endregion
   return rec;
 }
 
@@ -145,9 +139,6 @@ async function listPending({ chatId } = {}) {
     .filter((r) => (chatId == null ? true : r.chatId === Number(chatId)))
     .slice()
     .sort((a, b) => new Date(a.fireAt) - new Date(b.fireAt));
-  // #region agent log
-  fetch('http://127.0.0.1:7933/ingest/05d097ed-198e-47e6-8b77-1f7ddf4809a1',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'047796'},body:JSON.stringify({sessionId:'047796',runId:'pre-fix',hypothesisId:'H3,H5',location:'core/reminders.js:listPending',message:'pending reminders listed',data:{chatId,total:items.length,pending:pending.length,ids:pending.map((r)=>({id:r.id,chatId:r.chatId,fireAt:r.fireAt,text:r.text}))},timestamp:Date.now()})}).catch(()=>{});
-  // #endregion
   return pending;
 }
 
@@ -211,11 +202,6 @@ async function popDue(nowMs = Date.now(), log = console) {
   if (changed) {
     cache = remaining;
     await persist();
-  }
-  if (due.length > 0 || changed) {
-    // #region agent log
-    fetch('http://127.0.0.1:7933/ingest/05d097ed-198e-47e6-8b77-1f7ddf4809a1',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'047796'},body:JSON.stringify({sessionId:'047796',runId:'pre-fix',hypothesisId:'H4',location:'core/reminders.js:popDue',message:'scheduler popped due reminders',data:{nowMs,due:due.map((r)=>({id:r.id,chatId:r.chatId,fireAt:r.fireAt,text:r.text})),remaining:remaining.length},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
   }
   return due;
 }
