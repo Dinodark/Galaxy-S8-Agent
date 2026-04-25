@@ -226,6 +226,12 @@ function start() {
         await bot.sendMessage(msg.chat.id, '```\n' + runtime.formatStatus(status) + '\n```', {
           parse_mode: 'Markdown',
         });
+      } else if (action === 'more') {
+        await bot.answerCallbackQuery(query.id);
+        await editSettingsMenu(bot, msg, 'more');
+      } else if (action === 'main') {
+        await bot.answerCallbackQuery(query.id);
+        await editSettingsMenu(bot, msg, 'main');
       } else if (action === 'hint_time') {
         await bot.answerCallbackQuery(query.id, { text: 'Напиши /set daily_review_time 22:30' });
         await bot.sendMessage(
@@ -236,8 +242,10 @@ function start() {
         await bot.answerCallbackQuery(query.id, { text: 'Unknown action' });
       }
 
-      if (action !== 'summary_now' && action !== 'status' && action !== 'hint_time') {
-        await editSettingsMenu(bot, msg);
+      if (
+        !['summary_now', 'status', 'hint_time', 'more', 'main'].includes(action)
+      ) {
+        await editSettingsMenu(bot, msg, action === 'toggle_stt' ? 'more' : 'main');
       }
     } catch (err) {
       console.warn('[settings] callback error:', err.message);
@@ -558,8 +566,26 @@ function actorFromCallback(query) {
   };
 }
 
-async function settingsKeyboard(chatId) {
+async function settingsKeyboard(chatId, page = 'main') {
   const s = await runtime.buildStatus(chatId);
+  if (page === 'more') {
+    return {
+      inline_keyboard: [
+        [
+          {
+            text: `Голос в текст: ${s.stt.configured ? 'вкл' : 'выкл'}`,
+            callback_data: 'settings:toggle_stt',
+          },
+        ],
+        [
+          { text: 'Полный статус', callback_data: 'settings:status' },
+          { text: 'Изменить время сводки', callback_data: 'settings:hint_time' },
+        ],
+        [{ text: 'Назад', callback_data: 'settings:main' }],
+      ],
+    };
+  }
+
   return {
     inline_keyboard: [
       [
@@ -573,37 +599,46 @@ async function settingsKeyboard(chatId) {
       ],
       [
         {
-          text: `Голосовые: ${s.stt.configured ? 'вкл' : 'выкл'}`,
-          callback_data: 'settings:toggle_stt',
-        },
-        {
           text: `Вечерняя сводка: ${s.dailyReview.enabled ? 'вкл' : 'выкл'}`,
           callback_data: 'settings:toggle_daily',
         },
       ],
       [
         { text: 'Сводка сейчас', callback_data: 'settings:summary_now' },
-        { text: 'Статус', callback_data: 'settings:status' },
+        { text: 'Дополнительно', callback_data: 'settings:more' },
       ],
-      [{ text: 'Изменить время сводки', callback_data: 'settings:hint_time' }],
     ],
   };
 }
 
-async function settingsMenuText(chatId) {
+async function settingsMenuText(chatId, page = 'main') {
   const s = await runtime.buildStatus(chatId);
   const next = s.dailyReview.next ? s.dailyReview.next.local : 'выключена';
   const mode = s.mode === 'silent' ? 'тихий (только записываю)' : 'диалог';
+  if (page === 'more') {
+    return [
+      'Дополнительные настройки',
+      '',
+      `Голос в текст: ${s.stt.configured ? 'включён' : 'выключен'} (язык: ${s.stt.language})`,
+      `Макс. длина голосового: ${s.stt.maxDurationSec} сек.`,
+      `Модель сводки: ${s.dailyReview.model}`,
+      `Минимум записей для автосводки: ${s.dailyReview.minMessages}`,
+      '',
+      'Точные правки:',
+      '/set daily_review_time 22:30',
+      '/set daily_review_min_messages 1',
+      '/set stt_enabled false',
+    ].join('\n');
+  }
+
   return [
     'Настройки агента',
     '',
     `Режим: ${mode}`,
-    `Голосовые: ${s.stt.configured ? 'включены' : 'выключены'} (язык: ${s.stt.language})`,
     `Вечерняя сводка: ${s.dailyReview.enabled ? 'включена' : 'выключена'}`,
-    `Расписание сводки: ${s.dailyReview.cron} (${s.dailyReview.tz})`,
     `Следующая сводка: ${next}`,
     '',
-    'Точные правки: /set daily_review_time 22:30',
+    'Редко используемые настройки — в "Дополнительно".',
   ].join('\n');
 }
 
@@ -613,11 +648,11 @@ async function sendSettingsMenu(bot, chatId) {
   });
 }
 
-async function editSettingsMenu(bot, msg) {
-  await bot.editMessageText(await settingsMenuText(msg.chat.id), {
+async function editSettingsMenu(bot, msg, page = 'main') {
+  await bot.editMessageText(await settingsMenuText(msg.chat.id, page), {
     chat_id: msg.chat.id,
     message_id: msg.message_id,
-    reply_markup: await settingsKeyboard(msg.chat.id),
+    reply_markup: await settingsKeyboard(msg.chat.id, page),
   });
 }
 
