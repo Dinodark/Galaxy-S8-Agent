@@ -13,6 +13,7 @@ const journal = require('../core/journal');
 const modes = require('../core/modes');
 const settings = require('../core/settings');
 const runtime = require('../core/runtime');
+const atlas = require('../core/memory_atlas');
 const { startBatteryWatcher } = require('../core/watchers/battery');
 const { runReview } = require('../core/watchers/daily_review');
 const { isAllowed } = require('./auth');
@@ -59,7 +60,7 @@ function start() {
         status.dailyReview.enabled
           ? `on (cron "${status.dailyReview.cron}", tz=${status.dailyReview.tz})`
           : 'off'
-      }\n\nCommands:\n/status — runtime status\n/settings — Settings Center buttons\n/set — change a setting by name\n/ping — liveness check\n/diag — OpenRouter key status\n/battery — phone battery status\n/reminders — list pending reminders\n/summary — generate today's evening review now\n/silent — capture only, no replies (auto-exits at evening review)\n/chat — normal conversational mode\n/reset — wipe this chat's history`
+      }\n\nCommands:\n/status — runtime status\n/settings — Settings Center buttons\n/set — change a setting by name\n/atlas — build and send memory mindmap\n/atlas_status — memory atlas stats\n/ping — liveness check\n/diag — OpenRouter key status\n/battery — phone battery status\n/reminders — list pending reminders\n/summary — generate today's evening review now\n/silent — capture only, no replies (auto-exits at evening review)\n/chat — normal conversational mode\n/reset — wipe this chat's history`
     );
   });
 
@@ -131,6 +132,45 @@ function start() {
       });
     } catch (err) {
       await bot.sendMessage(msg.chat.id, 'status error: ' + err.message);
+    }
+  });
+
+  bot.onText(/^\/atlas$/, async (msg) => {
+    if (!isAllowed(msg.from && msg.from.id)) return replyUnauthorized(bot, msg);
+    try {
+      await bot.sendChatAction(msg.chat.id, 'upload_document');
+      const result = await atlas.buildAtlas({ chatId: msg.chat.id });
+      await bot.sendMessage(
+        msg.chat.id,
+        `Memory atlas built: ${result.index.stats.notes} notes, ${result.index.stats.topics} topics, ${result.index.stats.links} links.`
+      );
+      await bot.sendDocument(msg.chat.id, result.htmlFile);
+    } catch (err) {
+      console.error('[atlas] error:', err);
+      await bot.sendMessage(msg.chat.id, 'atlas error: ' + err.message);
+    }
+  });
+
+  bot.onText(/^\/atlas_status$/, async (msg) => {
+    if (!isAllowed(msg.from && msg.from.id)) return replyUnauthorized(bot, msg);
+    try {
+      const s = await atlas.status();
+      if (!s.exists) {
+        await bot.sendMessage(msg.chat.id, 'Memory atlas has not been built yet. Use /atlas.');
+        return;
+      }
+      await bot.sendMessage(
+        msg.chat.id,
+        [
+          `Memory atlas: ${s.generatedAt}`,
+          `Notes: ${s.stats.notes}`,
+          `Journal days: ${s.stats.journalDays}`,
+          `Topics: ${s.stats.topics}`,
+          `Links: ${s.stats.links}`,
+        ].join('\n')
+      );
+    } catch (err) {
+      await bot.sendMessage(msg.chat.id, 'atlas status error: ' + err.message);
     }
   });
 

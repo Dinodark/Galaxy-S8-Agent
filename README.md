@@ -50,7 +50,33 @@ Get a free Groq key for voice message transcription at
 <https://console.groq.com/keys> (optional — leave `GROQ_API_KEY` empty
 to disable voice support).
 
-## Setup (Galaxy S8 via Termux)
+## One-command Termux install
+
+For first-time testers, install **Termux** and **Termux:API** from F-Droid,
+then paste one command into Termux:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/Dinodark/Galaxy-S8-Agent/main/install.sh | sh
+```
+
+The installer will install packages, clone/update the repo, run `npm install`,
+ask for keys, create `.env`, write `memory/settings.json`, and create helper
+commands:
+
+- `agent-start` — start the bot in tmux
+- `agent-stop` — stop the bot
+- `agent-logs` — attach to logs
+- `agent-update` — pull updates and reinstall dependencies
+- `agent-doctor` — run environment checks
+
+Prepare these values before running setup:
+
+- Telegram bot token from [@BotFather](https://t.me/BotFather)
+- Your Telegram user id from [@userinfobot](https://t.me/userinfobot)
+- OpenRouter API key from <https://openrouter.ai/keys>
+- Optional Groq API key from <https://console.groq.com/keys> for voice messages
+
+## Manual setup (Galaxy S8 via Termux)
 
 Install Termux from **F-Droid** (not Google Play — that version is outdated):
 <https://f-droid.org/packages/com.termux/>
@@ -155,6 +181,8 @@ the scheduler in-process; no Termux restart is needed.
 - `/status` — full runtime status
 - `/settings` — Settings Center buttons
 - `/set ...` — change supported settings by name
+- `/atlas` — build and send an interactive HTML memory mindmap
+- `/atlas_status` — show mindmap stats
 - `/ping` — liveness check
 - `/diag` — check OpenRouter key status (credits, limits)
 - `/battery` — current phone battery (Termux only)
@@ -215,6 +243,20 @@ self-disabling when its prerequisites are missing (e.g. no `termux-api`).
   22:30` or `/settings` to change the schedule without restarting.
 
 Anything else goes through the agent.
+
+## Memory atlas
+
+`/atlas` builds a standalone interactive HTML mindmap at `memory/atlas.html`
+and sends it to Telegram as a file. It is generated locally from:
+
+- `memory/notes/*.md`
+- `memory/notes/summary-YYYY-MM-DD.md`
+- the last few journal days for the current chat
+
+The first MVP does not call an LLM, so it is fast and cheap. It extracts
+headings, keywords, note files, daily summaries, and shared topics, then
+renders a draggable graph with a side panel for details. The cached index
+lives in `memory/memory_index.json`.
 
 ## Troubleshooting
 

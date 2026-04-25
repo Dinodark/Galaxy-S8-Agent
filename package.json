@@ -4,7 +4,9 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "start": "node index.js"
+    "start": "node index.js",
+    "setup": "node scripts/setup.js",
+    "doctor": "node scripts/doctor.js"
   },
   "repository": {
     "type": "git",
