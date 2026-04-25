@@ -9,24 +9,6 @@ const atlas = require('./memory_atlas');
 const memory = require('./memory');
 const journal = require('./journal');
 
-function debugLog(runId, hypothesisId, location, message, data = {}) {
-  const safeData = { ...data };
-  if (safeData.token) safeData.token = '[redacted]';
-  const payload = {
-    sessionId: '047796',
-    runId,
-    hypothesisId,
-    location,
-    message,
-    data: safeData,
-    timestamp: Date.now(),
-  };
-  // #region agent log
-  fetch('http://127.0.0.1:7933/ingest/05d097ed-198e-47e6-8b77-1f7ddf4809a1',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'047796'},body:JSON.stringify(payload)}).catch(()=>{});
-  // #endregion
-  console.log('[debug:047796]', message, JSON.stringify(safeData));
-}
-
 function json(res, status, data) {
   const body = JSON.stringify(data, null, 2);
   res.writeHead(status, {
@@ -93,10 +75,6 @@ async function listNotesDetailed() {
 async function handleApi(req, res, url) {
   const pathname = url.pathname;
   const chatId = firstOwnerChatId();
-  debugLog('pre-fix-1', 'H5', 'core/web_server.js:handleApi', 'api route start', {
-    pathname,
-    hasChatId: !!chatId,
-  });
 
   if (pathname === '/api/status') {
     return json(res, 200, await runtime.buildStatus(chatId));
@@ -104,15 +82,6 @@ async function handleApi(req, res, url) {
 
   if (pathname === '/api/settings') {
     return json(res, 200, await settings.getPublicSettings());
-  }
-
-  if (pathname === '/api/debug-client') {
-    const event = url.searchParams.get('event') || 'unknown';
-    debugLog('pre-fix-1', 'H3', 'core/web_server.js:client-debug', 'client event', {
-      event,
-      ua: req.headers['user-agent'],
-    });
-    return json(res, 200, { ok: true });
   }
 
   if (pathname === '/api/atlas') {
@@ -156,7 +125,7 @@ function appHtml() {
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:14px/1.45 system-ui,-apple-system,Segoe UI,sans-serif}
 #app{display:grid;grid-template-columns:240px minmax(0,1fr);height:100vh}.side{border-right:1px solid var(--line);background:var(--panel);padding:16px;overflow:auto}.main{display:grid;grid-template-rows:52px minmax(0,1fr);min-width:0}
 h1{font-size:17px;margin:0 0 16px}.nav button{display:block;width:100%;text-align:left;background:transparent;color:var(--text);border:1px solid var(--line);border-radius:10px;padding:10px;margin:8px 0;cursor:pointer}.nav button:hover{border-color:var(--accent)}
-.top{display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--line);padding:0 16px;background:#0d1426}.content{padding:16px;overflow:auto}.grid{display:grid;grid-template-columns:280px minmax(0,1fr);gap:14px;height:100%}.card{background:var(--panel2);border:1px solid var(--line);border-radius:14px;padding:14px}.list{overflow:auto}.item{padding:9px;border-bottom:1px solid var(--line);cursor:pointer}.item:hover{background:#ffffff08}pre{white-space:pre-wrap;font-family:ui-monospace,SFMono-Regular,Consolas,monospace}.muted{color:var(--muted)}iframe{width:100%;height:calc(100vh - 92px);border:1px solid var(--line);border-radius:14px;background:#050812}
+.top{display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--line);padding:0 16px;background:#0d1426}.content{padding:16px;overflow:auto}.grid{display:grid;grid-template-columns:280px minmax(0,1fr);gap:14px;height:100%}.card{background:var(--panel2);border:1px solid var(--line);border-radius:14px;padding:14px}.list{overflow:auto}.item{padding:9px;border-bottom:1px solid var(--line);cursor:pointer}.item:hover{background:#ffffff08}pre{white-space:pre-wrap;font-family:ui-monospace,SFMono-Regular,Consolas,monospace}.muted{color:var(--muted)}iframe{width:100%;height:calc(100vh - 92px);border:1px solid var(--line);border-radius:14px;background:#050812}.journal{display:flex;flex-direction:column;gap:12px}.entry{border:1px solid var(--line);border-radius:12px;padding:12px;background:#0d1426}.entry.user{border-color:#345b7a}.entry.assistant{border-color:#4b5270}.entry-meta{display:flex;gap:8px;align-items:center;margin-bottom:8px;color:var(--muted);font-size:12px}.badge{border:1px solid var(--line);border-radius:999px;padding:2px 8px;background:#ffffff08;color:var(--text)}.entry-text{white-space:pre-wrap;color:var(--text);font-size:14px;line-height:1.5}
 </style>
 </head>
 <body>
@@ -169,26 +138,22 @@ h1{font-size:17px;margin:0 0 16px}.nav button{display:block;width:100%;text-alig
 <button onclick="showSettings()">Settings</button>
 </div><p class="muted">Read-only local UI. Keep this URL private.</p></aside><main class="main"><div class="top"><strong id="title">Status</strong><span class="muted" id="state"></span></div><div class="content" id="content"></div></main></div>
 <script>
-(function(){
-  function ping(event){try{fetch('/api/debug-client?event='+encodeURIComponent(event)+'&token='+encodeURIComponent(new URL(location.href).searchParams.get('token')||''),{cache:'no-store'}).catch(function(){});}catch(e){}}
-  window.onerror=function(message,source,line,column){ping('error:'+String(message).slice(0,80)+':'+line+':'+column);};
-  window.onunhandledrejection=function(event){ping('rejection:'+String(event.reason&&event.reason.message||event.reason||'unknown').slice(0,80));};
-  ping('bootstrap');
-})();
-</script>
-<script>
 const token=new URL(location.href).searchParams.get('token')||'';
 const api=(p)=>fetch(p+(p.includes('?')?'&':'?')+'token='+encodeURIComponent(token)).then(r=>{if(!r.ok)throw new Error(r.status+' '+r.statusText);return r.json()});
 const title=t=>document.getElementById('title').textContent=t;
 const content=html=>document.getElementById('content').innerHTML=html;
 const esc=s=>String(s??'').replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));
+const fmtTime=ts=>{try{return new Date(ts).toLocaleString('ru-RU',{dateStyle:'medium',timeStyle:'short'})}catch{return ts||''}};
+const sourceLabel=s=>s==='assistant'?'white rabbit':'Ты';
+const viaLabel=v=>({voice:'voice',audio:'audio',video_note:'video note',text:'text'}[v||'text']||v||'text');
+const renderJournalEntry=e=>'<article class="entry '+esc(e.source||'user')+'"><div class="entry-meta"><span class="badge">'+esc(sourceLabel(e.source))+'</span><span>'+esc(fmtTime(e.ts))+'</span><span>'+esc(viaLabel(e.via))+'</span></div><div class="entry-text">'+esc(e.text)+'</div></article>';
 async function showStatus(){title('Status');const s=await api('/api/status');content('<div class="card"><pre>'+esc(JSON.stringify(s,null,2))+'</pre></div>')}
 async function showSettings(){title('Settings');const s=await api('/api/settings');content('<div class="card"><pre>'+esc(JSON.stringify(s,null,2))+'</pre></div>')}
 async function showAtlas(){title('Memory Atlas');document.getElementById('state').textContent='building...';const a=await api('/api/atlas');document.getElementById('state').textContent=a.stats.notes+' files, '+a.stats.topics+' topics';content('<iframe src="/atlas.html?token='+encodeURIComponent(token)+'"></iframe>')}
 async function showNotes(kind){title(kind==='summary'?'Summaries':'Notes');const n=await api('/api/notes');const list=n.notes.filter(x=>x.kind===kind);content('<div class="grid"><div class="card list">'+list.map(x=>'<div class="item" onclick="openNote(\\''+esc(x.name)+'\\')"><strong>'+esc(x.name)+'</strong><br><span class="muted">'+esc(x.mtime||'')+'</span></div>').join('')+'</div><div class="card"><pre id="viewer" class="muted">Select a file</pre></div></div>')}
 async function openNote(name){const n=await api('/api/note?name='+encodeURIComponent(name));document.getElementById('viewer').textContent=n.content}
-async function showJournal(){title('Journal');const j=await api('/api/journal');content('<div class="grid"><div class="card list">'+j.days.map(d=>'<div class="item" onclick="openJournal(\\''+esc(d)+'\\')">'+esc(d)+'</div>').join('')+'</div><div class="card"><pre id="viewer" class="muted">Select a day</pre></div></div>')}
-async function openJournal(day){const j=await api('/api/journal?day='+encodeURIComponent(day));document.getElementById('viewer').textContent=j.entries.map(e=>'['+e.ts+'] '+e.source+' '+(e.via||'text')+'\\n'+e.text).join('\\n\\n')}
+async function showJournal(){title('Journal');const j=await api('/api/journal');content('<div class="grid"><div class="card list">'+j.days.map(d=>'<div class="item" onclick="openJournal(\\''+esc(d)+'\\')">'+esc(d)+'</div>').join('')+'</div><div class="card"><div id="viewer" class="muted">Select a day</div></div></div>')}
+async function openJournal(day){const j=await api('/api/journal?day='+encodeURIComponent(day));document.getElementById('viewer').className='journal';document.getElementById('viewer').innerHTML=j.entries.length?j.entries.map(renderJournalEntry).join(''):'<p class="muted">No entries for this day.</p>'}
 showStatus().catch(e=>content('<pre>'+esc(e.message)+'</pre>'));
 </script>
 </body></html>`;
@@ -209,21 +174,6 @@ async function startServer() {
   const s = await settings.getSettings();
   const host = s.web.host || '0.0.0.0';
   const port = s.web.port || 8787;
-  debugLog('pre-fix-1', 'H1,H2', 'core/web_server.js:startServer', 'server settings loaded', {
-    enabled: !!s.web.enabled,
-    host,
-    port,
-    hasToken: !!s.web.token,
-    localIp: localIp(),
-    interfaces: Object.fromEntries(
-      Object.entries(os.networkInterfaces()).map(([name, entries]) => [
-        name,
-        (entries || [])
-          .filter((n) => n.family === 'IPv4')
-          .map((n) => ({ address: n.address, internal: n.internal })),
-      ])
-    ),
-  });
   if (!s.web.enabled) {
     console.log('[web] disabled in settings');
     return null;
@@ -235,38 +185,14 @@ async function startServer() {
   const server = http.createServer(async (req, res) => {
     try {
       const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
-      debugLog('pre-fix-1', 'H1,H2,H4,H5', 'core/web_server.js:request', 'request received', {
-        method: req.method,
-        pathname: url.pathname,
-        host: req.headers.host,
-        remoteAddress: req.socket && req.socket.remoteAddress,
-        hasQueryToken: url.searchParams.has('token'),
-        hasHeaderToken: !!req.headers['x-agent-token'],
-        ua: req.headers['user-agent'],
-      });
-      const authed = await authorize(req, url, s);
-      debugLog('pre-fix-1', 'H4', 'core/web_server.js:authorize', 'auth result', {
-        pathname: url.pathname,
-        authed,
-      });
-      if (!authed) {
+      if (!(await authorize(req, url, s))) {
         return text(res, 401, 'Unauthorized');
       }
-      if (url.pathname === '/') {
-        debugLog('pre-fix-1', 'H3', 'core/web_server.js:root', 'serving app html', {
-          htmlLength: appHtml().length,
-        });
-        return html(res, appHtml());
-      }
+      if (url.pathname === '/') return html(res, appHtml());
       if (url.pathname === '/atlas.html') return serveAtlasHtml(res);
       if (url.pathname.startsWith('/api/')) return handleApi(req, res, url);
       return text(res, 404, 'Not found');
     } catch (err) {
-      debugLog('pre-fix-1', 'H5', 'core/web_server.js:request-error', 'request error', {
-        name: err.name,
-        message: err.message,
-        stack: String(err.stack || '').slice(0, 500),
-      });
       console.error('[web] request error:', err);
       return json(res, 500, { error: err.message });
     }
@@ -274,11 +200,6 @@ async function startServer() {
 
   await new Promise((resolve) => server.listen(port, host, resolve));
   const ip = localIp() || 'PHONE_IP';
-  debugLog('pre-fix-1', 'H1,H2', 'core/web_server.js:listening', 'server listening', {
-    host,
-    port,
-    ip,
-  });
   console.log(`[web] listening on http://${ip}:${port}/?token=${s.web.token}`);
   return server;
 }
