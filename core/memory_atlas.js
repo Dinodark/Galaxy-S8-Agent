@@ -248,6 +248,7 @@ function updateAtlasMobile(){document.body.classList.toggle('atlas-mobile',mqMob
 mqMobile.addEventListener('change',function(){updateAtlasMobile();if(mqMobile.matches){if(legend)legend.innerHTML=''}else{renderLegend()}if(!mqMobile.matches&&modalRoot&&!modalRoot.hidden)closeAtlasModal()});
 updateAtlasMobile();
 const POSKEY='vatoko-atlas-positions-v1';
+var graphDomBuilt=false;
 let activeId='';
 function size(n){if(n.isCore)return 30;return Math.max(10,Math.min(22,10+Math.sqrt(Math.max(n.size,1))/18))}
 function box(n){const label=(n.label||'').slice(0,32);const charW=n.isCore?8.2:7.2;const w=Math.max(70,Math.min(320,label.length*charW+22));const h=n.isCore?38:32;return {w,h}}
@@ -267,8 +268,70 @@ for(const l of links){const dx=l.target.x-l.source.x,dy=l.target.y-l.source.y,d=
 for(let i=0;i<nodes.length;i++)for(let j=i+1;j<nodes.length;j++){const a=nodes[i],b=nodes[j],dx=b.x-a.x,dy=b.y-a.y,d=Math.hypot(dx,dy)||1,ab=box(a),bb=box(b),min=(Math.max(ab.w,ab.h)+Math.max(bb.w,bb.h))*0.5+14;if(d<min){const f=(min-d)*0.022;if(!a.dragging){a.vx-=dx/d*f;a.vy-=dy/d*f}if(!b.dragging){b.vx+=dx/d*f;b.vy+=dy/d*f}}}
 for(const n of nodes){if(n.dragging)continue;n.vx*=0.88;n.vy*=0.88;const b=box(n),mx=b.w/2+6,my=b.h/2+6;n.x=Math.max(mx,Math.min(w-mx,n.x+n.vx));n.y=Math.max(my,Math.min(h-my,n.y+n.vy))}
 draw();requestAnimationFrame(tick)}
-function draw(){if(!svg)return;svg.innerHTML='';for(const l of links){const line=document.createElementNS('http://www.w3.org/2000/svg','line');line.setAttribute('class','link');line.setAttribute('x1',l.source.x);line.setAttribute('y1',l.source.y);line.setAttribute('x2',l.target.x);line.setAttribute('y2',l.target.y);svg.appendChild(line)}
-for(const n of nodes){const g=document.createElementNS('http://www.w3.org/2000/svg','g');g.setAttribute('class','node'+(n.id===activeId?' active':'')+(n.isCore?' core':''));g.setAttribute('transform',\`translate(\${n.x},\${n.y})\`);g.addEventListener('pointerdown',function(e){onNodePointerDown(e,n)});const b=box(n);const r=document.createElementNS('http://www.w3.org/2000/svg','rect');r.setAttribute('x',-b.w/2);r.setAttribute('y',-b.h/2);r.setAttribute('width',b.w);r.setAttribute('height',b.h);r.setAttribute('fill',n.color||'#fff');r.setAttribute('rx',12);r.setAttribute('ry',12);g.appendChild(r);const t=document.createElementNS('http://www.w3.org/2000/svg','text');t.setAttribute('text-anchor','middle');t.setAttribute('dominant-baseline','middle');t.setAttribute('x',0);t.setAttribute('y',1);t.textContent=n.label.slice(0,32);g.appendChild(t);svg.appendChild(g)}}
+function buildGraphDomOnce(){
+if(graphDomBuilt||!svg)return;
+svg.innerHTML='';
+for(const l of links){
+const line=document.createElementNS('http://www.w3.org/2000/svg','line');
+line.setAttribute('class','link');
+l._line=line;
+svg.appendChild(line);
+}
+for(const n of nodes){
+const g=document.createElementNS('http://www.w3.org/2000/svg','g');
+g.addEventListener('pointerdown',function(e){onNodePointerDown(e,n);});
+n._g=g;
+const b=box(n);
+const r=document.createElementNS('http://www.w3.org/2000/svg','rect');
+n._r=r;
+r.setAttribute('x',-b.w/2);
+r.setAttribute('y',-b.h/2);
+r.setAttribute('width',b.w);
+r.setAttribute('height',b.h);
+r.setAttribute('fill',n.color||'#fff');
+r.setAttribute('rx',12);
+r.setAttribute('ry',12);
+g.appendChild(r);
+const t=document.createElementNS('http://www.w3.org/2000/svg','text');
+n._t=t;
+t.setAttribute('text-anchor','middle');
+t.setAttribute('dominant-baseline','middle');
+t.setAttribute('x',0);
+t.setAttribute('y',1);
+t.textContent=n.label.slice(0,32);
+g.appendChild(t);
+svg.appendChild(g);
+}
+graphDomBuilt=true;
+}
+function syncGraphDom(){
+if(!graphDomBuilt||!svg)return;
+for(const l of links){
+if(l._line){
+l._line.setAttribute('x1',l.source.x);
+l._line.setAttribute('y1',l.source.y);
+l._line.setAttribute('x2',l.target.x);
+l._line.setAttribute('y2',l.target.y);
+}
+}
+for(const n of nodes){
+if(!n._g)continue;
+const b=box(n);
+n._g.setAttribute('class','node'+(n.id===activeId?' active':'')+(n.isCore?' core':''));
+n._g.setAttribute('transform','translate('+n.x+','+n.y+')');
+n._r.setAttribute('x',-b.w/2);
+n._r.setAttribute('y',-b.h/2);
+n._r.setAttribute('width',b.w);
+n._r.setAttribute('height',b.h);
+n._r.setAttribute('fill',n.color||'#fff');
+n._t.textContent=n.label.slice(0,32);
+}
+}
+function draw(){
+if(!svg)return;
+if(!graphDomBuilt)buildGraphDomOnce();
+syncGraphDom();
+}
 function show(n){activeId=n.id;draw();if(mqMobile.matches){openAtlasModal(n);return}
 const coreBanner=n.isCore?'<p class="hint" style="margin:10px 0 0;border-left:3px solid #c9a86b;padding-left:10px">Это <strong>ядро маршрутизации</strong>. Его вручную правите вы (в т.ч. ниже). Телеграм-агент в этот файл не пишет; веб с токеном из <code>/web</code> — можно.</p>':'';
 side.innerHTML=\`<div class="readerHead"><h2>\${escapeHtml(n.label)}</h2><div class="filePath">\${escapeHtml(n.file)}</div>\${coreBanner}<p class="hint">Папка: \${escapeHtml(n.folder)} · \${Math.round((n.size||0)/1024*10)/10} KB</p></div><h3>Ключевые темы</h3>\${(n.keywords||[]).slice(0,10).map(k=>\`<span class="pill">\${escapeHtml(k.word||k)}</span>\`).join('')||'<p class="hint">Нет</p>'}<div class="atlasEdit"><h3>Редактирование</h3><div class="atlasBar"><button type="button" id="atlasSave">Сохранить</button><button type="button" id="atlasRevert">Сбросить</button><span id="atlasStatus"></span></div><label class="hint" for="atlasTa" style="display:block;margin-bottom:6px">Markdown, полная перезапись файла (не дописывание)</label><textarea id="atlasTa" class="atlasTextarea" rows="20" wrap="off" spellcheck="false" autocomplete="off"></textarea></div>\`;
