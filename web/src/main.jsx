@@ -4,13 +4,13 @@ import './styles.css';
 
 const navItems = [
   ['home', 'Home'],
-  ['status', 'Status'],
   ['atlas', 'Memory Atlas'],
-  ['notes', 'Notes'],
   ['summaries', 'Summaries'],
+  ['notes', 'Notes'],
   ['journal', 'Journal'],
   ['reminders', 'Reminders'],
   ['settings', 'Settings'],
+  ['status', 'Status'],
   ['update', 'Update'],
 ];
 
