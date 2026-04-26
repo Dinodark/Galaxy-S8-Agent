@@ -101,6 +101,25 @@ function fmtTime(ts) {
   }
 }
 
+function parseSummaryDate(name) {
+  const m = String(name || '').match(/summary-(\d{4})-(\d{2})-(\d{2})\.md$/);
+  if (!m) return null;
+  const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+function formatSummaryMenuLabel(name) {
+  const d = parseSummaryDate(name);
+  if (!d) return name;
+  return d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' });
+}
+
+function formatSummaryTitleLabel(name) {
+  const d = parseSummaryDate(name);
+  if (!d) return name;
+  return d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' });
+}
+
 function sourceLabel(source) {
   return source === 'assistant' ? 'white rabbit' : 'Ты';
 }
@@ -430,6 +449,8 @@ function FileBrowser({ kind, api, desktopDetail = false }) {
   const [content, setContent] = useState('');
   const kindLabel = kind === 'summary' ? 'сводку' : 'файл';
   const selectedStorageKey = 'galaxy-dashboard-selected-' + kind;
+  const selectedDisplayTitle =
+    kind === 'summary' ? formatSummaryTitleLabel(selected) : selected;
 
   useEffect(() => {
     api.get('/api/notes').then((data) => {
@@ -461,7 +482,9 @@ function FileBrowser({ kind, api, desktopDetail = false }) {
             key={note.name}
             onClick={() => openNote(note.name)}
           >
-            <strong>{note.name}</strong>
+            <strong>
+              {kind === 'summary' ? formatSummaryMenuLabel(note.name) : note.name}
+            </strong>
             <span className="muted">{note.mtime || ''}</span>
           </button>
         ))}
@@ -470,7 +493,7 @@ function FileBrowser({ kind, api, desktopDetail = false }) {
       {desktopDetail && (
         <div className="desktop-reader">
           {selected ? (
-            <ReaderPane title={selected} meta={kind}>
+            <ReaderPane title={selectedDisplayTitle} meta={kind}>
               {kind === 'summary' ? <SummaryMarkdown text={content} /> : <pre>{content}</pre>}
             </ReaderPane>
           ) : (
@@ -483,7 +506,7 @@ function FileBrowser({ kind, api, desktopDetail = false }) {
       {selected && (
         <ReaderModal
           className={desktopDetail ? 'mobile-reader' : ''}
-          title={selected}
+          title={selectedDisplayTitle}
           meta={kind}
           onClose={() => setSelected(null)}
         >
