@@ -68,11 +68,11 @@ function userAskedForReminder(text) {
 
 function userAskedForMemoryInventory(text) {
   const s = String(text || '').toLowerCase();
-  const asksInventory =
-    /какие|какой|какая|какое|список|покажи|показать|структур|дерев|что\s+есть|где\s+файл|какие\s+файл|memory|notes|list/.test(s) &&
-    /файл|замет|баз[ауы]\s+знан|memory|notes/.test(s);
   const asksWrite =
-    /созда(й|ть)|запиши|сохрани|добавь|добавить|заполни|сформируй|создай\s+файл|создай\s+структур/.test(s);
+    /созда(й|ть)|запиши|сохрани|добавь|добавить|внеси|занеси|разнеси|заполни|сформируй|сделай|создай\s+файл|создай\s+структур|внеси\s+туда/.test(s);
+  const asksInventory =
+    /какие|какой|какая|какое|список|покажи|показать|структур|дерев|что\s+есть|где\s+файл|какие\s+файл|memory|notes|list|что\s+в\s+базе/.test(s) &&
+    /файл|замет|баз[ауы]\s+знан|memory|notes/.test(s);
   return asksInventory && !asksWrite;
 }
 

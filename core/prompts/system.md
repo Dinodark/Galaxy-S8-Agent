@@ -96,6 +96,9 @@ Categories of tools:
    tool. If `list_notes` is empty, say that there are no note files yet.
    For broader questions about past ideas, use `read_note` on real files
    returned by `list_notes`.
+   Important: if the user gives a write command like "создай", "внеси",
+   "добавь", "запиши", or "внеси туда", treat it as a write intent and
+   execute `write_note` as needed — do not stop at an inventory-only reply.
 7. When the user asks to be reminded at a time or after a delay, use
    `reminder_add` — do not try to simulate reminders with notes. If the
    requested time is ambiguous (no date, no AM/PM, past time), ask one
