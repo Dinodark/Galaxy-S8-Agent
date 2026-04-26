@@ -598,6 +598,8 @@ function Atlas({ api, token, setStateText }) {
       setSrc(
         '/atlas.html?token=' +
         encodeURIComponent(token) +
+        '&atlas_ts=' +
+        encodeURIComponent(atlas.generatedAt || Date.now()) +
         (theme ? '&' + theme : '')
       );
       setReady(true);

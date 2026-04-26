@@ -4,6 +4,7 @@ const config = require('../config');
 
 const INDEX_FILE = path.join(config.paths.memoryDir, 'memory_index.json');
 const HTML_FILE = path.join(config.paths.memoryDir, 'atlas.html');
+const ATLAS_VERSION = 'knowledge-map-v2';
 const FOLDER_COLORS = [
   '#9cbf8f',
   '#d8c16f',
@@ -181,7 +182,7 @@ h2{margin:0 0 8px;font-size:18px}h3{margin:18px 0 8px;font-size:13px;color:var(-
 </style>
 </head>
 <body>
-<header><h1>Memory Atlas</h1><span>${escHtml(index.generatedAt)} · ${index.stats.notes} knowledge files · ${index.stats.folders} folders · ${index.stats.links} links</span></header>
+<header><h1>Memory Atlas</h1><span>${escHtml(index.version)} · ${escHtml(index.generatedAt)} · ${index.stats.notes} knowledge files · ${index.stats.folders} folders · ${index.stats.links} links</span></header>
 <div id="wrap"><main id="graphWrap"><div class="legend" id="legend"></div><svg id="graph" role="img" aria-label="Knowledge graph"></svg></main><aside id="side"><h2>Выбери файл</h2><p class="hint">Слева база знаний: каждая точка — markdown-файл из memory/notes. Цвет показывает папку.</p></aside></div>
 <script>
 (function applyTheme(){
@@ -219,6 +220,7 @@ async function buildAtlas({ chatId } = {}) {
   const notes = await readNotes();
   const graph = buildGraph(notes);
   const index = {
+    version: ATLAS_VERSION,
     generatedAt: new Date().toISOString(),
     stats: {
       notes: notes.length,

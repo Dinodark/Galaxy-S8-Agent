@@ -233,9 +233,7 @@ async function serveWebAsset(res, pathname) {
 }
 
 async function serveAtlasHtml(res) {
-  if (!(await fse.pathExists(atlas.HTML_FILE))) {
-    await atlas.buildAtlas({ chatId: firstOwnerChatId() });
-  }
+  await atlas.buildAtlas({ chatId: firstOwnerChatId() });
   res.writeHead(200, {
     'Content-Type': 'text/html; charset=utf-8',
     'Cache-Control': 'no-store',
