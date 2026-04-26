@@ -485,37 +485,6 @@ iframe {
   background: var(--color-surface);
 }
 
-.atlas-page {
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
-  gap: 12px;
-  min-height: calc(100vh - 84px);
-}
-
-.atlas-page iframe {
-  height: 100%;
-}
-
-.atlas-debug {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px 14px;
-  align-items: center;
-  color: var(--color-muted);
-  font-size: 12px;
-}
-
-.atlas-debug strong {
-  color: var(--color-text);
-}
-
-.atlas-debug span {
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .journal {
   display: flex;
   flex-direction: column;

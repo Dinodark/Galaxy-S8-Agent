@@ -67,25 +67,6 @@ function tokenFromLocation() {
   return new URL(window.location.href).searchParams.get('token') || '';
 }
 
-function debugLog(hypothesisId, location, message, data) {
-  fetch('http://127.0.0.1:7933/ingest/05d097ed-198e-47e6-8b77-1f7ddf4809a1', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-Debug-Session-Id': '047796',
-    },
-    body: JSON.stringify({
-      sessionId: '047796',
-      runId: 'atlas-pre-fix',
-      hypothesisId,
-      location,
-      message,
-      data,
-      timestamp: Date.now(),
-    }),
-  }).catch(() => {});
-}
-
 function useApi() {
   const token = useMemo(tokenFromLocation, []);
   return useMemo(() => {
@@ -579,22 +560,10 @@ function Journal({ api }) {
 function Atlas({ api, token, setStateText }) {
   const [ready, setReady] = useState(false);
   const [src, setSrc] = useState('');
-  const [atlasInfo, setAtlasInfo] = useState(null);
 
   useEffect(() => {
     setStateText('building...');
     api.get('/api/atlas').then((atlas) => {
-      // #region agent log
-      debugLog('A1,A2,A3', 'web/src/main.jsx:Atlas:apiAtlas', 'atlas api result received', {
-        stats: atlas.stats,
-        noteCount: Array.isArray(atlas.notes) ? atlas.notes.length : null,
-        graphNodeCount: atlas.graph && Array.isArray(atlas.graph.nodes) ? atlas.graph.nodes.length : null,
-        graphLinkCount: atlas.graph && Array.isArray(atlas.graph.links) ? atlas.graph.links.length : null,
-        folders: atlas.graph && Array.isArray(atlas.graph.folders) ? atlas.graph.folders : null,
-        files: Array.isArray(atlas.notes) ? atlas.notes.map((note) => note.file).slice(0, 50) : null,
-      });
-      // #endregion
-      setAtlasInfo(atlas);
       setStateText(atlas.stats.notes + ' files, ' + atlas.stats.folders + ' folders');
       const theme = atlasThemeQuery();
       setSrc(
@@ -610,21 +579,7 @@ function Atlas({ api, token, setStateText }) {
   }, [api, setStateText]);
 
   if (!ready) return <div className="card muted">Building atlas...</div>;
-  return (
-    <div className="atlas-page">
-      <div className="card atlas-debug">
-        <strong>Atlas debug</strong>
-        <span>React marker: atlas-react-v2</span>
-        <span>
-          API: {atlasInfo?.stats?.notes ?? '?'} files, {atlasInfo?.stats?.folders ?? '?'} folders, {atlasInfo?.stats?.links ?? '?'} links
-        </span>
-        <span>
-          Files: {atlasInfo?.notes?.length ? atlasInfo.notes.map((note) => note.file).join(', ') : 'none'}
-        </span>
-      </div>
-      <iframe src={src} title="Memory Atlas" />
-    </div>
-  );
+  return <iframe src={src} title="Memory Atlas" />;
 }
 
 function UpdatePanel({ api }) {

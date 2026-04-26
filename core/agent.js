@@ -7,26 +7,6 @@ const tools = require('./tools');
 
 let cachedSystemPrompt = null;
 
-function debugLog(hypothesisId, location, message, data) {
-  if (typeof fetch !== 'function') return;
-  fetch('http://127.0.0.1:7933/ingest/05d097ed-198e-47e6-8b77-1f7ddf4809a1', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-Debug-Session-Id': '047796',
-    },
-    body: JSON.stringify({
-      sessionId: '047796',
-      runId: 'pre-fix',
-      hypothesisId,
-      location,
-      message,
-      data,
-      timestamp: Date.now(),
-    }),
-  }).catch(() => {});
-}
-
 async function getSystemPrompt() {
   if (cachedSystemPrompt) return cachedSystemPrompt;
   const p = path.join(__dirname, 'prompts', 'system.md');
@@ -87,7 +67,13 @@ function userAskedForReminder(text) {
 }
 
 function userAskedForMemoryInventory(text) {
-  return /файл|замет|структур|дерев|баз[ауы]\s+знан|memory|notes|list/i.test(String(text || ''));
+  const s = String(text || '').toLowerCase();
+  const asksInventory =
+    /какие|какой|какая|какое|список|покажи|показать|структур|дерев|что\s+есть|где\s+файл|какие\s+файл|memory|notes|list/.test(s) &&
+    /файл|замет|баз[ауы]\s+знан|memory|notes/.test(s);
+  const asksWrite =
+    /созда(й|ть)|запиши|сохрани|добавь|добавить|заполни|сформируй|создай\s+файл|создай\s+структур/.test(s);
+  return asksInventory && !asksWrite;
 }
 
 function renderTreeFromFiles(files) {
@@ -206,21 +192,6 @@ async function runAgent({ chatId, userMessage }) {
   const newMessages = [{ role: 'user', content: userMessage }];
   let history = await memory.appendToHistory(chatId, newMessages);
 
-  // #region agent log
-  console.log('[debug:047796] agent turn started', {
-    hypothesisId: 'H1,H4',
-    chatId,
-    historyLength: history.length,
-    asksAboutFiles: userAskedForMemoryInventory(userMessage),
-  });
-  debugLog('H1,H4', 'core/agent.js:runAgent:start', 'agent turn started', {
-    chatId,
-    historyLength: history.length,
-    userMessageLength: String(userMessage || '').length,
-    asksAboutFiles: /файл|замет|структур|дерев|memory|notes|list/i.test(String(userMessage || '')),
-  });
-  // #endregion
-
   const toolSchemas = tools.listSchemas();
   const transcript = [];
   const toolCtx = { chatId };
@@ -237,30 +208,7 @@ async function runAgent({ chatId, userMessage }) {
     });
     turnContext.push(inventory.message);
 
-    // #region agent log
-    console.log('[debug:047796] memory inventory injected', {
-      hypothesisId: 'H1,H2,H4',
-      fileCount: Array.isArray(inventory.result.files) ? inventory.result.files.length : null,
-      files: Array.isArray(inventory.result.files) ? inventory.result.files.slice(0, 50) : null,
-    });
-    debugLog('H1,H2,H4', 'core/agent.js:runAgent:memoryInventoryContext', 'memory inventory injected', {
-      fileCount: Array.isArray(inventory.result.files) ? inventory.result.files.length : null,
-      files: Array.isArray(inventory.result.files) ? inventory.result.files.slice(0, 50) : null,
-    });
-    // #endregion
-
     const deterministicReply = buildMemoryInventoryReply(files);
-    // #region agent log
-    console.log('[debug:047796] deterministic memory inventory reply', {
-      hypothesisId: 'H6',
-      fileCount: files.length,
-      usedLlm: false,
-    });
-    debugLog('H6', 'core/agent.js:runAgent:deterministicInventoryReply', 'deterministic inventory reply returned', {
-      fileCount: files.length,
-      files: files.slice(0, 50),
-    });
-    // #endregion
     history = await memory.appendToHistory(chatId, [{ role: 'assistant', content: deterministicReply }]);
     return {
       reply: deterministicReply,
@@ -274,25 +222,6 @@ async function runAgent({ chatId, userMessage }) {
       messages: [...withRuntimeContext(history), ...turnContext],
       tools: toolSchemas,
     });
-
-    // #region agent log
-    console.log('[debug:047796] assistant response received', {
-      hypothesisId: 'H1,H3,H4',
-      step,
-      hasToolCalls: Boolean(assistantMsg.tool_calls && assistantMsg.tool_calls.length),
-      toolCallNames: (assistantMsg.tool_calls || []).map((call) => call.function && call.function.name),
-      contentLooksLikeFileTree: /memory|notes|projects\/|```|Дерево базы/i.test(String(assistantMsg.content || '')),
-      transcriptToolNames: transcript.map((item) => item.tool),
-    });
-    debugLog('H1,H3,H4', 'core/agent.js:runAgent:assistantResponse', 'assistant response received', {
-      step,
-      hasToolCalls: Boolean(assistantMsg.tool_calls && assistantMsg.tool_calls.length),
-      toolCallNames: (assistantMsg.tool_calls || []).map((call) => call.function && call.function.name),
-      contentLength: String(assistantMsg.content || '').length,
-      contentLooksLikeFileTree: /memory|notes|projects\/|```|Дерево базы/i.test(String(assistantMsg.content || '')),
-      transcriptToolNames: transcript.map((item) => item.tool),
-    });
-    // #endregion
 
     const pushed = [assistantMsg];
 
@@ -310,19 +239,6 @@ async function runAgent({ chatId, userMessage }) {
 
         const result = await tools.execute(name, args, toolCtx);
         transcript.push({ tool: name, args, result });
-
-        // #region agent log
-        debugLog('H2,H3', 'core/agent.js:runAgent:toolResult', 'tool executed', {
-          step,
-          tool: name,
-          argKeys: Object.keys(args || {}),
-          resultFound: result && result.found,
-          resultFileCount: result && Array.isArray(result.files) ? result.files.length : null,
-          resultFiles: result && Array.isArray(result.files) ? result.files.slice(0, 30) : undefined,
-          saved: result && result.saved,
-          ok: result && result.ok,
-        });
-        // #endregion
 
         pushed.push({
           role: 'tool',
@@ -355,20 +271,6 @@ async function runAgent({ chatId, userMessage }) {
     }
 
     history = await memory.appendToHistory(chatId, pushed);
-    // #region agent log
-    console.log('[debug:047796] final reply without tool calls', {
-      hypothesisId: 'H1,H3,H4',
-      step,
-      transcriptToolNames: transcript.map((item) => item.tool),
-      replyLooksLikeFileTree: /memory|notes|projects\/|```|Дерево базы/i.test(String(assistantMsg.content || '')),
-    });
-    debugLog('H1,H3,H4', 'core/agent.js:runAgent:finalReply', 'final reply without tool calls', {
-      step,
-      transcriptToolNames: transcript.map((item) => item.tool),
-      replyLength: String(assistantMsg.content || '').length,
-      replyLooksLikeFileTree: /memory|notes|projects\/|```|Дерево базы/i.test(String(assistantMsg.content || '')),
-    });
-    // #endregion
     return {
       reply: assistantMsg.content || '',
       toolCalls: transcript,
