@@ -175,6 +175,7 @@ function start() {
       const ip = localIp();
       const host = ip || 'PHONE_IP';
       const port = s.web.port || 8787;
+      const bindHost = String((s.web && s.web.host) || '0.0.0.0');
       const token = encodeURIComponent(s.web.token);
       const phoneUrl = `http://127.0.0.1:${port}/?token=${token}`;
       const lanUrl = `http://${host}:${port}/?token=${token}`;
@@ -189,6 +190,11 @@ function start() {
         '',
         'Start it on the phone with: agent-web',
       ];
+      if (bindHost !== '0.0.0.0' && bindHost !== '::') {
+        lines.push('');
+        lines.push(`Warning: web.host is ${bindHost}. Remote devices may not connect.`);
+        lines.push('Set /set web_host 0.0.0.0 for LAN access.');
+      }
       if (!ip) {
         lines.push('Could not detect phone IP. Replace PHONE_IP with the Wi-Fi address from: ip addr');
       }

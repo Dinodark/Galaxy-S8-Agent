@@ -53,12 +53,24 @@ function firstOwnerChatId() {
 
 function localIp() {
   const nets = os.networkInterfaces();
-  for (const entries of Object.values(nets)) {
+  const candidates = [];
+  for (const [name, entries] of Object.entries(nets)) {
     for (const n of entries || []) {
-      if (n.family === 'IPv4' && !n.internal) return n.address;
+      if (n.family !== 'IPv4' || n.internal) continue;
+      const ip = n.address;
+      let score = 0;
+      if (/^192\.168\./.test(ip)) score += 40;
+      else if (/^10\./.test(ip)) score += 35;
+      else if (/^172\.(1[6-9]|2\d|3[0-1])\./.test(ip)) score += 30;
+      else if (/^169\.254\./.test(ip)) score -= 50;
+      if (/wlan|wi-?fi|eth|en|rmnet/i.test(name)) score += 8;
+      if (/tailscale|tun|tap|wg|utun|ppp|vpn/i.test(name)) score -= 20;
+      candidates.push({ ip, score });
     }
   }
-  return null;
+  if (candidates.length === 0) return null;
+  candidates.sort((a, b) => b.score - a.score);
+  return candidates[0].ip;
 }
 
 async function authorize(req, url, s) {
