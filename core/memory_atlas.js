@@ -194,6 +194,10 @@ const svg=document.getElementById('graph'),side=document.getElementById('side'),
 let activeId='';
 let nodes=ATLAS.graph.nodes.map((n,i)=>({...n,x:W()/2+Math.cos(i*2.399)*220+Math.random()*120,y:H()/2+Math.sin(i*2.399)*220+Math.random()*120,vx:0,vy:0}));
 let links=ATLAS.graph.links.map(l=>({source:nodes.find(n=>n.id===l.source),target:nodes.find(n=>n.id===l.target),label:l.label})).filter(l=>l.source&&l.target);
+function debugLog(hypothesisId,location,message,data){fetch('http://127.0.0.1:7933/ingest/05d097ed-198e-47e6-8b77-1f7ddf4809a1',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'047796'},body:JSON.stringify({sessionId:'047796',runId:'atlas-pre-fix',hypothesisId,location,message,data,timestamp:Date.now()})}).catch(()=>{})}
+// #region agent log
+debugLog('A2,A3,A4','core/memory_atlas.js:renderHtml:clientInit','atlas iframe initialized',{stats:ATLAS.stats,nodeCount:nodes.length,linkCount:links.length,folders:ATLAS.graph.folders||[],files:nodes.map(n=>n.file).slice(0,50),svgWidth:W(),svgHeight:H()});
+// #endregion
 if(!nodes.length){svg.outerHTML='<div class="empty">Пока нет файлов базы знаний. Создай markdown в memory/notes, например projects/white_rabbit_spec.md.</div>'}
 renderLegend();
 function size(n){return Math.max(10,Math.min(22,10+Math.sqrt(Math.max(n.size,1))/18))}

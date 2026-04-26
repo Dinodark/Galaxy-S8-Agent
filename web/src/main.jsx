@@ -67,6 +67,25 @@ function tokenFromLocation() {
   return new URL(window.location.href).searchParams.get('token') || '';
 }
 
+function debugLog(hypothesisId, location, message, data) {
+  fetch('http://127.0.0.1:7933/ingest/05d097ed-198e-47e6-8b77-1f7ddf4809a1', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Debug-Session-Id': '047796',
+    },
+    body: JSON.stringify({
+      sessionId: '047796',
+      runId: 'atlas-pre-fix',
+      hypothesisId,
+      location,
+      message,
+      data,
+      timestamp: Date.now(),
+    }),
+  }).catch(() => {});
+}
+
 function useApi() {
   const token = useMemo(tokenFromLocation, []);
   return useMemo(() => {
@@ -564,6 +583,16 @@ function Atlas({ api, token, setStateText }) {
   useEffect(() => {
     setStateText('building...');
     api.get('/api/atlas').then((atlas) => {
+      // #region agent log
+      debugLog('A1,A2,A3', 'web/src/main.jsx:Atlas:apiAtlas', 'atlas api result received', {
+        stats: atlas.stats,
+        noteCount: Array.isArray(atlas.notes) ? atlas.notes.length : null,
+        graphNodeCount: atlas.graph && Array.isArray(atlas.graph.nodes) ? atlas.graph.nodes.length : null,
+        graphLinkCount: atlas.graph && Array.isArray(atlas.graph.links) ? atlas.graph.links.length : null,
+        folders: atlas.graph && Array.isArray(atlas.graph.folders) ? atlas.graph.folders : null,
+        files: Array.isArray(atlas.notes) ? atlas.notes.map((note) => note.file).slice(0, 50) : null,
+      });
+      // #endregion
       setStateText(atlas.stats.notes + ' files, ' + atlas.stats.folders + ' folders');
       const theme = atlasThemeQuery();
       setSrc(

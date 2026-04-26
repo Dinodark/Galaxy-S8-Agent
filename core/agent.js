@@ -6,6 +6,27 @@ const memory = require('./memory');
 const tools = require('./tools');
 
 let cachedSystemPrompt = null;
+
+function debugLog(hypothesisId, location, message, data) {
+  if (typeof fetch !== 'function') return;
+  fetch('http://127.0.0.1:7933/ingest/05d097ed-198e-47e6-8b77-1f7ddf4809a1', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Debug-Session-Id': '047796',
+    },
+    body: JSON.stringify({
+      sessionId: '047796',
+      runId: 'pre-fix',
+      hypothesisId,
+      location,
+      message,
+      data,
+      timestamp: Date.now(),
+    }),
+  }).catch(() => {});
+}
+
 async function getSystemPrompt() {
   if (cachedSystemPrompt) return cachedSystemPrompt;
   const p = path.join(__dirname, 'prompts', 'system.md');
@@ -111,6 +132,15 @@ async function runAgent({ chatId, userMessage }) {
   const newMessages = [{ role: 'user', content: userMessage }];
   let history = await memory.appendToHistory(chatId, newMessages);
 
+  // #region agent log
+  debugLog('H1,H4', 'core/agent.js:runAgent:start', 'agent turn started', {
+    chatId,
+    historyLength: history.length,
+    userMessageLength: String(userMessage || '').length,
+    asksAboutFiles: /файл|замет|структур|дерев|memory|notes|list/i.test(String(userMessage || '')),
+  });
+  // #endregion
+
   const toolSchemas = tools.listSchemas();
   const transcript = [];
   const toolCtx = { chatId };
@@ -120,6 +150,17 @@ async function runAgent({ chatId, userMessage }) {
       messages: withRuntimeContext(history),
       tools: toolSchemas,
     });
+
+    // #region agent log
+    debugLog('H1,H3,H4', 'core/agent.js:runAgent:assistantResponse', 'assistant response received', {
+      step,
+      hasToolCalls: Boolean(assistantMsg.tool_calls && assistantMsg.tool_calls.length),
+      toolCallNames: (assistantMsg.tool_calls || []).map((call) => call.function && call.function.name),
+      contentLength: String(assistantMsg.content || '').length,
+      contentLooksLikeFileTree: /memory|notes|projects\/|```|Дерево базы/i.test(String(assistantMsg.content || '')),
+      transcriptToolNames: transcript.map((item) => item.tool),
+    });
+    // #endregion
 
     const pushed = [assistantMsg];
 
@@ -137,6 +178,19 @@ async function runAgent({ chatId, userMessage }) {
 
         const result = await tools.execute(name, args, toolCtx);
         transcript.push({ tool: name, args, result });
+
+        // #region agent log
+        debugLog('H2,H3', 'core/agent.js:runAgent:toolResult', 'tool executed', {
+          step,
+          tool: name,
+          argKeys: Object.keys(args || {}),
+          resultFound: result && result.found,
+          resultFileCount: result && Array.isArray(result.files) ? result.files.length : null,
+          resultFiles: result && Array.isArray(result.files) ? result.files.slice(0, 30) : undefined,
+          saved: result && result.saved,
+          ok: result && result.ok,
+        });
+        // #endregion
 
         pushed.push({
           role: 'tool',
@@ -169,6 +223,14 @@ async function runAgent({ chatId, userMessage }) {
     }
 
     history = await memory.appendToHistory(chatId, pushed);
+    // #region agent log
+    debugLog('H1,H3,H4', 'core/agent.js:runAgent:finalReply', 'final reply without tool calls', {
+      step,
+      transcriptToolNames: transcript.map((item) => item.tool),
+      replyLength: String(assistantMsg.content || '').length,
+      replyLooksLikeFileTree: /memory|notes|projects\/|```|Дерево базы/i.test(String(assistantMsg.content || '')),
+    });
+    // #endregion
     return {
       reply: assistantMsg.content || '',
       toolCalls: transcript,
