@@ -90,6 +90,59 @@ function userAskedForMemoryInventory(text) {
   return /файл|замет|структур|дерев|баз[ауы]\s+знан|memory|notes|list/i.test(String(text || ''));
 }
 
+function renderTreeFromFiles(files) {
+  const root = {};
+  for (const file of files) {
+    const parts = String(file || '').split('/').filter(Boolean);
+    let node = root;
+    for (let i = 0; i < parts.length; i += 1) {
+      const part = parts[i];
+      const isLeaf = i === parts.length - 1;
+      if (isLeaf) {
+        node[part] = null;
+      } else {
+        if (!node[part] || node[part] === null) node[part] = {};
+        node = node[part];
+      }
+    }
+  }
+
+  function walk(node, indent) {
+    const lines = [];
+    const entries = Object.keys(node).sort((a, b) => a.localeCompare(b));
+    for (const name of entries) {
+      const child = node[name];
+      if (child === null) {
+        lines.push(`${indent}- ${name}`);
+      } else {
+        lines.push(`${indent}- ${name}/`);
+        lines.push(...walk(child, `${indent}  `));
+      }
+    }
+    return lines;
+  }
+
+  return ['memory/', '  notes/', ...walk(root, '    ')].join('\n');
+}
+
+function buildMemoryInventoryReply(files) {
+  const safeFiles = (files || []).map(String).filter(Boolean).sort((a, b) => a.localeCompare(b));
+  if (safeFiles.length === 0) {
+    return (
+      'Сейчас в базе знаний нет markdown-файлов в `memory/notes`.\n' +
+      'Есть только авто-сводки, если они уже сгенерированы.\n\n' +
+      'Проверено через `list_notes` в текущем рантайме.'
+    );
+  }
+  return (
+    'Вот фактическая структура базы знаний (по `list_notes`):\n\n' +
+    '```\n' +
+    renderTreeFromFiles(safeFiles) +
+    '\n```\n\n' +
+    `Файлов: ${safeFiles.length}.`
+  );
+}
+
 async function buildMemoryInventoryContext(toolCtx) {
   const result = await tools.execute('list_notes', {}, toolCtx);
   const files = Array.isArray(result.files) ? result.files : [];
@@ -175,6 +228,7 @@ async function runAgent({ chatId, userMessage }) {
 
   if (userAskedForMemoryInventory(userMessage)) {
     const inventory = await buildMemoryInventoryContext(toolCtx);
+    const files = Array.isArray(inventory.result.files) ? inventory.result.files : [];
     transcript.push({
       tool: 'list_notes',
       args: {},
@@ -194,6 +248,25 @@ async function runAgent({ chatId, userMessage }) {
       files: Array.isArray(inventory.result.files) ? inventory.result.files.slice(0, 50) : null,
     });
     // #endregion
+
+    const deterministicReply = buildMemoryInventoryReply(files);
+    // #region agent log
+    console.log('[debug:047796] deterministic memory inventory reply', {
+      hypothesisId: 'H6',
+      fileCount: files.length,
+      usedLlm: false,
+    });
+    debugLog('H6', 'core/agent.js:runAgent:deterministicInventoryReply', 'deterministic inventory reply returned', {
+      fileCount: files.length,
+      files: files.slice(0, 50),
+    });
+    // #endregion
+    history = await memory.appendToHistory(chatId, [{ role: 'assistant', content: deterministicReply }]);
+    return {
+      reply: deterministicReply,
+      toolCalls: transcript,
+      steps: 1,
+    };
   }
 
   for (let step = 0; step < config.agent.maxSteps; step++) {
