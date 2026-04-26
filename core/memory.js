@@ -53,8 +53,23 @@ async function resetHistory(chatId) {
 
 async function listNotes() {
   await fse.ensureDir(config.paths.notesDir);
-  const files = await fse.readdir(config.paths.notesDir);
-  return files.filter((f) => f.endsWith('.md'));
+  const out = [];
+
+  async function walk(dir, prefix = '') {
+    const entries = await fse.readdir(dir, { withFileTypes: true });
+    for (const entry of entries) {
+      const rel = prefix ? `${prefix}/${entry.name}` : entry.name;
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        await walk(full, rel);
+      } else if (entry.isFile() && entry.name.endsWith('.md')) {
+        out.push(rel);
+      }
+    }
+  }
+
+  await walk(config.paths.notesDir);
+  return out.sort();
 }
 
 async function readNote(name) {
@@ -68,6 +83,7 @@ async function writeNote(name, content, { append = false } = {}) {
   await fse.ensureDir(config.paths.notesDir);
   const safe = sanitizeName(name);
   const file = path.join(config.paths.notesDir, safe);
+  await fse.ensureDir(path.dirname(file));
   if (append) {
     await fse.appendFile(file, content.endsWith('\n') ? content : content + '\n');
   } else {
@@ -77,7 +93,14 @@ async function writeNote(name, content, { append = false } = {}) {
 }
 
 function sanitizeName(name) {
-  let n = String(name || '').trim().replace(/[^a-zA-Z0-9._-]+/g, '_');
+  let n = String(name || '')
+    .trim()
+    .replace(/\\/g, '/')
+    .split('/')
+    .filter(Boolean)
+    .map((part) => part.replace(/[^a-zA-Z0-9._-]+/g, '_'))
+    .filter((part) => part && part !== '.' && part !== '..')
+    .join('/');
   if (!n) n = 'note';
   if (!n.endsWith('.md')) n += '.md';
   return n;

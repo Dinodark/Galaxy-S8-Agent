@@ -143,7 +143,7 @@ function start() {
       const result = await atlas.buildAtlas({ chatId: msg.chat.id });
       await bot.sendMessage(
         msg.chat.id,
-        `Memory atlas built: ${result.index.stats.notes} notes, ${result.index.stats.topics} topics, ${result.index.stats.links} links.`
+        `Memory atlas built: ${result.index.stats.notes} knowledge files, ${result.index.stats.folders} folders, ${result.index.stats.links} links.`
       );
       await bot.sendDocument(msg.chat.id, result.htmlFile);
     } catch (err) {
@@ -165,10 +165,18 @@ function start() {
       const s = await settings.getSettings();
       const ip = localIp();
       const host = ip || 'PHONE_IP';
-      const url = `http://${host}:${s.web.port || 8787}/?token=${s.web.token}`;
+      const port = s.web.port || 8787;
+      const token = encodeURIComponent(s.web.token);
+      const phoneUrl = `http://127.0.0.1:${port}/?token=${token}`;
+      const lanUrl = `http://${host}:${port}/?token=${token}`;
       const lines = [
         'Local web UI:',
-        url,
+        '',
+        'On this phone:',
+        phoneUrl,
+        '',
+        'From another device on the same Wi-Fi/VPN:',
+        lanUrl,
         '',
         'Start it on the phone with: agent-web',
       ];
@@ -194,9 +202,8 @@ function start() {
         msg.chat.id,
         [
           `Memory atlas: ${s.generatedAt}`,
-          `Notes: ${s.stats.notes}`,
-          `Journal days: ${s.stats.journalDays}`,
-          `Topics: ${s.stats.topics}`,
+          `Knowledge files: ${s.stats.notes}`,
+          `Folders: ${s.stats.folders}`,
           `Links: ${s.stats.links}`,
         ].join('\n')
       );

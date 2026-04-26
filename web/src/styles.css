@@ -574,6 +574,39 @@ iframe {
   margin: 0 auto;
 }
 
+.summary-markdown {
+  max-width: 920px;
+  margin: 0 auto;
+  color: var(--color-text);
+  font-size: 15px;
+  line-height: 1.65;
+}
+
+.summary-markdown h1 {
+  margin: 0 0 18px;
+  font-size: 28px;
+  line-height: 1.15;
+}
+
+.summary-markdown h2 {
+  margin: 26px 0 10px;
+  font-size: 18px;
+  line-height: 1.25;
+}
+
+.summary-markdown p {
+  margin: 0 0 12px;
+}
+
+.summary-markdown ul {
+  margin: 0 0 16px;
+  padding-left: 22px;
+}
+
+.summary-markdown li {
+  margin: 6px 0;
+}
+
 .modal-backdrop.mobile-reader {
   display: none;
 }

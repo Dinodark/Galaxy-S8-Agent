@@ -68,7 +68,14 @@ async function authorize(req, url, s) {
 }
 
 function sanitizeName(name) {
-  return String(name || '').trim().replace(/[^a-zA-Z0-9._-]+/g, '_');
+  return String(name || '')
+    .trim()
+    .replace(/\\/g, '/')
+    .split('/')
+    .filter(Boolean)
+    .map((part) => part.replace(/[^a-zA-Z0-9._-]+/g, '_'))
+    .filter((part) => part && part !== '.' && part !== '..')
+    .join('/');
 }
 
 async function isUpdateRunning() {
@@ -133,9 +140,10 @@ async function listNotesDetailed() {
   for (const file of files.sort()) {
     const full = path.join(config.paths.notesDir, file);
     const stat = await fse.stat(full).catch(() => null);
+    const base = path.basename(file);
     out.push({
       name: file,
-      kind: file.startsWith('summary-') ? 'summary' : 'note',
+      kind: base.startsWith('summary-') ? 'summary' : 'note',
       size: stat ? stat.size : 0,
       mtime: stat ? stat.mtime.toISOString() : null,
     });

@@ -171,6 +171,63 @@ function ReaderPane({ title, meta, children }) {
   );
 }
 
+function SummaryMarkdown({ text }) {
+  const blocks = [];
+  let list = [];
+
+  function flushList() {
+    if (list.length === 0) return;
+    blocks.push({ type: 'list', items: list });
+    list = [];
+  }
+
+  String(text || '').split(/\r?\n/).forEach((line) => {
+    const trimmed = line.trim();
+    if (!trimmed) {
+      flushList();
+      return;
+    }
+
+    if (trimmed.startsWith('# ')) {
+      flushList();
+      blocks.push({ type: 'h1', text: trimmed.slice(2).trim() });
+      return;
+    }
+
+    if (trimmed.startsWith('## ')) {
+      flushList();
+      blocks.push({ type: 'h2', text: trimmed.slice(3).trim() });
+      return;
+    }
+
+    if (trimmed.startsWith('- ')) {
+      list.push(trimmed.slice(2).trim());
+      return;
+    }
+
+    flushList();
+    blocks.push({ type: 'p', text: trimmed });
+  });
+  flushList();
+
+  return (
+    <div className="summary-markdown">
+      {blocks.map((block, index) => {
+        if (block.type === 'h1') return <h1 key={index}>{block.text}</h1>;
+        if (block.type === 'h2') return <h2 key={index}>{block.text}</h2>;
+        if (block.type === 'list') {
+          return (
+            <ul key={index}>
+              {block.items.map((item, itemIndex) => <li key={itemIndex}>{item}</li>)}
+            </ul>
+          );
+        }
+        return <p key={index}>{block.text}</p>;
+      })}
+    </div>
+  );
+}
+
 function excerpt(text, max = 220) {
   const clean = String(text || '')
     .replace(/[#>*_`[\]()]/g, ' ')
@@ -402,7 +459,7 @@ function FileBrowser({ kind, api, desktopDetail = false }) {
         <div className="desktop-reader">
           {selected ? (
             <ReaderPane title={selected} meta={kind}>
-              <pre>{content}</pre>
+              {kind === 'summary' ? <SummaryMarkdown text={content} /> : <pre>{content}</pre>}
             </ReaderPane>
           ) : (
             <div className="card reader-empty">
@@ -418,7 +475,7 @@ function FileBrowser({ kind, api, desktopDetail = false }) {
           meta={kind}
           onClose={() => setSelected(null)}
         >
-          <pre>{content}</pre>
+          {kind === 'summary' ? <SummaryMarkdown text={content} /> : <pre>{content}</pre>}
         </ReaderModal>
       )}
     </div>
@@ -507,7 +564,7 @@ function Atlas({ api, token, setStateText }) {
   useEffect(() => {
     setStateText('building...');
     api.get('/api/atlas').then((atlas) => {
-      setStateText(atlas.stats.notes + ' files, ' + atlas.stats.topics + ' topics');
+      setStateText(atlas.stats.notes + ' files, ' + atlas.stats.folders + ' folders');
       const theme = atlasThemeQuery();
       setSrc(
         '/atlas.html?token=' +

@@ -4,7 +4,7 @@ module.exports = {
   list_notes: {
     name: 'list_notes',
     description:
-      "List the filenames of the agent's long-term notes (markdown files in memory/notes).",
+      "List the filenames of the agent's long-term notes (markdown files under memory/notes, including folders).",
     parameters: { type: 'object', properties: {}, additionalProperties: false },
     handler: async () => {
       const files = await memory.listNotes();
@@ -14,7 +14,7 @@ module.exports = {
 
   read_note: {
     name: 'read_note',
-    description: 'Read a long-term note by filename (e.g. "ideas.md").',
+    description: 'Read a long-term note by filename or folder path (e.g. "ideas.md" or "projects/psur_club.md").',
     parameters: {
       type: 'object',
       properties: { name: { type: 'string' } },
@@ -31,11 +31,11 @@ module.exports = {
   write_note: {
     name: 'write_note',
     description:
-      'Write or append to a long-term markdown note. Use "append": true to add to an existing note instead of overwriting.',
+      'Write or append to a long-term markdown note. Folder paths are allowed, e.g. "projects/psur_club.md". Use "append": true to add to an existing note instead of overwriting.',
     parameters: {
       type: 'object',
       properties: {
-        name: { type: 'string', description: 'Note filename, e.g. "ideas.md"' },
+        name: { type: 'string', description: 'Note filename or folder path, e.g. "ideas.md" or "projects/psur_club.md"' },
         content: { type: 'string' },
         append: { type: 'boolean', default: true },
       },
