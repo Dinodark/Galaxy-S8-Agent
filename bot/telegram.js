@@ -14,7 +14,7 @@ const modes = require('../core/modes');
 const settings = require('../core/settings');
 const runtime = require('../core/runtime');
 const atlas = require('../core/memory_atlas');
-const { localIp } = require('../core/web_server');
+const { localIpCandidates } = require('../core/web_server');
 const { startBatteryWatcher } = require('../core/watchers/battery');
 const { runReview } = require('../core/watchers/daily_review');
 const { isAllowed } = require('./auth');
@@ -172,33 +172,42 @@ function start() {
         return;
       }
       const s = await settings.getSettings();
-      const ip = localIp();
-      const host = ip || 'PHONE_IP';
       const port = s.web.port || 8787;
       const bindHost = String((s.web && s.web.host) || '0.0.0.0');
       const token = encodeURIComponent(s.web.token);
       const phoneUrl = `http://127.0.0.1:${port}/?token=${token}`;
-      const lanUrl = `http://${host}:${port}/?token=${token}`;
+      const candidates = localIpCandidates(5);
       const lines = [
-        'Local web UI:',
+        'Веб-панель (локально):',
         '',
-        'On this phone:',
+        'Только на этом телефоне (Termux, где крутится агент):',
         phoneUrl,
         '',
-        'From another device on the same Wi-Fi/VPN:',
-        lanUrl,
-        '',
-        'Start it on the phone with: agent-web',
+        'С другого телефона или ПК адрес 127.0.0.1 не сработает — это «сам на себя».',
+        'Нужен IP телефона с агентом в вашей Wi‑Fi. Попробуй по очереди:',
       ];
+      if (candidates.length === 0) {
+        lines.push('');
+        lines.push(
+          '(IP не определился. На телефоне с агентом: ip -4 addr — подставь адрес вида 192.168.x.x.)'
+        );
+      } else {
+        candidates.forEach((c, i) => {
+          lines.push(`${i + 1}. http://${c.ip}:${port}/?token=${token}  (${c.iface})`);
+        });
+      }
+      lines.push('');
+      lines.push('Запуск веба на телефоне с агентом: agent-web (или agent-up).');
       if (bindHost !== '0.0.0.0' && bindHost !== '::') {
         lines.push('');
-        lines.push(`Warning: web.host is ${bindHost}. Remote devices may not connect.`);
-        lines.push('Set /set web_host 0.0.0.0 for LAN access.');
+        lines.push(`Внимание: web.host = ${bindHost}. С других устройств может не открыться.`);
+        lines.push('Поставь: /set web_host 0.0.0.0');
       }
-      if (!ip) {
-        lines.push('Could not detect phone IP. Replace PHONE_IP with the Wi-Fi address from: ip addr');
-      }
-      lines.push('Security note: open this only in a trusted Wi-Fi/VPN network.');
+      lines.push('');
+      lines.push(
+        'Проверь: оба устройства в одной Wi‑Fi (не «гость» с изоляцией клиентов). На втором телефоне на время выключи мобильный интернет. Private DNS / VPN могут мешать.'
+      );
+      lines.push('Безопасность: открывай только в доверенной сети.');
       await bot.sendMessage(msg.chat.id, lines.join('\n'), { disable_web_page_preview: true });
     } catch (err) {
       await bot.sendMessage(msg.chat.id, 'web error: ' + err.message);

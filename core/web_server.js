@@ -51,7 +51,7 @@ function firstOwnerChatId() {
   return config.telegram.allowedUserIds[0] || null;
 }
 
-function localIp() {
+function collectLanCandidates() {
   const nets = os.networkInterfaces();
   const candidates = [];
   for (const [name, entries] of Object.entries(nets)) {
@@ -65,12 +65,33 @@ function localIp() {
       else if (/^169\.254\./.test(ip)) score -= 50;
       if (/wlan|wi-?fi|eth|en|rmnet/i.test(name)) score += 8;
       if (/tailscale|tun|tap|wg|utun|ppp|vpn/i.test(name)) score -= 20;
-      candidates.push({ ip, score });
+      candidates.push({ ip, score, iface: name });
     }
   }
-  if (candidates.length === 0) return null;
   candidates.sort((a, b) => b.score - a.score);
-  return candidates[0].ip;
+  return candidates;
+}
+
+/**
+ * @param {number} [max]
+ * @returns {{ ip: string, score: number, iface: string }[]}
+ */
+function localIpCandidates(max = 5) {
+  const all = collectLanCandidates();
+  const seen = new Set();
+  const out = [];
+  for (const c of all) {
+    if (seen.has(c.ip)) continue;
+    seen.add(c.ip);
+    out.push(c);
+    if (out.length >= max) break;
+  }
+  return out;
+}
+
+function localIp() {
+  const top = localIpCandidates(1);
+  return top[0] ? top[0].ip : null;
 }
 
 async function authorize(req, url, s) {
@@ -375,7 +396,7 @@ async function startServer() {
   return server;
 }
 
-module.exports = { startServer, localIp };
+module.exports = { startServer, localIp, localIpCandidates };
 
 if (require.main === module) {
   startServer().catch((err) => {
