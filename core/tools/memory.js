@@ -31,7 +31,7 @@ module.exports = {
   write_note: {
     name: 'write_note',
     description:
-      'Write or append to a long-term markdown note. Folder paths are allowed, e.g. "projects/psur_club.md". Use "append": true to add to an existing note instead of overwriting.',
+      'Write or append to a long-term markdown note. Folder paths are allowed, e.g. "projects/psur_club.md". Use "append": true to add to an existing note instead of overwriting. You cannot target projects/_index.md (human-only routing file).',
     parameters: {
       type: 'object',
       properties: {

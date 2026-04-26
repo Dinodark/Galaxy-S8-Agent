@@ -1,5 +1,6 @@
 const path = require('path');
 const fse = require('fs-extra');
+const { isKnowledgeCoreIndexAbs } = require('../knowledge_orchestrator');
 
 const MAX_READ_BYTES = 200_000;
 
@@ -52,6 +53,11 @@ module.exports = {
     },
     handler: async ({ path: p, content, append = false }) => {
       const abs = resolveSafe(p);
+      if (isKnowledgeCoreIndexAbs(abs)) {
+        throw new Error(
+          'read-only: memory/notes/projects/_index.md (ядро маршрутов) — правит только владелец, агент не перезаписывает.'
+        );
+      }
       await fse.ensureDir(path.dirname(abs));
       if (append) await fse.appendFile(abs, content);
       else await fse.writeFile(abs, content);

@@ -9,6 +9,7 @@ const runtime = require('./runtime');
 const atlas = require('./memory_atlas');
 const memory = require('./memory');
 const journal = require('./journal');
+const reminders = require('./reminders');
 
 const UPDATE_LOG_FILE = path.join(config.paths.tmpDir, 'update-restart.log');
 const UPDATE_PID_FILE = path.join(config.paths.tmpDir, 'update-restart.pid');
@@ -67,15 +68,38 @@ async function authorize(req, url, s) {
   return got === token;
 }
 
-function sanitizeName(name) {
-  return String(name || '')
-    .trim()
-    .replace(/\\/g, '/')
-    .split('/')
-    .filter(Boolean)
-    .map((part) => part.replace(/[^a-zA-Z0-9._-]+/g, '_'))
-    .filter((part) => part && part !== '.' && part !== '..')
-    .join('/');
+function isPathUnderDir(filePath, rootDir) {
+  const rel = path.relative(path.resolve(rootDir), path.resolve(filePath));
+  return !rel.startsWith('..') && !path.isAbsolute(rel);
+}
+
+function readJsonBody(req, maxBytes = 512_000) {
+  return new Promise((resolve, reject) => {
+    const chunks = [];
+    let size = 0;
+    req.on('data', (ch) => {
+      size += ch.length;
+      if (size > maxBytes) {
+        req.destroy();
+        reject(new Error('body too large'));
+        return;
+      }
+      chunks.push(ch);
+    });
+    req.on('end', () => {
+      try {
+        const raw = Buffer.concat(chunks).toString('utf8');
+        if (!raw.trim()) {
+          resolve(null);
+          return;
+        }
+        resolve(JSON.parse(raw));
+      } catch (e) {
+        reject(e);
+      }
+    });
+    req.on('error', reject);
+  });
 }
 
 async function isUpdateRunning() {
@@ -184,7 +208,7 @@ async function handleApi(req, res, url) {
   }
 
   if (pathname === '/api/note') {
-    const name = sanitizeName(url.searchParams.get('name'));
+    const name = memory.sanitizeName(url.searchParams.get('name'));
     if (!name) return json(res, 400, { error: 'missing name' });
     const content = await memory.readNote(name);
     if (content == null) return json(res, 404, { error: 'not found' });
@@ -198,6 +222,57 @@ async function handleApi(req, res, url) {
       return json(res, 200, { day, entries: await journal.readDay(chatId, day) });
     }
     return json(res, 200, { days: await journal.listDays(chatId) });
+  }
+
+  if (pathname === '/api/reminders') {
+    const tz =
+      (await settings.get('dailyReview.tz').catch(() => '')) ||
+      reminders.systemTz();
+    if (!chatId) return json(res, 200, { count: 0, tz, reminders: [] });
+    const items = await reminders.listPending({ chatId });
+    const out = items.map((r) => ({
+      id: r.id,
+      text: r.text,
+      fire_at: r.fireAt,
+      recurrence: r.recurrence || null,
+      until: r.until || null,
+      max_count: r.maxCount == null ? null : r.maxCount,
+      fired_count: r.firedCount || 0,
+      created_at: r.createdAt || null,
+    }));
+    return json(res, 200, { count: out.length, tz, reminders: out });
+  }
+
+  if (pathname === '/api/notes/save' && req.method === 'POST') {
+    let body;
+    try {
+      body = await readJsonBody(req);
+    } catch (e) {
+      return json(res, 400, { error: e && e.message ? e.message : 'invalid body' });
+    }
+    if (!body || typeof body.name !== 'string' || typeof body.content !== 'string') {
+      return json(res, 400, { error: 'expected JSON { name, content }' });
+    }
+    const safe = memory.sanitizeName(body.name);
+    if (!safe) return json(res, 400, { error: 'invalid name' });
+    const full = path.join(config.paths.notesDir, safe);
+    if (!isPathUnderDir(full, config.paths.notesDir)) {
+      return json(res, 400, { error: 'path must stay under memory/notes' });
+    }
+    await fse.ensureDir(path.dirname(full));
+    await fse.writeFile(full, body.content, 'utf8');
+    const stat = await fse.stat(full);
+    try {
+      await atlas.buildAtlas({ chatId });
+    } catch (e) {
+      console.warn('[web] atlas rebuild after save failed:', e.message);
+    }
+    return json(res, 200, {
+      ok: true,
+      name: safe,
+      mtime: stat.mtime.toISOString(),
+      size: stat.size,
+    });
   }
 
   return json(res, 404, { error: 'not found' });
@@ -251,6 +326,16 @@ async function startServer() {
   }
   if (!s.web.token) {
     throw new Error('web token is missing');
+  }
+
+  try {
+    const { ensureKnowledgeTree } = require('./bootstrap_knowledge');
+    const k = await ensureKnowledgeTree();
+    if (k.createdIndex) {
+      console.log(`[web] created knowledge core: ${k.path}`);
+    }
+  } catch (e) {
+    console.warn('[web] knowledge bootstrap failed:', e.message);
   }
 
   const server = http.createServer(async (req, res) => {

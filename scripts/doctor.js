@@ -128,6 +128,18 @@ async function main() {
   checkEnv();
   checkSettings();
   checkTermux();
+
+  try {
+    const { ensureKnowledgeTree } = require('../core/bootstrap_knowledge');
+    const { createdIndex, path: idxPath } = await ensureKnowledgeTree();
+    if (createdIndex) {
+      ok('knowledge core', `создан ${idxPath} из шаблона`);
+    } else {
+      ok('knowledge core', 'projects/_index.md на месте');
+    }
+  } catch (e) {
+    warn('knowledge core', e.message);
+  }
   await checkOpenRouter();
   await checkGroq();
 

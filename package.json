@@ -10,7 +10,8 @@
     "web:dev": "node scripts/web_dev.js",
     "web:dev:client": "vite --config web/vite.config.js",
     "setup": "node scripts/setup.js",
-    "doctor": "node scripts/doctor.js"
+    "doctor": "node scripts/doctor.js",
+    "test": "node --test tests/knowledge_orchestrator.test.js"
   },
   "repository": {
     "type": "git",

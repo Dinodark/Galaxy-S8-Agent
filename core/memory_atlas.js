@@ -1,10 +1,11 @@
 const path = require('path');
 const fse = require('fs-extra');
 const config = require('../config');
+const { CORE_KNOWLEDGE_RELPATH } = require('./knowledge_orchestrator');
 
 const INDEX_FILE = path.join(config.paths.memoryDir, 'memory_index.json');
 const HTML_FILE = path.join(config.paths.memoryDir, 'atlas.html');
-const ATLAS_VERSION = 'knowledge-map-v2';
+const ATLAS_VERSION = 'knowledge-map-v3';
 const FOLDER_COLORS = [
   '#9cbf8f',
   '#d8c16f',
@@ -103,7 +104,8 @@ async function readNotes() {
     const folder = file.includes('/') ? file.split('/')[0] : 'root';
     out.push({
       file,
-      label: base.replace(/\.md$/, ''),
+      label: file === CORE_KNOWLEDGE_RELPATH ? 'Маршруты (ядро)' : base.replace(/\.md$/, ''),
+      isCore: file === CORE_KNOWLEDGE_RELPATH,
       folder,
       content,
       size: content.length,
@@ -121,13 +123,15 @@ function buildGraph(notes) {
   const folderColors = Object.fromEntries(
     folders.map((folder, index) => [folder, FOLDER_COLORS[index % FOLDER_COLORS.length]])
   );
+  const coreGold = '#c9a86b';
   const nodes = notes.map((n) => ({
     id: nodeId('note', n.file),
     label: n.label,
     type: 'note',
     file: n.file,
     folder: n.folder,
-    color: folderColors[n.folder],
+    isCore: Boolean(n.isCore),
+    color: n.isCore ? coreGold : folderColors[n.folder],
     content: n.content,
     excerpt: n.excerpt,
     headings: n.headings,
@@ -176,36 +180,65 @@ function renderHtml(index) {
 header{height:58px;display:flex;align-items:center;gap:16px;padding:0 18px;background:var(--bg)}
 h1{font-size:17px;margin:0}header span{color:var(--muted)}#wrap{display:grid;grid-template-columns:minmax(0,1fr) minmax(320px,38vw);height:calc(100vh - 58px)}#graphWrap{position:relative;background:var(--bg)}#graph{width:100%;height:100%}#side{background:var(--panel-soft);padding:18px;overflow:auto}
 .legend{position:absolute;left:14px;top:14px;max-width:280px;padding:10px 12px;border-radius:14px;background:var(--panel);box-shadow:0 12px 40px #0003}.legend strong{display:block;margin-bottom:6px}.legendItem{display:flex;align-items:center;gap:8px;color:var(--muted);margin:5px 0}.dot{width:10px;height:10px;border-radius:50%;display:inline-block}
-.pill{display:inline-block;border-radius:999px;padding:3px 8px;margin:2px;color:var(--muted);background:var(--panel-hover)}.node{cursor:pointer}.node circle{stroke:#fff3;stroke-width:1.5}.node.active circle{stroke:var(--text);stroke-width:2.5}.node text{fill:var(--text);font-size:12px;text-shadow:0 1px 8px #000}.link{stroke:#ffffff20;stroke-width:1}.hint{color:var(--muted)}.empty{max-width:520px;margin:10vh auto;color:var(--muted);font-size:18px}
+.pill{display:inline-block;border-radius:999px;padding:3px 8px;margin:2px;color:var(--muted);background:var(--panel-hover)}.node{cursor:pointer}.node circle{stroke:#fff3;stroke-width:1.5}.node.active circle{stroke:var(--text);stroke-width:2.5}.node.core circle{stroke:var(--text);stroke-width:2.2;filter:drop-shadow(0 0 10px #0004)}.node text{fill:var(--text);font-size:12px;text-shadow:0 1px 8px #000}.node.core text{fill:var(--text);font-size:13px}.link{stroke:#ffffff20;stroke-width:1}.hint{color:var(--muted)}.empty{max-width:520px;margin:10vh auto;color:var(--muted);font-size:18px}
 h2{margin:0 0 8px;font-size:18px}h3{margin:18px 0 8px;font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}pre{white-space:pre-wrap;font-family:inherit;color:var(--text);line-height:1.6}.filePath{color:var(--muted);word-break:break-all}.readerHead{position:sticky;top:0;margin:-18px -18px 16px;padding:18px;background:var(--panel-soft)}
+.atlasEdit{margin-top:8px}.atlasBar{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:0 0 8px}.atlasBar button{background:var(--panel-hover);color:var(--text);border:none;border-radius:10px;padding:8px 14px;cursor:pointer;font:inherit}.atlasBar button:disabled{opacity:0.45;cursor:default}#atlasStatus{flex:1;font-size:12px;color:var(--muted);min-width:120px}.atlasTextarea{width:100%;min-height:22vh;box-sizing:border-box;padding:12px 14px;border-radius:12px;border:1px solid #2a2a2a;background:var(--bg);color:var(--text);font:13px/1.5 ui-monospace,SFMono-Regular,Consolas,monospace;resize:vertical}
 @media(max-width:900px){#wrap{grid-template-columns:1fr;grid-template-rows:minmax(55vh,1fr) minmax(280px,45vh)}.legend{position:static;margin:12px}.readerHead{position:static}}
 </style>
 </head>
 <body>
 <header><h1>Memory Atlas</h1><span>${escHtml(index.version)} · ${escHtml(index.generatedAt)} · ${index.stats.notes} knowledge files · ${index.stats.folders} folders · ${index.stats.links} links</span></header>
-<div id="wrap"><main id="graphWrap"><div class="legend" id="legend"></div><svg id="graph" role="img" aria-label="Knowledge graph"></svg></main><aside id="side"><h2>Выбери файл</h2><p class="hint">Слева база знаний: каждая точка — markdown-файл из memory/notes. Цвет показывает папку.</p></aside></div>
+<div id="wrap"><main id="graphWrap"><div class="legend" id="legend"></div><svg id="graph" role="img" aria-label="Knowledge graph"></svg></main><aside id="side"><h2>Выбери файл</h2><p class="hint">Слева база знаний: каждая точка — markdown в memory/notes. Крупный золотой узел — <strong>Маршруты (ядро)</strong>: маршрутный файл, его правите только вы, агент в него не пишет. Остальные цвета — папки.</p></aside></div>
 <script>
 (function applyTheme(){
 const p=new URLSearchParams(location.search);
 const map={theme_bg:'--bg',theme_surface:'--panel',theme_surfaceSoft:'--panel-soft',theme_surfaceHover:'--panel-hover',theme_text:'--text',theme_muted:'--muted',theme_accent:'--accent',theme_line:'--line'};
 for(const [param,cssVar] of Object.entries(map)){const value=p.get(param);if(value)document.documentElement.style.setProperty(cssVar,value)}
 })();
+const URLTOK=(()=>{try{return new URLSearchParams(location.search).get('token')||''}catch(e){return''}})();
+async function saveAtlas(n){
+const st=document.getElementById('atlasStatus'),ta=document.getElementById('atlasTa');
+if(!ta||!n)return;
+if(!URLTOK){if(st)st.textContent='Нет token в URL. Открой ссылку из Telegram /web (с параметром token).';return}
+st.textContent='Сохранение…';
+try{
+const u=new URL('/api/notes/save',location.origin);u.searchParams.set('token',URLTOK);
+const r=await fetch(u.toString(),{method:'POST',headers:{'Content-Type':'application/json','X-Agent-Token':URLTOK},body:JSON.stringify({name:n.file,content:ta.value})});
+const j=await r.json();
+if(!r.ok)throw new Error((j&&j.error)?j.error:('HTTP '+r.status));
+st.textContent='Сохранено, обновляю граф…';
+setTimeout(()=>location.reload(),450);
+}catch(e){st.textContent='Ошибка: '+(e&&e.message?e.message:String(e))}
+}
+function revertAtlas(n){
+const ta=document.getElementById('atlasTa');
+if(ta&&n)ta.value=n.content;
+const st=document.getElementById('atlasStatus');
+if(st)st.textContent='';
+}
 const ATLAS=${data};
 const svg=document.getElementById('graph'),side=document.getElementById('side'),legend=document.getElementById('legend'),W=()=>svg.clientWidth,H=()=>svg.clientHeight;
 let activeId='';
-let nodes=ATLAS.graph.nodes.map((n,i)=>({...n,x:W()/2+Math.cos(i*2.399)*220+Math.random()*120,y:H()/2+Math.sin(i*2.399)*220+Math.random()*120,vx:0,vy:0}));
+let nodes=ATLAS.graph.nodes.map((n,i)=>({...n,x:n.isCore?W()/2:W()/2+Math.cos(i*2.399)*220+Math.random()*120,y:n.isCore?H()/2:H()/2+Math.sin(i*2.399)*220+Math.random()*120,vx:0,vy:0}));
 let links=ATLAS.graph.links.map(l=>({source:nodes.find(n=>n.id===l.source),target:nodes.find(n=>n.id===l.target),label:l.label})).filter(l=>l.source&&l.target);
 if(!nodes.length){svg.outerHTML='<div class="empty">Пока нет файлов базы знаний. Создай markdown в memory/notes, например projects/white_rabbit_spec.md.</div>'}
 renderLegend();
-function size(n){return Math.max(10,Math.min(22,10+Math.sqrt(Math.max(n.size,1))/18))}
-function tick(){const w=W(),h=H();for(const n of nodes){n.vx+=(w/2-n.x)*0.00035;n.vy+=(h/2-n.y)*0.00035}
+function size(n){if(n.isCore)return 30;return Math.max(10,Math.min(22,10+Math.sqrt(Math.max(n.size,1))/18))}
+function tick(){const w=W(),h=H();for(const n of nodes){if(n.isCore)continue;n.vx+=(w/2-n.x)*0.00035;n.vy+=(h/2-n.y)*0.00035}
 for(const l of links){const dx=l.target.x-l.source.x,dy=l.target.y-l.source.y,d=Math.hypot(dx,dy)||1,force=(d-190)*0.00055;l.source.vx+=dx/d*force;l.source.vy+=dy/d*force;l.target.vx-=dx/d*force;l.target.vy-=dy/d*force}
-for(let i=0;i<nodes.length;i++)for(let j=i+1;j<nodes.length;j++){const a=nodes[i],b=nodes[j],dx=b.x-a.x,dy=b.y-a.y,d=Math.hypot(dx,dy)||1,min=92;if(d<min){const f=(min-d)*0.018;a.vx-=dx/d*f;a.vy-=dy/d*f;b.vx+=dx/d*f;b.vy+=dy/d*f}}
-for(const n of nodes){n.vx*=0.84;n.vy*=0.84;n.x=Math.max(36,Math.min(w-36,n.x+n.vx));n.y=Math.max(36,Math.min(h-36,n.y+n.vy))}draw();requestAnimationFrame(tick)}
+for(let i=0;i<nodes.length;i++)for(let j=i+1;j<nodes.length;j++){const a=nodes[i],b=nodes[j];if(a.isCore||b.isCore)continue;const dx=b.x-a.x,dy=b.y-a.y,d=Math.hypot(dx,dy)||1,min=92;if(d<min){const f=(min-d)*0.018;a.vx-=dx/d*f;a.vy-=dy/d*f;b.vx+=dx/d*f;b.vy+=dy/d*f}}
+for(const n of nodes){if(n.isCore){n.x=w/2;n.y=h/2;n.vx=0;n.vy=0;continue}n.vx*=0.84;n.vy*=0.84;n.x=Math.max(36,Math.min(w-36,n.x+n.vx));n.y=Math.max(36,Math.min(h-36,n.y+n.vy))}draw();requestAnimationFrame(tick)}
 function draw(){svg.innerHTML='';for(const l of links){const line=document.createElementNS('http://www.w3.org/2000/svg','line');line.setAttribute('class','link');line.setAttribute('x1',l.source.x);line.setAttribute('y1',l.source.y);line.setAttribute('x2',l.target.x);line.setAttribute('y2',l.target.y);svg.appendChild(line)}
-for(const n of nodes){const g=document.createElementNS('http://www.w3.org/2000/svg','g');g.setAttribute('class','node'+(n.id===activeId?' active':''));g.setAttribute('transform',\`translate(\${n.x},\${n.y})\`);g.onmousedown=e=>drag(e,n);g.onclick=()=>show(n);const c=document.createElementNS('http://www.w3.org/2000/svg','circle');c.setAttribute('r',size(n));c.setAttribute('fill',n.color||'#fff');g.appendChild(c);const t=document.createElementNS('http://www.w3.org/2000/svg','text');t.setAttribute('x',size(n)+4);t.setAttribute('y',4);t.textContent=n.label.slice(0,32);g.appendChild(t);svg.appendChild(g)}}
-function show(n){activeId=n.id;draw();side.innerHTML=\`<div class="readerHead"><h2>\${escapeHtml(n.label)}</h2><div class="filePath">\${escapeHtml(n.file)}</div><p class="hint">Папка: \${escapeHtml(n.folder)} · \${Math.round((n.size||0)/1024*10)/10} KB</p></div><h3>Ключевые темы</h3>\${(n.keywords||[]).slice(0,10).map(k=>\`<span class="pill">\${escapeHtml(k.word||k)}</span>\`).join('')||'<p class="hint">Нет</p>'}<h3>Текст файла</h3><pre>\${escapeHtml(n.content||'')}</pre>\`}
-function renderLegend(){legend.innerHTML='<strong>Папки</strong>'+((ATLAS.graph.folders||[]).map(f=>\`<div class="legendItem"><span class="dot" style="background:\${escapeHtml(f.color)}"></span><span>\${escapeHtml(f.name)}</span></div>\`).join('')||'<div class="hint">Пока нет папок</div>')}
+for(const n of nodes){const g=document.createElementNS('http://www.w3.org/2000/svg','g');g.setAttribute('class','node'+(n.id===activeId?' active':'')+(n.isCore?' core':''));g.setAttribute('transform',\`translate(\${n.x},\${n.y})\`);g.onmousedown=(e)=>{if(!n.isCore)drag(e,n)};g.onclick=()=>show(n);const c=document.createElementNS('http://www.w3.org/2000/svg','circle');c.setAttribute('r',size(n));c.setAttribute('fill',n.color||'#fff');g.appendChild(c);const t=document.createElementNS('http://www.w3.org/2000/svg','text');t.setAttribute('x',size(n)+4);t.setAttribute('y',4);t.textContent=n.label.slice(0,32);g.appendChild(t);svg.appendChild(g)}}
+function show(n){activeId=n.id;draw();
+const coreBanner=n.isCore?'<p class="hint" style="margin:10px 0 0;border-left:3px solid #c9a86b;padding-left:10px">Это <strong>ядро маршрутизации</strong>. Его вручную правите вы (в т.ч. ниже). Телеграм-агент в этот файл не пишет; веб с токеном из <code>/web</code> — можно.</p>':'';
+side.innerHTML=\`<div class="readerHead"><h2>\${escapeHtml(n.label)}</h2><div class="filePath">\${escapeHtml(n.file)}</div>\${coreBanner}<p class="hint">Папка: \${escapeHtml(n.folder)} · \${Math.round((n.size||0)/1024*10)/10} KB</p></div><h3>Ключевые темы</h3>\${(n.keywords||[]).slice(0,10).map(k=>\`<span class="pill">\${escapeHtml(k.word||k)}</span>\`).join('')||'<p class="hint">Нет</p>'}<div class="atlasEdit"><h3>Редактирование</h3><div class="atlasBar"><button type="button" id="atlasSave">Сохранить</button><button type="button" id="atlasRevert">Сбросить</button><span id="atlasStatus"></span></div><label class="hint" for="atlasTa" style="display:block;margin-bottom:6px">Markdown, полная перезапись файла (не дописывание)</label><textarea id="atlasTa" class="atlasTextarea" rows="20" wrap="off" spellcheck="false" autocomplete="off"></textarea></div>\`;
+const taEl=document.getElementById('atlasTa');
+if(taEl)taEl.value=n.content||'';
+document.getElementById('atlasSave')&&document.getElementById('atlasSave').addEventListener('click',()=>saveAtlas(n));
+document.getElementById('atlasRevert')&&document.getElementById('atlasRevert').addEventListener('click',()=>revertAtlas(n));
+}
+function renderLegend(){legend.innerHTML='<strong>Папки</strong>'+((ATLAS.graph.folders||[]).map(f=>\`<div class="legendItem"><span class="dot" style="background:\${escapeHtml(f.color)}"></span><span>\${escapeHtml(f.name)}</span></div>\`).join('')||'<div class="hint">Пока нет папок</div>')+'<div style="margin-top:12px"><strong>Роли узлов</strong></div><div class="legendItem"><span class="dot" style="width:14px;height:14px;min-width:14px;box-sizing:border-box;border:1.5px solid #f1f1f1;background:#c9a86b"></span><span>Ядро: маршруты (только владелец)</span></div>'}
 function escapeHtml(s){return String(s??'').replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]))}
 function drag(e,n){e.preventDefault();const move=ev=>{const r=svg.getBoundingClientRect();n.x=ev.clientX-r.left;n.y=ev.clientY-r.top;draw()};const up=()=>{window.removeEventListener('mousemove',move);window.removeEventListener('mouseup',up)};window.addEventListener('mousemove',move);window.addEventListener('mouseup',up)}
 tick();</script>

@@ -5,6 +5,7 @@ const config = require('../../config');
 const { chatCompletion } = require('../llm');
 const journal = require('../journal');
 const settings = require('../settings');
+const memory = require('../memory');
 
 const PROMPT_FILE = path.join(__dirname, '..', 'prompts', 'daily_review.md');
 const SUMMARY_PREFIX = 'summary-';
@@ -45,20 +46,43 @@ function truncateHead(s, maxChars) {
   );
 }
 
+function isSummaryFile(rel) {
+  return path.basename(rel).startsWith(SUMMARY_PREFIX);
+}
+
 async function loadLongTermNotes() {
   const dir = config.paths.notesDir;
   await fse.ensureDir(dir);
-  const files = (await fse.readdir(dir))
-    .filter((f) => f.endsWith('.md'))
-    .filter((f) => !f.startsWith(SUMMARY_PREFIX))
+  const relFiles = (await memory.listNotes())
+    .filter((f) => !isSummaryFile(f))
     .sort();
   const parts = [];
-  for (const f of files) {
+  for (const f of relFiles) {
     const content = (await fse.readFile(path.join(dir, f), 'utf8')).trim();
     if (!content) continue;
     parts.push(`## ${f}\n\n${truncateHead(content, MAX_NOTE_CHARS)}`);
   }
   return parts.join('\n\n---\n\n');
+}
+
+async function loadInboxExcerpt() {
+  const dir = config.paths.notesDir;
+  const rel = 'inbox.md';
+  const full = path.join(dir, rel);
+  if (!(await fse.pathExists(full))) return '';
+  const content = (await fse.readFile(full, 'utf8')).trim();
+  if (!content) return '';
+  return truncateHead(`## ${rel}\n\n${content}`, 6_000);
+}
+
+async function loadInboxConflictsExcerpt() {
+  const dir = config.paths.notesDir;
+  const rel = 'inbox_conflicts.md';
+  const full = path.join(dir, rel);
+  if (!(await fse.pathExists(full))) return '';
+  const content = (await fse.readFile(full, 'utf8')).trim();
+  if (!content) return '';
+  return truncateHead(`## ${rel}\n\n${content}`, 2_000);
 }
 
 async function loadPreviousSummaries(upToN, todayStr) {
@@ -103,6 +127,8 @@ async function runReview(chatId, { log = console, force = false } = {}) {
     s.dailyReview.prevDays,
     today
   );
+  const inbox = await loadInboxExcerpt();
+  const conflicts = await loadInboxConflictsExcerpt();
 
   const promptSys = await fse.readFile(PROMPT_FILE, 'utf8');
 
@@ -112,6 +138,12 @@ async function runReview(chatId, { log = console, force = false } = {}) {
     '',
     '# LONG-TERM NOTES',
     notes || '(no long-term notes yet)',
+    '',
+    '# INBOX (routed/unsorted — consolidate if present)',
+    inbox || '(inbox is empty or missing)',
+    '',
+    '# AMBIGUITY LOG (inbox_conflicts — optional)',
+    conflicts || '(no logged conflicts)',
     '',
     '# PREVIOUS SUMMARIES',
     prev || '(no previous daily summaries)',

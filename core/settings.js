@@ -36,6 +36,9 @@ function defaults() {
       token: '',
     },
     chats: {},
+    knowledge: {
+      orchestrator: true,
+    },
   };
 }
 
@@ -237,6 +240,8 @@ function validatePathValue(settingPath, value, mergedSettings) {
     return token;
   }
 
+  if (settingPath === 'knowledge.orchestrator') return parseBool(value);
+
   const modeMatch = settingPath.match(/^chats\.(-?\d+)\.mode$/);
   if (modeMatch) {
     const mode = String(value || '').trim();
@@ -270,6 +275,7 @@ function aliasToPath(alias, rawValue) {
     web_host: 'web.host',
     web_port: 'web.port',
     web_token: 'web.token',
+    knowledge_orchestrator: 'knowledge.orchestrator',
   };
   if (key === 'daily_review_time' || key === 'review_time') {
     return { path: 'dailyReview.cron', value: normalizeReviewTime(rawValue) };

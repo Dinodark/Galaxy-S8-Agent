@@ -4,6 +4,12 @@ const config = require('../config');
 const { chatCompletion } = require('./llm');
 const memory = require('./memory');
 const tools = require('./tools');
+const settings = require('./settings');
+const {
+  planWriteOrchestration,
+  loadProjectsIndex,
+  isKnowledgeCoreIndexPath,
+} = require('./knowledge_orchestrator');
 
 let cachedSystemPrompt = null;
 
@@ -87,13 +93,18 @@ function hasSuccessfulWriteCall(transcript) {
   );
 }
 
-async function fallbackSaveUserMessage({ userMessage, toolCtx, transcript }) {
+async function fallbackSaveUserMessage({
+  userMessage,
+  toolCtx,
+  transcript,
+  targetName = 'inbox.md',
+}) {
   const stamp = new Date().toISOString();
   const content =
     `## ${stamp}\n` +
     `${String(userMessage || '').trim()}\n\n`;
   const args = {
-    name: 'inbox.md',
+    name: targetName,
     content,
     append: true,
   };
@@ -234,6 +245,23 @@ async function runAgent({ chatId, userMessage }) {
   const toolCtx = { chatId };
   const turnContext = [];
   const writeIntent = userAskedToWriteMemory(userMessage);
+  let orchestration = null;
+
+  if (writeIntent) {
+    try {
+      const s = await settings.getSettings();
+      if (s.knowledge && s.knowledge.orchestrator !== false) {
+        const files = await memory.listNotes();
+        const index = await loadProjectsIndex();
+        orchestration = planWriteOrchestration(userMessage, files, index);
+        if (orchestration.systemMessage) {
+          turnContext.push({ role: 'system', content: orchestration.systemMessage });
+        }
+      }
+    } catch {
+      // orchestration is optional; never block the turn
+    }
+  }
 
   if (userAskedForMemoryInventory(userMessage)) {
     const inventory = await buildMemoryInventoryContext(toolCtx);
@@ -310,7 +338,14 @@ async function runAgent({ chatId, userMessage }) {
 
     history = await memory.appendToHistory(chatId, pushed);
     if (writeIntent && !hasSuccessfulWriteCall(transcript)) {
-      const reply = await fallbackSaveUserMessage({ userMessage, toolCtx, transcript });
+      let targetName = (orchestration && orchestration.fallbackName) || 'inbox.md';
+      if (isKnowledgeCoreIndexPath(targetName)) targetName = 'inbox.md';
+      const reply = await fallbackSaveUserMessage({
+        userMessage,
+        toolCtx,
+        transcript,
+        targetName,
+      });
       history = await memory.appendToHistory(chatId, [{ role: 'assistant', content: reply }]);
       return {
         reply,

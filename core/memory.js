@@ -1,6 +1,7 @@
 const path = require('path');
 const fse = require('fs-extra');
 const config = require('../config');
+const { isKnowledgeCoreIndexPath } = require('./knowledge_orchestrator');
 
 const historyCache = new Map();
 
@@ -82,6 +83,13 @@ async function readNote(name) {
 async function writeNote(name, content, { append = false } = {}) {
   await fse.ensureDir(config.paths.notesDir);
   const safe = sanitizeName(name);
+  if (isKnowledgeCoreIndexPath(safe)) {
+    const err = new Error(
+      'memory/notes/projects/_index.md — «ядро» маршрутов: его редактирует только владелец, агент не может писать в этот файл.'
+    );
+    err.code = 'READ_ONLY_KNOWLEDGE_CORE';
+    throw err;
+  }
   const file = path.join(config.paths.notesDir, safe);
   await fse.ensureDir(path.dirname(file));
   if (append) {
@@ -114,4 +122,5 @@ module.exports = {
   listNotes,
   readNote,
   writeNote,
+  sanitizeName,
 };

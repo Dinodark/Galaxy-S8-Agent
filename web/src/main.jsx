@@ -9,6 +9,7 @@ const navItems = [
   ['notes', 'Notes'],
   ['summaries', 'Summaries'],
   ['journal', 'Journal'],
+  ['reminders', 'Reminders'],
   ['settings', 'Settings'],
   ['update', 'Update'],
 ];
@@ -427,6 +428,8 @@ function FileBrowser({ kind, api, desktopDetail = false }) {
   const [notes, setNotes] = useState([]);
   const [selected, setSelected] = useState(null);
   const [content, setContent] = useState('');
+  const kindLabel = kind === 'summary' ? 'сводку' : 'файл';
+  const selectedStorageKey = 'galaxy-dashboard-selected-' + kind;
 
   useEffect(() => {
     api.get('/api/notes').then((data) => {
@@ -434,8 +437,17 @@ function FileBrowser({ kind, api, desktopDetail = false }) {
     });
   }, [api, kind]);
 
+  useEffect(() => {
+    if (!notes.length) return;
+    const saved = localStorage.getItem(selectedStorageKey) || '';
+    if (!saved) return;
+    if (!notes.some((note) => note.name === saved)) return;
+    openNote(saved);
+  }, [notes]);
+
   async function openNote(name) {
     setSelected(name);
+    localStorage.setItem(selectedStorageKey, name);
     const note = await api.get('/api/note?name=' + encodeURIComponent(name));
     setContent(note.content);
   }
@@ -463,7 +475,7 @@ function FileBrowser({ kind, api, desktopDetail = false }) {
             </ReaderPane>
           ) : (
             <div className="card reader-empty">
-              <p className="muted">Выбери сводку слева, чтобы открыть текст здесь.</p>
+              <p className="muted">Выбери {kindLabel} слева, чтобы открыть текст здесь.</p>
             </div>
           )}
         </div>
@@ -504,14 +516,23 @@ function Journal({ api }) {
   const [days, setDays] = useState([]);
   const [selectedDay, setSelectedDay] = useState('');
   const [entries, setEntries] = useState(null);
+  const selectedDayStorageKey = 'galaxy-dashboard-selected-journal-day';
 
   useEffect(() => {
     api.get('/api/journal').then((data) => setDays(data.days));
   }, [api]);
 
+  useEffect(() => {
+    if (!days.length) return;
+    const saved = localStorage.getItem(selectedDayStorageKey) || '';
+    if (!saved || !days.includes(saved)) return;
+    openDay(saved);
+  }, [days]);
+
   async function openDay(day) {
     const data = await api.get('/api/journal?day=' + encodeURIComponent(day));
     setSelectedDay(day);
+    localStorage.setItem(selectedDayStorageKey, day);
     setEntries(data.entries);
   }
 
@@ -553,6 +574,153 @@ function Journal({ api }) {
           <JournalEntries entries={entries} />
         </ReaderModal>
       )}
+    </div>
+  );
+}
+
+function Reminders({ api }) {
+  const [state, setState] = useState({ loading: true, error: '', tz: '', reminders: [] });
+  const [monthOffset, setMonthOffset] = useState(0);
+
+  useEffect(() => {
+    let cancelled = false;
+    api
+      .get('/api/reminders')
+      .then((data) => {
+        if (cancelled) return;
+        setState({
+          loading: false,
+          error: '',
+          tz: data.tz || Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
+          reminders: Array.isArray(data.reminders) ? data.reminders : [],
+        });
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setState({ loading: false, error: err.message, tz: '', reminders: [] });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [api]);
+
+  const monthData = useMemo(() => {
+    const now = new Date();
+    const base = new Date(now.getFullYear(), now.getMonth() + monthOffset, 1);
+    const year = base.getFullYear();
+    const month = base.getMonth();
+    const firstDay = new Date(year, month, 1);
+    const startWeekday = (firstDay.getDay() + 6) % 7;
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const cells = [];
+    for (let i = 0; i < startWeekday; i += 1) cells.push(null);
+    for (let d = 1; d <= daysInMonth; d += 1) {
+      cells.push(new Date(year, month, d));
+    }
+    while (cells.length % 7 !== 0) cells.push(null);
+    return { base, cells };
+  }, [monthOffset]);
+
+  function dayKey(date) {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }
+
+  const remindersByDay = useMemo(() => {
+    const byDay = new Map();
+    for (const reminder of state.reminders) {
+      const dt = new Date(reminder.fire_at);
+      if (Number.isNaN(dt.getTime())) continue;
+      const key = dayKey(dt);
+      if (!byDay.has(key)) byDay.set(key, []);
+      byDay.get(key).push(reminder);
+    }
+    return byDay;
+  }, [state.reminders]);
+
+  const upcoming = useMemo(
+    () =>
+      [...state.reminders]
+        .sort((a, b) => new Date(a.fire_at) - new Date(b.fire_at))
+        .slice(0, 12),
+    [state.reminders]
+  );
+
+  if (state.loading) return <div className="card muted">Loading reminders...</div>;
+  if (state.error) return <pre>{state.error}</pre>;
+
+  return (
+    <div className="reminders-page">
+      <section className="card">
+        <div className="reminders-head">
+          <div>
+            <h2>
+              {monthData.base.toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' })}
+            </h2>
+            <p className="muted">Timezone: {state.tz}</p>
+          </div>
+          <div className="actions">
+            <button className="secondary" onClick={() => setMonthOffset((v) => v - 1)}>←</button>
+            <button className="secondary" onClick={() => setMonthOffset(0)}>Сегодня</button>
+            <button className="secondary" onClick={() => setMonthOffset((v) => v + 1)}>→</button>
+          </div>
+        </div>
+        <div className="calendar-weekdays">
+          {['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'].map((name) => (
+            <div key={name}>{name}</div>
+          ))}
+        </div>
+        <div className="calendar-grid">
+          {monthData.cells.map((date, idx) => {
+            if (!date) return <div key={idx} className="calendar-cell empty" />;
+            const key = dayKey(date);
+            const dayReminders = remindersByDay.get(key) || [];
+            const count = dayReminders.length;
+            const today = dayKey(new Date()) === key;
+            return (
+              <div key={idx} className={'calendar-cell' + (today ? ' today' : '')}>
+                <div className="calendar-day">{date.getDate()}</div>
+                <div className="calendar-dots">
+                  {count > 0 ? (
+                    <>
+                      <span className="dot-fill" />
+                      <small>{count}</small>
+                    </>
+                  ) : (
+                    <small className="muted">—</small>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </section>
+
+      <section className="card">
+        <div className="section-head">
+          <h2>Ближайшие напоминания</h2>
+          <span className="muted">{state.reminders.length} всего</span>
+        </div>
+        <div className="reminders-list">
+          {upcoming.length === 0 && <p className="muted">Пока нет активных напоминаний.</p>}
+          {upcoming.map((item) => (
+            <article className="reminder-item" key={item.id}>
+              <div className="reminder-main">
+                <strong>{item.text}</strong>
+                <span className="muted">{item.id}</span>
+              </div>
+              <div className="reminder-meta">
+                <span>{fmtTime(item.fire_at)}</span>
+                {item.recurrence?.cron && (
+                  <code>{item.recurrence.cron} ({item.recurrence.tz || state.tz})</code>
+                )}
+              </div>
+            </article>
+          ))}
+        </div>
+      </section>
     </div>
   );
 }
@@ -776,9 +944,10 @@ function App() {
           {!error && view === 'status' && data && <JsonCard data={data} />}
           {!error && view === 'settings' && data && <JsonCard data={data} />}
           {view === 'atlas' && <Atlas api={api} token={api.token} setStateText={setStateText} />}
-          {view === 'notes' && <FileBrowser api={api} kind="note" />}
+          {view === 'notes' && <FileBrowser api={api} kind="note" desktopDetail />}
           {view === 'summaries' && <FileBrowser api={api} kind="summary" desktopDetail />}
           {view === 'journal' && <Journal api={api} />}
+          {view === 'reminders' && <Reminders api={api} />}
           {view === 'update' && <UpdatePanel api={api} />}
         </div>
       </main>
