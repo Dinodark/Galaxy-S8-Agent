@@ -68,12 +68,49 @@ function userAskedForReminder(text) {
 
 function userAskedForMemoryInventory(text) {
   const s = String(text || '').toLowerCase();
-  const asksWrite =
-    /созда(й|ть)|запиши|сохрани|добавь|добавить|внеси|занеси|разнеси|заполни|сформируй|сделай|создай\s+файл|создай\s+структур|внеси\s+туда/.test(s);
+  const asksWrite = userAskedToWriteMemory(s);
   const asksInventory =
     /какие|какой|какая|какое|список|покажи|показать|структур|дерев|что\s+есть|где\s+файл|какие\s+файл|memory|notes|list|что\s+в\s+базе/.test(s) &&
     /файл|замет|баз[ауы]\s+знан|memory|notes/.test(s);
   return asksInventory && !asksWrite;
+}
+
+function userAskedToWriteMemory(text) {
+  return /созда(й|ть)|запиши|сохрани|добавь|добавить|внеси|занеси|разнеси|заполни|сформируй|сделай|создай\s+файл|создай\s+структур|внеси\s+туда|сохрани\s+это|запомни\s+это/.test(
+    String(text || '').toLowerCase()
+  );
+}
+
+function hasSuccessfulWriteCall(transcript) {
+  return transcript.some(
+    (item) => item && item.tool === 'write_note' && item.result && item.result.ok
+  );
+}
+
+async function fallbackSaveUserMessage({ userMessage, toolCtx, transcript }) {
+  const stamp = new Date().toISOString();
+  const content =
+    `## ${stamp}\n` +
+    `${String(userMessage || '').trim()}\n\n`;
+  const args = {
+    name: 'inbox.md',
+    content,
+    append: true,
+  };
+  const result = await tools.execute('write_note', args, toolCtx);
+  transcript.push({
+    tool: 'write_note',
+    args,
+    result,
+    fallback: true,
+  });
+  if (result && result.ok && result.result && result.result.saved) {
+    return `Сохранил в память: \`memory/notes/${result.result.saved}\`.\n(Фолбэк-сохранение, потому что модель не вызвала write_note сама.)`;
+  }
+  return (
+    'Не удалось сохранить в память автоматически: ' +
+    (result && result.error ? result.error : 'unknown error')
+  );
 }
 
 function renderTreeFromFiles(files) {
@@ -196,6 +233,7 @@ async function runAgent({ chatId, userMessage }) {
   const transcript = [];
   const toolCtx = { chatId };
   const turnContext = [];
+  const writeIntent = userAskedToWriteMemory(userMessage);
 
   if (userAskedForMemoryInventory(userMessage)) {
     const inventory = await buildMemoryInventoryContext(toolCtx);
@@ -271,6 +309,15 @@ async function runAgent({ chatId, userMessage }) {
     }
 
     history = await memory.appendToHistory(chatId, pushed);
+    if (writeIntent && !hasSuccessfulWriteCall(transcript)) {
+      const reply = await fallbackSaveUserMessage({ userMessage, toolCtx, transcript });
+      history = await memory.appendToHistory(chatId, [{ role: 'assistant', content: reply }]);
+      return {
+        reply,
+        toolCalls: transcript,
+        steps: step + 1,
+      };
+    }
     return {
       reply: assistantMsg.content || '',
       toolCalls: transcript,
