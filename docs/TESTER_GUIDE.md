@@ -1,4 +1,4 @@
-# Galaxy S8 Agent Tester Guide
+# Vatoko Galaxy Tester Guide
 
 This guide is for first testers installing the agent on an Android phone
 through Termux.

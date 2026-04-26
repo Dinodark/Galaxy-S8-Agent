@@ -131,7 +131,7 @@ async function main() {
   await checkOpenRouter();
   await checkGroq();
 
-  console.log('Galaxy S8 Agent doctor');
+  console.log('Vatoko Galaxy doctor');
   console.log('');
   for (const r of results) {
     console.log(`[${r.level}] ${r.name}${r.detail ? ` — ${r.detail}` : ''}`);

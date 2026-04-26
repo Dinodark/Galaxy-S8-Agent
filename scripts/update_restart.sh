@@ -52,7 +52,7 @@ start_session() {
   tmux new-session -d -s "$session" "$command"
 }
 
-log "Galaxy S8 Agent update/restart started."
+log "Vatoko Galaxy update/restart started."
 log "App dir: $APP_DIR"
 
 log "Pulling latest code..."

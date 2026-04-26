@@ -168,7 +168,7 @@ function renderHtml(index) {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Galaxy S8 Agent Memory Atlas</title>
+<title>Vatoko Galaxy Memory Atlas</title>
 <style>
 :root{color-scheme:dark;--bg:#111111;--panel:#171717;--panel-soft:#1d1d1d;--panel-hover:#242424;--muted:#9a9a9a;--text:#f1f1f1;--line:transparent;--accent:#d6d6d6}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);font:14px/1.45 system-ui,-apple-system,Segoe UI,sans-serif;color:var(--text);overflow:hidden}

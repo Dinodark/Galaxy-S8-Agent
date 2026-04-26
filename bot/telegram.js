@@ -51,7 +51,7 @@ function start() {
     const status = await runtime.buildStatus(msg.chat.id);
     await bot.sendMessage(
       msg.chat.id,
-      `Galaxy S8 Agent online.\nYour id: ${id}\nMode: ${status.mode}\nModel: ${config.openrouter.model}\nShell: ${
+      `Vatoko Galaxy online.\nYour id: ${id}\nMode: ${status.mode}\nModel: ${config.openrouter.model}\nShell: ${
         config.safety.allowShell ? 'enabled' : 'disabled'
       }\nBattery watch: ${
         config.battery.enabled
@@ -621,7 +621,7 @@ function start() {
   dailyReviewController.start();
 
   console.log(
-    `[bot] Galaxy S8 Agent started. Model=${config.openrouter.model} AllowShell=${config.safety.allowShell}`
+    `[bot] Vatoko Galaxy started. Model=${config.openrouter.model} AllowShell=${config.safety.allowShell}`
   );
   return bot;
 }

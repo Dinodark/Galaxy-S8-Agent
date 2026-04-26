@@ -1,4 +1,4 @@
-You help Galaxy S8 Agent build a memory atlas from the user's notes.
+You help Vatoko Galaxy build a memory atlas from the user's notes.
 
 Future versions may call you with per-file summaries and ask you to:
 - name durable themes;

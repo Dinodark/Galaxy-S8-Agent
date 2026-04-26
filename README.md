@@ -1,6 +1,6 @@
-# Galaxy S8 Agent
+# Vatoko Galaxy
 
-Personal AI agent that lives on a Samsung Galaxy S8 phone (via Termux),
+Personal AI agent that lives on an Android phone (via Termux),
 talks to you through Telegram, reasons with an LLM (OpenRouter), and can
 actually control the device through a set of tools.
 
@@ -36,8 +36,8 @@ settings, audit logs) and `logs/`. Both are gitignored.
 ## Setup (dev machine)
 
 ```bash
-git clone https://github.com/Dinodark/Galaxy-S8-Agent.git
-cd Galaxy-S8-Agent
+git clone https://github.com/Dinodark/Galaxy-S8-Agent.git Vatoko-Galaxy
+cd Vatoko-Galaxy
 npm install
 cp .env.example .env
 # edit .env: put your OpenRouter key, Telegram token, and your Telegram user id
@@ -84,7 +84,7 @@ Prepare these values before running setup:
 - OpenRouter API key from <https://openrouter.ai/keys>
 - Optional Groq API key from <https://console.groq.com/keys> for voice messages
 
-## Manual setup (Galaxy S8 via Termux)
+## Manual setup (Android via Termux)
 
 Install Termux from **F-Droid** (not Google Play — that version is outdated):
 <https://f-droid.org/packages/com.termux/>
@@ -99,8 +99,8 @@ pkg update && pkg upgrade -y
 pkg install -y nodejs git termux-api
 termux-setup-storage
 
-git clone https://github.com/Dinodark/Galaxy-S8-Agent.git
-cd Galaxy-S8-Agent
+git clone https://github.com/Dinodark/Galaxy-S8-Agent.git Vatoko-Galaxy
+cd Vatoko-Galaxy
 npm install
 cp .env.example .env
 nano .env   # put your real keys and user id

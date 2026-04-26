@@ -744,7 +744,7 @@ function App() {
   return (
     <div id="app">
       <aside className={'side ' + (menuOpen ? 'open' : '')}>
-        <h1>Galaxy S8 Agent</h1>
+        <h1>Vatoko Galaxy</h1>
         <div className="nav">
           {navItems.map(([id, label]) => (
             <button

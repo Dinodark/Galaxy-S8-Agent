@@ -53,7 +53,7 @@ async function chatCompletion({
           Authorization: `Bearer ${config.openrouter.apiKey}`,
           'Content-Type': 'application/json',
           'HTTP-Referer': 'https://github.com/Dinodark/Galaxy-S8-Agent',
-          'X-Title': 'Galaxy S8 Agent',
+          'X-Title': 'Vatoko Galaxy',
         },
         timeout: timeoutMs || 60_000,
         validateStatus: () => true,

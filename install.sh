@@ -2,7 +2,7 @@
 set -eu
 
 REPO_URL="${GALAXY_AGENT_REPO_URL:-https://github.com/Dinodark/Galaxy-S8-Agent.git}"
-APP_DIR="${GALAXY_AGENT_DIR:-$HOME/Galaxy-S8-Agent}"
+APP_DIR="${GALAXY_AGENT_DIR:-$HOME/Vatoko-Galaxy}"
 SESSION_NAME="${GALAXY_AGENT_SESSION:-galaxy-agent}"
 AUTO_START="${GALAXY_AGENT_AUTO_START:-1}"
 

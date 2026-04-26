@@ -4,7 +4,7 @@ set -eu
 SESSION_NAME="${GALAXY_AGENT_SESSION:-galaxy-agent}"
 
 if ! tmux has-session -t "$SESSION_NAME" 2>/dev/null; then
-  echo "Galaxy S8 Agent is not running."
+  echo "Vatoko Galaxy is not running."
   echo "Use: agent-start"
   exit 1
 fi
