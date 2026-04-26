@@ -154,6 +154,12 @@ async function runAgent({ chatId, userMessage }) {
   let history = await memory.appendToHistory(chatId, newMessages);
 
   // #region agent log
+  console.log('[debug:047796] agent turn started', {
+    hypothesisId: 'H1,H4',
+    chatId,
+    historyLength: history.length,
+    asksAboutFiles: userAskedForMemoryInventory(userMessage),
+  });
   debugLog('H1,H4', 'core/agent.js:runAgent:start', 'agent turn started', {
     chatId,
     historyLength: history.length,
@@ -178,6 +184,11 @@ async function runAgent({ chatId, userMessage }) {
     turnContext.push(inventory.message);
 
     // #region agent log
+    console.log('[debug:047796] memory inventory injected', {
+      hypothesisId: 'H1,H2,H4',
+      fileCount: Array.isArray(inventory.result.files) ? inventory.result.files.length : null,
+      files: Array.isArray(inventory.result.files) ? inventory.result.files.slice(0, 50) : null,
+    });
     debugLog('H1,H2,H4', 'core/agent.js:runAgent:memoryInventoryContext', 'memory inventory injected', {
       fileCount: Array.isArray(inventory.result.files) ? inventory.result.files.length : null,
       files: Array.isArray(inventory.result.files) ? inventory.result.files.slice(0, 50) : null,
@@ -192,6 +203,14 @@ async function runAgent({ chatId, userMessage }) {
     });
 
     // #region agent log
+    console.log('[debug:047796] assistant response received', {
+      hypothesisId: 'H1,H3,H4',
+      step,
+      hasToolCalls: Boolean(assistantMsg.tool_calls && assistantMsg.tool_calls.length),
+      toolCallNames: (assistantMsg.tool_calls || []).map((call) => call.function && call.function.name),
+      contentLooksLikeFileTree: /memory|notes|projects\/|```|Дерево базы/i.test(String(assistantMsg.content || '')),
+      transcriptToolNames: transcript.map((item) => item.tool),
+    });
     debugLog('H1,H3,H4', 'core/agent.js:runAgent:assistantResponse', 'assistant response received', {
       step,
       hasToolCalls: Boolean(assistantMsg.tool_calls && assistantMsg.tool_calls.length),
@@ -264,6 +283,12 @@ async function runAgent({ chatId, userMessage }) {
 
     history = await memory.appendToHistory(chatId, pushed);
     // #region agent log
+    console.log('[debug:047796] final reply without tool calls', {
+      hypothesisId: 'H1,H3,H4',
+      step,
+      transcriptToolNames: transcript.map((item) => item.tool),
+      replyLooksLikeFileTree: /memory|notes|projects\/|```|Дерево базы/i.test(String(assistantMsg.content || '')),
+    });
     debugLog('H1,H3,H4', 'core/agent.js:runAgent:finalReply', 'final reply without tool calls', {
       step,
       transcriptToolNames: transcript.map((item) => item.tool),
