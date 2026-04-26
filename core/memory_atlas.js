@@ -182,13 +182,38 @@ h1{font-size:17px;margin:0}header span{color:var(--muted)}#wrap{display:grid;gri
 .legend{position:absolute;left:14px;top:14px;max-width:280px;padding:10px 12px;border-radius:14px;background:var(--panel);box-shadow:0 12px 40px #0003}.legend strong{display:block;margin-bottom:6px}.legendItem{display:flex;align-items:center;gap:8px;color:var(--muted);margin:5px 0}.dot{width:10px;height:10px;border-radius:50%;display:inline-block}
 .pill{display:inline-block;border-radius:999px;padding:3px 8px;margin:2px;color:var(--muted);background:var(--panel-hover)}.node{cursor:pointer}.node rect{stroke:#fff3;stroke-width:1.3;rx:12;ry:12}.node.active rect{stroke:var(--text);stroke-width:2}.node.core rect{stroke:var(--text);stroke-width:2.1;filter:drop-shadow(0 0 10px #0004)}.node text{fill:var(--text);font-size:12px;text-shadow:0 1px 8px #000}.node.core text{fill:var(--text);font-size:13px}.link{stroke:#ffffff20;stroke-width:1}.hint{color:var(--muted)}.empty{max-width:520px;margin:10vh auto;color:var(--muted);font-size:18px}
 h2{margin:0 0 8px;font-size:18px}h3{margin:18px 0 8px;font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}pre{white-space:pre-wrap;font-family:inherit;color:var(--text);line-height:1.6}.filePath{color:var(--muted);word-break:break-all}.readerHead{position:sticky;top:0;margin:-18px -18px 16px;padding:18px;background:var(--panel-soft)}
-.atlasEdit{margin-top:8px}.atlasBar{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:0 0 8px}.atlasBar button{background:var(--panel-hover);color:var(--text);border:none;border-radius:10px;padding:8px 14px;cursor:pointer;font:inherit}.atlasBar button:disabled{opacity:0.45;cursor:default}#atlasStatus{flex:1;font-size:12px;color:var(--muted);min-width:120px}.atlasTextarea{width:100%;min-height:22vh;box-sizing:border-box;padding:12px 14px;border-radius:12px;border:1px solid #2a2a2a;background:var(--bg);color:var(--text);font:13px/1.5 ui-monospace,SFMono-Regular,Consolas,monospace;resize:vertical}
+.atlasEdit{margin-top:8px}.atlasBar{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:0 0 8px}.atlasBar button{background:var(--panel-hover);color:var(--text);border:none;border-radius:10px;padding:8px 14px;cursor:pointer;font:inherit}.atlasBar button:disabled{opacity:0.45;cursor:default}#atlasStatus{flex:1;font-size:12px;color:var(--muted);min-width:120px}.atlasTextarea{width:100%;min-height:22vh;box-sizing:border-box;padding:12px 14px;border-radius:12px;border:1px solid #2a2a2a;background:var(--bg);color:var(--text);font:13px/1.5 ui-monospace,SFMono-Regular,Consolas,monospace;resize:vertical;min-height:40vh}
+.atlas-modal-root{position:fixed;inset:0;z-index:200;display:grid;place-items:stretch}
+.atlas-modal-root[hidden]{display:none!important}
+.atlas-modal-backdrop{position:absolute;inset:0;background:var(--bg)}
+.atlas-modal-panel{position:relative;display:grid;grid-template-rows:52px minmax(0,1fr);height:100%;min-height:0;background:var(--bg)}
+.atlas-modal-top{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--panel-soft);border-bottom:1px solid #2a2a2a}
+.atlas-modal-top .atlas-back-btn{border:0;border-radius:10px;padding:10px 12px;background:var(--panel-hover);color:var(--text);font:inherit;cursor:pointer;flex-shrink:0}
+.atlas-modal-top .atlas-modal-title-wrap{display:flex;flex-direction:column;min-width:0;flex:1}
+.atlas-modal-top strong{font-size:16px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.atlas-modal-top .atlas-modal-meta{font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.atlas-modal-body{overflow:auto;padding:14px;-webkit-overflow-scrolling:touch;min-height:0}
+body.atlas-mobile header{display:none!important}
+body.atlas-mobile #wrap{height:100dvh;height:100vh;grid-template-columns:1fr!important;grid-template-rows:1fr!important}
+body.atlas-mobile #side{display:none!important}
+body.atlas-mobile .legend{display:none!important}
+body.atlas-mobile #graphWrap{min-height:0}
+.node{cursor:grab;touch-action:none}
+.node:active{cursor:grabbing}
 @media(max-width:900px){#wrap{grid-template-columns:1fr;grid-template-rows:minmax(55vh,1fr) minmax(280px,45vh)}.legend{position:static;margin:12px}.readerHead{position:static}}
+body.atlas-mobile #wrap{grid-template-rows:1fr!important}
 </style>
 </head>
 <body>
 <header><h1>Memory Atlas</h1><span>${escHtml(index.version)} · ${escHtml(index.generatedAt)} · ${index.stats.notes} knowledge files · ${index.stats.folders} folders · ${index.stats.links} links</span></header>
 <div id="wrap"><main id="graphWrap"><div class="legend" id="legend"></div><svg id="graph" role="img" aria-label="Knowledge graph"></svg></main><aside id="side"><h2>Выбери файл</h2><p class="hint">Слева база знаний: каждая точка — markdown в memory/notes. Крупный золотой узел — <strong>Маршруты (ядро)</strong>: маршрутный файл, его правите только вы, агент в него не пишет. Остальные цвета — папки.</p></aside></div>
+<div id="atlasModalRoot" class="atlas-modal-root" hidden>
+<div class="atlas-modal-backdrop" aria-hidden="true"></div>
+<section class="atlas-modal-panel" role="dialog" aria-modal="true" aria-labelledby="atlasModalTitleLbl">
+<header class="atlas-modal-top"><button type="button" class="atlas-back-btn" id="atlasModalBack">Назад</button><div class="atlas-modal-title-wrap"><strong id="atlasModalTitleLbl"></strong><span class="atlas-modal-meta" id="atlasModalMeta"></span></div></header>
+<div class="atlas-modal-body" id="atlasModalBody"></div>
+</section>
+</div>
 <script>
 (function applyTheme(){
 const p=new URLSearchParams(location.search);
@@ -217,7 +242,11 @@ const st=document.getElementById('atlasStatus');
 if(st)st.textContent='';
 }
 const ATLAS=${data};
-const svg=document.getElementById('graph'),side=document.getElementById('side'),legend=document.getElementById('legend'),W=()=>svg.clientWidth,H=()=>svg.clientHeight;
+const svg=document.getElementById('graph'),side=document.getElementById('side'),legend=document.getElementById('legend'),modalRoot=document.getElementById('atlasModalRoot'),modalBody=document.getElementById('atlasModalBody'),modalTitle=document.getElementById('atlasModalTitleLbl'),modalMeta=document.getElementById('atlasModalMeta'),W=()=>svg&&svg.clientWidth,H=()=>svg&&svg.clientHeight;
+const mqMobile=window.matchMedia('(max-width:900px)');
+function updateAtlasMobile(){document.body.classList.toggle('atlas-mobile',mqMobile.matches)}
+mqMobile.addEventListener('change',function(){updateAtlasMobile();if(mqMobile.matches){if(legend)legend.innerHTML=''}else{renderLegend()}if(!mqMobile.matches&&modalRoot&&!modalRoot.hidden)closeAtlasModal()});
+updateAtlasMobile();
 const POSKEY='vatoko-atlas-positions-v1';
 let activeId='';
 function size(n){if(n.isCore)return 30;return Math.max(10,Math.min(22,10+Math.sqrt(Math.max(n.size,1))/18))}
@@ -228,15 +257,19 @@ const savedPos=loadPositions();
 let nodes=ATLAS.graph.nodes.map((n,i)=>{const p=savedPos[n.id];return {...n,x:(p&&Number.isFinite(p.x))?p.x:(n.isCore?W()/2:W()/2+Math.cos(i*2.399)*220+Math.random()*120),y:(p&&Number.isFinite(p.y))?p.y:(n.isCore?H()/2:H()/2+Math.sin(i*2.399)*220+Math.random()*120),vx:0,vy:0,dragging:false}});
 let links=ATLAS.graph.links.map(l=>({source:nodes.find(n=>n.id===l.source),target:nodes.find(n=>n.id===l.target),label:l.label})).filter(l=>l.source&&l.target);
 if(!nodes.length){svg.outerHTML='<div class="empty">Пока нет файлов базы знаний. Создай markdown в memory/notes, например projects/white_rabbit_spec.md.</div>'}
-renderLegend();
+else{if(mqMobile.matches){if(legend)legend.innerHTML=''}else{renderLegend()}}
+function openAtlasModal(n){if(!modalRoot||!modalBody)return;if(modalTitle)modalTitle.textContent=n.label||'';if(modalMeta)modalMeta.textContent=(n.file||'')+' · '+String(Math.round((n.size||0)/1024*10)/10)+' KB';const coreMob=n.isCore?'<p class="hint" style="margin:0 0 14px">Ядро маршрутизации — только ручные правки; Telegram-агент в этот файл не пишет.</p>':'';modalBody.innerHTML=coreMob+'<div class="atlasEdit"><h3>Редактирование</h3><div class="atlasBar"><button type="button" id="atlasSave">Сохранить</button><button type="button" id="atlasRevert">Сбросить</button><span id="atlasStatus"></span></div><label class="hint" for="atlasTa" style="display:block;margin-bottom:6px">Markdown, полная перезапись файла (не дописывание)</label><textarea id="atlasTa" class="atlasTextarea" rows="18" wrap="off" spellcheck="false" autocomplete="off"></textarea></div>';const ta=document.getElementById('atlasTa');if(ta)ta.value=n.content||'';const sv=document.getElementById('atlasSave'),rv=document.getElementById('atlasRevert');if(sv)sv.addEventListener('click',function(){saveAtlas(n)});if(rv)rv.addEventListener('click',function(){revertAtlas(n)});modalRoot.hidden=false;document.body.style.overflow='hidden';}
+function closeAtlasModal(){if(!modalRoot)return;modalRoot.hidden=true;document.body.style.overflow='';activeId='';draw()}
+const atlasBack=document.getElementById('atlasModalBack');if(atlasBack)atlasBack.addEventListener('click',closeAtlasModal);
+window.addEventListener('keydown',function(e){if(e.key==='Escape'&&modalRoot&&!modalRoot.hidden)closeAtlasModal()});
 function tick(){const w=W(),h=H();
 for(const l of links){const dx=l.target.x-l.source.x,dy=l.target.y-l.source.y,d=Math.hypot(dx,dy)||1,force=(d-200)*0.0006;if(!l.source.dragging){l.source.vx+=dx/d*force;l.source.vy+=dy/d*force}if(!l.target.dragging){l.target.vx-=dx/d*force;l.target.vy-=dy/d*force}}
 for(let i=0;i<nodes.length;i++)for(let j=i+1;j<nodes.length;j++){const a=nodes[i],b=nodes[j],dx=b.x-a.x,dy=b.y-a.y,d=Math.hypot(dx,dy)||1,ab=box(a),bb=box(b),min=(Math.max(ab.w,ab.h)+Math.max(bb.w,bb.h))*0.5+14;if(d<min){const f=(min-d)*0.022;if(!a.dragging){a.vx-=dx/d*f;a.vy-=dy/d*f}if(!b.dragging){b.vx+=dx/d*f;b.vy+=dy/d*f}}}
 for(const n of nodes){if(n.dragging)continue;n.vx*=0.88;n.vy*=0.88;const b=box(n),mx=b.w/2+6,my=b.h/2+6;n.x=Math.max(mx,Math.min(w-mx,n.x+n.vx));n.y=Math.max(my,Math.min(h-my,n.y+n.vy))}
 draw();requestAnimationFrame(tick)}
-function draw(){svg.innerHTML='';for(const l of links){const line=document.createElementNS('http://www.w3.org/2000/svg','line');line.setAttribute('class','link');line.setAttribute('x1',l.source.x);line.setAttribute('y1',l.source.y);line.setAttribute('x2',l.target.x);line.setAttribute('y2',l.target.y);svg.appendChild(line)}
-for(const n of nodes){const g=document.createElementNS('http://www.w3.org/2000/svg','g');g.setAttribute('class','node'+(n.id===activeId?' active':'')+(n.isCore?' core':''));g.setAttribute('transform',\`translate(\${n.x},\${n.y})\`);g.onmousedown=(e)=>drag(e,n);g.onclick=()=>show(n);const b=box(n);const r=document.createElementNS('http://www.w3.org/2000/svg','rect');r.setAttribute('x',-b.w/2);r.setAttribute('y',-b.h/2);r.setAttribute('width',b.w);r.setAttribute('height',b.h);r.setAttribute('fill',n.color||'#fff');r.setAttribute('rx',12);r.setAttribute('ry',12);g.appendChild(r);const t=document.createElementNS('http://www.w3.org/2000/svg','text');t.setAttribute('text-anchor','middle');t.setAttribute('dominant-baseline','middle');t.setAttribute('x',0);t.setAttribute('y',1);t.textContent=n.label.slice(0,32);g.appendChild(t);svg.appendChild(g)}}
-function show(n){activeId=n.id;draw();
+function draw(){if(!svg)return;svg.innerHTML='';for(const l of links){const line=document.createElementNS('http://www.w3.org/2000/svg','line');line.setAttribute('class','link');line.setAttribute('x1',l.source.x);line.setAttribute('y1',l.source.y);line.setAttribute('x2',l.target.x);line.setAttribute('y2',l.target.y);svg.appendChild(line)}
+for(const n of nodes){const g=document.createElementNS('http://www.w3.org/2000/svg','g');g.setAttribute('class','node'+(n.id===activeId?' active':'')+(n.isCore?' core':''));g.setAttribute('transform',\`translate(\${n.x},\${n.y})\`);g.addEventListener('pointerdown',function(e){onNodePointerDown(e,n)});const b=box(n);const r=document.createElementNS('http://www.w3.org/2000/svg','rect');r.setAttribute('x',-b.w/2);r.setAttribute('y',-b.h/2);r.setAttribute('width',b.w);r.setAttribute('height',b.h);r.setAttribute('fill',n.color||'#fff');r.setAttribute('rx',12);r.setAttribute('ry',12);g.appendChild(r);const t=document.createElementNS('http://www.w3.org/2000/svg','text');t.setAttribute('text-anchor','middle');t.setAttribute('dominant-baseline','middle');t.setAttribute('x',0);t.setAttribute('y',1);t.textContent=n.label.slice(0,32);g.appendChild(t);svg.appendChild(g)}}
+function show(n){activeId=n.id;draw();if(mqMobile.matches){openAtlasModal(n);return}
 const coreBanner=n.isCore?'<p class="hint" style="margin:10px 0 0;border-left:3px solid #c9a86b;padding-left:10px">Это <strong>ядро маршрутизации</strong>. Его вручную правите вы (в т.ч. ниже). Телеграм-агент в этот файл не пишет; веб с токеном из <code>/web</code> — можно.</p>':'';
 side.innerHTML=\`<div class="readerHead"><h2>\${escapeHtml(n.label)}</h2><div class="filePath">\${escapeHtml(n.file)}</div>\${coreBanner}<p class="hint">Папка: \${escapeHtml(n.folder)} · \${Math.round((n.size||0)/1024*10)/10} KB</p></div><h3>Ключевые темы</h3>\${(n.keywords||[]).slice(0,10).map(k=>\`<span class="pill">\${escapeHtml(k.word||k)}</span>\`).join('')||'<p class="hint">Нет</p>'}<div class="atlasEdit"><h3>Редактирование</h3><div class="atlasBar"><button type="button" id="atlasSave">Сохранить</button><button type="button" id="atlasRevert">Сбросить</button><span id="atlasStatus"></span></div><label class="hint" for="atlasTa" style="display:block;margin-bottom:6px">Markdown, полная перезапись файла (не дописывание)</label><textarea id="atlasTa" class="atlasTextarea" rows="20" wrap="off" spellcheck="false" autocomplete="off"></textarea></div>\`;
 const taEl=document.getElementById('atlasTa');
@@ -244,9 +277,9 @@ if(taEl)taEl.value=n.content||'';
 document.getElementById('atlasSave')&&document.getElementById('atlasSave').addEventListener('click',()=>saveAtlas(n));
 document.getElementById('atlasRevert')&&document.getElementById('atlasRevert').addEventListener('click',()=>revertAtlas(n));
 }
-function renderLegend(){legend.innerHTML='<strong>Папки</strong>'+((ATLAS.graph.folders||[]).map(f=>\`<div class="legendItem"><span class="dot" style="background:\${escapeHtml(f.color)}"></span><span>\${escapeHtml(f.name)}</span></div>\`).join('')||'<div class="hint">Пока нет папок</div>')+'<div style="margin-top:12px"><strong>Роли узлов</strong></div><div class="legendItem"><span class="dot" style="width:14px;height:14px;min-width:14px;box-sizing:border-box;border:1.5px solid #f1f1f1;background:#c9a86b"></span><span>Ядро: маршруты (только владелец)</span></div>'}
+function renderLegend(){if(!legend)return;legend.innerHTML='<strong>Папки</strong>'+((ATLAS.graph.folders||[]).map(f=>\`<div class="legendItem"><span class="dot" style="background:\${escapeHtml(f.color)}"></span><span>\${escapeHtml(f.name)}</span></div>\`).join('')||'<div class="hint">Пока нет папок</div>')+'<div style="margin-top:12px"><strong>Роли узлов</strong></div><div class="legendItem"><span class="dot" style="width:14px;height:14px;min-width:14px;box-sizing:border-box;border:1.5px solid #f1f1f1;background:#c9a86b"></span><span>Ядро: маршруты (только владелец)</span></div>'}
 function escapeHtml(s){return String(s??'').replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]))}
-function drag(e,n){e.preventDefault();e.stopPropagation();n.dragging=true;let lastX=n.x,lastY=n.y,lastT=performance.now();const move=ev=>{const r=svg.getBoundingClientRect(),nx=ev.clientX-r.left,ny=ev.clientY-r.top,now=performance.now(),dt=Math.max(8,now-lastT);n.vx=(nx-lastX)/dt*16;n.vy=(ny-lastY)/dt*16;lastX=nx;lastY=ny;lastT=now;n.x=nx;n.y=ny;draw()};const up=()=>{n.dragging=false;savePositions();window.removeEventListener('mousemove',move);window.removeEventListener('mouseup',up)};window.addEventListener('mousemove',move);window.addEventListener('mouseup',up)}
+function onNodePointerDown(ev,n){if(ev.pointerType==='mouse'&&ev.button!==0)return;ev.preventDefault();const sx=ev.clientX,sy=ev.clientY;let moved=false;n.dragging=true;let lastX=n.x,lastY=n.y,lastT=performance.now();const el=ev.currentTarget;try{el.setPointerCapture(ev.pointerId)}catch(_){}function move(ev2){if(ev2.pointerId!==ev.pointerId)return;ev2.preventDefault();if(Math.hypot(ev2.clientX-sx,ev2.clientY-sy)>10)moved=true;const r=svg.getBoundingClientRect();const nx=ev2.clientX-r.left,ny=ev2.clientY-r.top,now=performance.now(),dt=Math.max(8,now-lastT);n.vx=(nx-lastX)/dt*16;n.vy=(ny-lastY)/dt*16;lastX=nx;lastY=ny;lastT=now;n.x=nx;n.y=ny;draw()}function up(ev2){if(ev2.pointerId!==ev.pointerId)return;n.dragging=false;savePositions();window.removeEventListener('pointermove',move);window.removeEventListener('pointerup',up);window.removeEventListener('pointercancel',up);try{el.releasePointerCapture(ev.pointerId)}catch(_){}if(!moved)show(n);else draw()}window.addEventListener('pointermove',move,{passive:false});window.addEventListener('pointerup',up);window.addEventListener('pointercancel',up)}
 window.addEventListener('beforeunload',savePositions);
 tick();</script>
 </body></html>`;
