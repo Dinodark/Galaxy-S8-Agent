@@ -86,6 +86,27 @@ function userAskedForReminder(text) {
   return /\bremind\b|напомни|напомин/i.test(String(text || ''));
 }
 
+function userAskedForMemoryInventory(text) {
+  return /файл|замет|структур|дерев|баз[ауы]\s+знан|memory|notes|list/i.test(String(text || ''));
+}
+
+async function buildMemoryInventoryContext(toolCtx) {
+  const result = await tools.execute('list_notes', {}, toolCtx);
+  const files = Array.isArray(result.files) ? result.files : [];
+  return {
+    result,
+    message: {
+      role: 'system',
+      content:
+        'Fresh memory inventory for this turn from list_notes:\n' +
+        (files.length > 0
+          ? files.map((file) => `- ${file}`).join('\n')
+          : '- No markdown note files currently exist under memory/notes.\n') +
+        '\nWhen answering questions about existing files, notes, folders, or the knowledge-base tree, use ONLY this inventory. Do not invent files, folders, images, or prototypes. If the inventory is empty, say plainly that no note files exist yet.',
+    },
+  };
+}
+
 function extractJsonObjectFromMarkdown(text) {
   const s = String(text || '').trim();
   const fenced = s.match(/^```(?:json)?\s*([\s\S]*?)\s*```/i);
@@ -144,10 +165,29 @@ async function runAgent({ chatId, userMessage }) {
   const toolSchemas = tools.listSchemas();
   const transcript = [];
   const toolCtx = { chatId };
+  const turnContext = [];
+
+  if (userAskedForMemoryInventory(userMessage)) {
+    const inventory = await buildMemoryInventoryContext(toolCtx);
+    transcript.push({
+      tool: 'list_notes',
+      args: {},
+      result: inventory.result,
+      grounded: true,
+    });
+    turnContext.push(inventory.message);
+
+    // #region agent log
+    debugLog('H1,H2,H4', 'core/agent.js:runAgent:memoryInventoryContext', 'memory inventory injected', {
+      fileCount: Array.isArray(inventory.result.files) ? inventory.result.files.length : null,
+      files: Array.isArray(inventory.result.files) ? inventory.result.files.slice(0, 50) : null,
+    });
+    // #endregion
+  }
 
   for (let step = 0; step < config.agent.maxSteps; step++) {
     const assistantMsg = await chatCompletion({
-      messages: withRuntimeContext(history),
+      messages: [...withRuntimeContext(history), ...turnContext],
       tools: toolSchemas,
     });
 

@@ -27,6 +27,13 @@ run() {
   "$@" >> "$LOG_FILE" 2>&1
 }
 
+reset_package_lock_if_changed() {
+  if ! git diff --quiet -- package-lock.json 2>/dev/null; then
+    log "Resetting generated package-lock.json changes."
+    git checkout -- package-lock.json >> "$LOG_FILE" 2>&1 || true
+  fi
+}
+
 stop_session() {
   session="$1"
   label="$2"
@@ -55,11 +62,14 @@ start_session() {
 log "Vatoko Galaxy update/restart started."
 log "App dir: $APP_DIR"
 
+reset_package_lock_if_changed
+
 log "Pulling latest code..."
 run git pull --ff-only
 
 log "Installing npm dependencies..."
 run npm install
+reset_package_lock_if_changed
 
 log "Running doctor..."
 npm run doctor >> "$LOG_FILE" 2>&1 || log "Doctor finished with warnings."
