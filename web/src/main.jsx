@@ -579,6 +579,7 @@ function Journal({ api }) {
 function Atlas({ api, token, setStateText }) {
   const [ready, setReady] = useState(false);
   const [src, setSrc] = useState('');
+  const [atlasInfo, setAtlasInfo] = useState(null);
 
   useEffect(() => {
     setStateText('building...');
@@ -593,6 +594,7 @@ function Atlas({ api, token, setStateText }) {
         files: Array.isArray(atlas.notes) ? atlas.notes.map((note) => note.file).slice(0, 50) : null,
       });
       // #endregion
+      setAtlasInfo(atlas);
       setStateText(atlas.stats.notes + ' files, ' + atlas.stats.folders + ' folders');
       const theme = atlasThemeQuery();
       setSrc(
@@ -608,7 +610,21 @@ function Atlas({ api, token, setStateText }) {
   }, [api, setStateText]);
 
   if (!ready) return <div className="card muted">Building atlas...</div>;
-  return <iframe src={src} title="Memory Atlas" />;
+  return (
+    <div className="atlas-page">
+      <div className="card atlas-debug">
+        <strong>Atlas debug</strong>
+        <span>React marker: atlas-react-v2</span>
+        <span>
+          API: {atlasInfo?.stats?.notes ?? '?'} files, {atlasInfo?.stats?.folders ?? '?'} folders, {atlasInfo?.stats?.links ?? '?'} links
+        </span>
+        <span>
+          Files: {atlasInfo?.notes?.length ? atlasInfo.notes.map((note) => note.file).join(', ') : 'none'}
+        </span>
+      </div>
+      <iframe src={src} title="Memory Atlas" />
+    </div>
+  );
 }
 
 function UpdatePanel({ api }) {
