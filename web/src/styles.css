@@ -13,10 +13,8 @@
   --color-agent-mark: #555555;
   --color-danger-bg: #2a171a;
   --color-danger-text: #f0c8cf;
-  --color-shadow: rgb(0 0 0 / 22%);
   --radius-lg: 18px;
   --radius-md: 12px;
-  --shadow-soft: 0 12px 40px var(--color-shadow);
 
   /* Legacy aliases while the dashboard evolves. */
   --bg: var(--color-bg);
@@ -859,7 +857,7 @@ button.calendar-cell:focus-visible {
   min-height: 0;
   background: var(--color-surface-soft);
   border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-soft);
+  box-shadow: none;
   overflow: hidden;
 }
 
