@@ -21,6 +21,57 @@ const { isAllowed } = require('./auth');
 
 const SILENT_REACTION = '✍';
 
+/** Private chat: merge rapid-fire text parts (long Telegram messages are split) before runAgent. */
+const textCoalesceState = new Map();
+const runChatSerialized = new Map();
+
+function runSerialized(chatId, fn) {
+  const prev = runChatSerialized.get(chatId) || Promise.resolve();
+  const next = prev.then(() => fn());
+  runChatSerialized.set(chatId, next);
+  return next.catch((err) => {
+    console.error('[telegram] serialized handler error:', err);
+  });
+}
+
+/**
+ * Buffers `text` with prior parts for this chat, flushes `coalesceMs` after the last part.
+ * Silent mode should call handleUserMessage directly, not this.
+ */
+function scheduleCoalescedTextMessage(chatId, text, { coalesceMs, onFlush }) {
+  if (!coalesceMs || coalesceMs <= 0) {
+    return runSerialized(chatId, () => onFlush(String(text || '')));
+  }
+  const t = String(text || '');
+  let st = textCoalesceState.get(chatId);
+  if (!st) {
+    st = { parts: [], timer: null };
+    textCoalesceState.set(chatId, st);
+  }
+  st.parts.push(t);
+  if (st.timer) {
+    clearTimeout(st.timer);
+    st.timer = null;
+  }
+  st.timer = setTimeout(() => {
+    st = textCoalesceState.get(chatId);
+    if (!st || st.parts.length === 0) return;
+    const combined = st.parts.join('\n\n');
+    const n = st.parts.length;
+    if (st.timer) {
+      clearTimeout(st.timer);
+      st.timer = null;
+    }
+    textCoalesceState.delete(chatId);
+    if (n > 1) {
+      console.log(
+        `[telegram] coalesced ${n} text parts for chat ${chatId} (total ${combined.length} chars)`
+      );
+    }
+    return runSerialized(chatId, () => onFlush(combined));
+  }, coalesceMs);
+}
+
 async function setReaction(chatId, messageId, emoji) {
   try {
     await axios.post(
@@ -460,7 +511,20 @@ function start() {
         });
         return;
       }
-      await handleUserMessage(msg.chat.id, msg.text);
+      const coalesceMs = config.telegram.textCoalesceMs;
+      scheduleCoalescedTextMessage(msg.chat.id, msg.text, {
+        coalesceMs,
+        onFlush: (combined) =>
+          handleUserMessage(msg.chat.id, combined).catch((err) => {
+            console.error('[agent] error:', err);
+            return bot
+              .sendMessage(
+                msg.chat.id,
+                'Error: ' + (err && err.message ? err.message : String(err))
+              )
+              .catch((e) => console.warn('[telegram] error reply failed:', e.message));
+          }),
+      });
     } catch (err) {
       console.error('[agent] error:', err);
       await bot.sendMessage(

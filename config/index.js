@@ -46,6 +46,8 @@ const config = {
   telegram: {
     token: required('TELEGRAM_BOT_TOKEN'),
     allowedUserIds: parseIdList(process.env.ALLOWED_TELEGRAM_USER_IDS),
+    /** 0 = off. Otherwise chat-mode text is held up to this many ms after the last part; all parts in one burst are joined. Solo messages are delayed this long. */
+    textCoalesceMs: Number(optional('TELEGRAM_TEXT_COALESCE_MS', '350')),
   },
   agent: {
     maxSteps: Number(optional('AGENT_MAX_STEPS', '8')),

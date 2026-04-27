@@ -10,6 +10,11 @@ const {
   loadProjectsIndex,
   isKnowledgeCoreIndexPath,
 } = require('./knowledge_orchestrator');
+const {
+  userAskedToWriteMemory,
+  shouldUseDeterministicMemoryInventory,
+  userAskedForReminder,
+} = require('./user_intent');
 
 let cachedSystemPrompt = null;
 
@@ -66,25 +71,6 @@ function withRuntimeContext(history) {
     return [history[0], ctx, ...history.slice(1)];
   }
   return [ctx, ...history];
-}
-
-function userAskedForReminder(text) {
-  return /\bremind\b|напомни|напомин/i.test(String(text || ''));
-}
-
-function userAskedForMemoryInventory(text) {
-  const s = String(text || '').toLowerCase();
-  const asksWrite = userAskedToWriteMemory(s);
-  const asksInventory =
-    /какие|какой|какая|какое|список|покажи|показать|структур|дерев|что\s+есть|где\s+файл|какие\s+файл|memory|notes|list|что\s+в\s+базе/.test(s) &&
-    /файл|замет|баз[ауы]\s+знан|memory|notes/.test(s);
-  return asksInventory && !asksWrite;
-}
-
-function userAskedToWriteMemory(text) {
-  return /созда(й|ть)|запиши|сохрани|добавь|добавить|внеси|занеси|разнеси|заполни|сформируй|сделай|создай\s+файл|создай\s+структур|внеси\s+туда|сохрани\s+это|запомни\s+это/.test(
-    String(text || '').toLowerCase()
-  );
 }
 
 function hasSuccessfulWriteCall(transcript) {
@@ -263,7 +249,7 @@ async function runAgent({ chatId, userMessage }) {
     }
   }
 
-  if (userAskedForMemoryInventory(userMessage)) {
+  if (shouldUseDeterministicMemoryInventory(userMessage)) {
     const inventory = await buildMemoryInventoryContext(toolCtx);
     const files = Array.isArray(inventory.result.files) ? inventory.result.files : [];
     transcript.push({
@@ -369,4 +355,9 @@ async function runAgent({ chatId, userMessage }) {
   return { reply: fallback.content, toolCalls: transcript, steps: config.agent.maxSteps };
 }
 
-module.exports = { runAgent };
+module.exports = {
+  runAgent,
+  userAskedToWriteMemory,
+  shouldUseDeterministicMemoryInventory,
+  userAskedForReminder,
+};
