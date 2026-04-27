@@ -130,10 +130,16 @@ h1 {
   justify-content: space-between;
   gap: 24px;
   align-items: flex-end;
-  background:
-    radial-gradient(circle at top left, var(--color-glow) 0, transparent 36%),
-    linear-gradient(135deg, var(--color-surface-soft), var(--color-surface));
+  background: linear-gradient(135deg, var(--color-surface-soft), var(--color-surface));
   box-shadow: none;
+}
+
+/* hero + card share one surface — no elevation shadow */
+.hero.card,
+section.hero.card {
+  box-shadow: none !important;
+  filter: none;
+  background: linear-gradient(135deg, var(--color-surface-soft), var(--color-surface));
 }
 
 .hero h2 {
@@ -396,6 +402,7 @@ h1 {
   background: var(--color-surface-soft);
   border-radius: var(--radius-lg);
   padding: 14px;
+  box-shadow: none;
 }
 
 .stack {
@@ -899,6 +906,13 @@ button.calendar-cell:focus-visible {
 @media (max-width: 900px) {
   #app {
     grid-template-columns: 1fr;
+    box-shadow: none;
+    filter: none;
+  }
+
+  .main {
+    box-shadow: none;
+    filter: none;
   }
 
   .side {
@@ -933,6 +947,8 @@ button.calendar-cell:focus-visible {
     position: sticky;
     top: 0;
     z-index: 40;
+    box-shadow: none;
+    filter: none;
   }
 
   .stats,
