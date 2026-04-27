@@ -601,9 +601,67 @@ function Journal({ api }) {
   );
 }
 
+function ReminderDayModal({ dayLabel, items, onClose, cronTz }) {
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
+  return (
+    <div className="reminder-day-modal" role="dialog" aria-modal="true" aria-labelledby="reminder-day-title">
+      <button
+        type="button"
+        className="reminder-day-modal__backdrop"
+        aria-label="Закрыть"
+        onClick={onClose}
+      />
+      <div className="reminder-day-modal__panel">
+        <header className="reminder-day-modal__head">
+          <strong id="reminder-day-title">{dayLabel}</strong>
+          <button
+            type="button"
+            className="reminder-day-modal__close"
+            onClick={onClose}
+            aria-label="Закрыть"
+          >
+            ×
+          </button>
+        </header>
+        <div className="reminder-day-modal__body">
+          {items.length === 0 && (
+            <p className="muted">На этот день нет напоминаний.</p>
+          )}
+          {items.map((item) => (
+            <article className="reminder-item" key={item.id}>
+              <div className="reminder-main">
+                <strong>{item.text}</strong>
+              </div>
+              <div className="reminder-meta">
+                <span>{fmtTime(item.fire_at)}</span>
+                {item.recurrence?.cron && (
+                  <code>
+                    {item.recurrence.cron}
+                    {item.recurrence.tz || cronTz
+                      ? ` (${item.recurrence.tz || cronTz})`
+                      : ''}
+                  </code>
+                )}
+              </div>
+            </article>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function Reminders({ api }) {
   const [state, setState] = useState({ loading: true, error: '', tz: '', reminders: [] });
   const [monthOffset, setMonthOffset] = useState(0);
+  const [dayModal, setDayModal] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -676,13 +734,20 @@ function Reminders({ api }) {
 
   return (
     <div className="reminders-page">
+      {dayModal && (
+        <ReminderDayModal
+          dayLabel={dayModal.label}
+          items={dayModal.items}
+          onClose={() => setDayModal(null)}
+          cronTz={state.tz}
+        />
+      )}
       <section className="card">
         <div className="reminders-head">
           <div>
             <h2>
               {monthData.base.toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' })}
             </h2>
-            <p className="muted">Timezone: {state.tz}</p>
           </div>
           <div className="actions">
             <button className="secondary" onClick={() => setMonthOffset((v) => v - 1)}>←</button>
@@ -702,8 +767,24 @@ function Reminders({ api }) {
             const dayReminders = remindersByDay.get(key) || [];
             const count = dayReminders.length;
             const today = dayKey(new Date()) === key;
+            const dayTitle = date.toLocaleDateString('ru-RU', {
+              weekday: 'long',
+              day: 'numeric',
+              month: 'long',
+              year: 'numeric',
+            });
             return (
-              <div key={idx} className={'calendar-cell' + (today ? ' today' : '')}>
+              <button
+                type="button"
+                key={idx}
+                className={'calendar-cell calendar-cell--btn' + (today ? ' today' : '')}
+                onClick={() =>
+                  setDayModal({
+                    label: dayTitle.charAt(0).toUpperCase() + dayTitle.slice(1),
+                    items: dayReminders,
+                  })
+                }
+              >
                 <div className="calendar-day">{date.getDate()}</div>
                 <div className="calendar-dots">
                   {count > 0 ? (
@@ -715,7 +796,7 @@ function Reminders({ api }) {
                     <small className="muted">—</small>
                   )}
                 </div>
-              </div>
+              </button>
             );
           })}
         </div>
@@ -732,7 +813,6 @@ function Reminders({ api }) {
             <article className="reminder-item" key={item.id}>
               <div className="reminder-main">
                 <strong>{item.text}</strong>
-                <span className="muted">{item.id}</span>
               </div>
               <div className="reminder-meta">
                 <span>{fmtTime(item.fire_at)}</span>

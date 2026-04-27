@@ -727,6 +727,27 @@ iframe {
   background: transparent;
 }
 
+button.calendar-cell {
+  width: 100%;
+  border: 0;
+  padding: 8px;
+  margin: 0;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.12s ease;
+}
+
+button.calendar-cell:hover {
+  background: var(--color-surface-hover);
+}
+
+button.calendar-cell:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
 .calendar-cell.today {
   box-shadow: inset 0 0 0 1px var(--color-accent);
 }
@@ -783,6 +804,84 @@ iframe {
 
 .reminder-meta code {
   color: var(--color-muted);
+}
+
+.reminder-day-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: grid;
+  place-items: center;
+  padding: max(16px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom));
+  box-sizing: border-box;
+}
+
+.reminder-day-modal__backdrop {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  background: rgb(0 0 0 / 55%);
+  cursor: pointer;
+}
+
+.reminder-day-modal__panel {
+  position: relative;
+  z-index: 1;
+  width: min(100%, 440px);
+  max-height: min(86vh, 640px);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--color-surface-soft);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-soft);
+  overflow: hidden;
+}
+
+.reminder-day-modal__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  background: var(--color-surface);
+  border-bottom: 1px solid #2a2a2a;
+  flex-shrink: 0;
+}
+
+.reminder-day-modal__head strong {
+  font-size: 16px;
+  line-height: 1.35;
+  padding-right: 8px;
+}
+
+.reminder-day-modal__close {
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: var(--color-surface-hover);
+  color: var(--color-text);
+  font-size: 24px;
+  line-height: 1;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+}
+
+.reminder-day-modal__body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 14px 16px;
+  -webkit-overflow-scrolling: touch;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
 @media (max-width: 900px) {
