@@ -179,8 +179,8 @@ function renderHtml(index) {
 :root{color-scheme:dark;--bg:#111111;--panel:#171717;--panel-soft:#1d1d1d;--panel-hover:#242424;--muted:#9a9a9a;--text:#f1f1f1;--line:transparent;--accent:#d6d6d6}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);font:14px/1.45 system-ui,-apple-system,Segoe UI,sans-serif;color:var(--text);overflow:hidden}
 header{height:58px;display:flex;align-items:center;gap:16px;padding:0 18px;background:var(--bg)}
-h1{font-size:17px;margin:0}header span{color:var(--muted)}#wrap{display:grid;grid-template-columns:minmax(0,1fr) minmax(320px,38vw);height:calc(100vh - 58px);min-height:0}#graphWrap{position:relative;background:var(--bg);min-height:0}#graph{width:100%;height:100%}#side{background:var(--panel-soft);padding:18px;overflow:hidden;display:flex;flex-direction:column;min-height:0}
-.legend{position:absolute;left:14px;top:14px;max-width:280px;padding:10px 12px;border-radius:14px;background:var(--panel);box-shadow:0 12px 40px #0003}.legend strong{display:block;margin-bottom:6px}.legendItem{display:flex;align-items:center;gap:8px;color:var(--muted);margin:5px 0}.dot{width:10px;height:10px;border-radius:50%;display:inline-block}
+h1{font-size:17px;margin:0}header span{color:var(--muted)}#wrap{display:grid;grid-template-columns:minmax(0,1fr) minmax(320px,38vw);height:calc(100vh - 58px);min-height:0}#graphWrap{position:relative;background:var(--bg);min-height:0}#graph{width:100%;height:100%}#side{background:var(--panel-soft);padding:18px;overflow:hidden;display:flex;flex-direction:column;min-height:0;border-radius:16px 0 0 16px}
+.legend{position:absolute;left:14px;top:14px;max-width:280px;padding:10px 12px;border-radius:14px;background:var(--panel);box-shadow:none}.legend strong{display:block;margin-bottom:6px}.legendItem{display:flex;align-items:center;gap:8px;color:var(--muted);margin:5px 0}.dot{width:10px;height:10px;border-radius:50%;display:inline-block}
 .pill{display:inline-block;border-radius:999px;padding:3px 8px;margin:2px;color:var(--muted);background:var(--panel-hover)}.node{cursor:pointer}.node rect{stroke:#fff3;stroke-width:1.3;rx:12;ry:12}.node.active rect{stroke:var(--text);stroke-width:2}.node.core rect{stroke:var(--text);stroke-width:2.1}.node text{fill:var(--text);font-size:12px}.node.core text{fill:var(--text);font-size:13px}.link{stroke:#ffffff20;stroke-width:1}.hint{color:var(--muted)}.empty{max-width:520px;margin:10vh auto;color:var(--muted);font-size:18px}
 h2{margin:0 0 8px;font-size:18px}h3{margin:18px 0 8px;font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}pre{white-space:pre-wrap;font-family:inherit;color:var(--text);line-height:1.6}.filePath{color:var(--muted);word-break:break-all}.readerHead{position:sticky;top:0;margin:-18px -18px 16px;padding:18px;background:var(--panel-soft)}
 .atlasEdit{margin-top:8px;display:flex;flex-direction:column;min-height:0;flex:1}.atlasBar{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:0 0 8px}.atlasBar button{background:var(--panel-hover);color:var(--text);border:none;border-radius:10px;padding:8px 14px;cursor:pointer;font:inherit}.atlasBar button:disabled{opacity:0.45;cursor:default}#atlasStatus{flex:1;font-size:12px;color:var(--muted);min-width:120px}
@@ -193,17 +193,19 @@ h2{margin:0 0 8px;font-size:18px}h3{margin:18px 0 8px;font-size:13px;color:var(-
 .atlas-modal-root[hidden]{display:none!important}
 .atlas-modal-backdrop{position:absolute;inset:0;background:var(--bg);z-index:0}
 .atlas-modal-panel{position:relative;z-index:1;display:flex;flex-direction:column;height:100%;min-height:100%;min-height:100dvh;max-height:100dvh;box-sizing:border-box;background:var(--bg);padding:env(safe-area-inset-top,0) env(safe-area-inset-right,0) 0 env(safe-area-inset-left,0)}
-.atlas-modal-top{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:12px 14px 10px;flex-shrink:0;background:var(--panel-soft);border-bottom:1px solid #2a2a2a;min-height:48px;box-sizing:border-box}
-.atlas-modal-top .atlas-modal-title-wrap{display:flex;flex-direction:column;min-width:0;flex:1;padding-right:4px}
-.atlas-modal-top strong{font-size:16px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%}
+.atlas-modal-top{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:10px 14px;flex-shrink:0;background:var(--panel-soft);border-bottom:1px solid #2a2a2a;min-height:52px;box-sizing:border-box}
+.atlas-modal-top .atlas-modal-title-wrap{display:flex;flex-direction:column;min-width:0;flex:1 1 200px}
+.atlas-modal-top strong{font-size:15px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%}
 .atlas-modal-top .atlas-modal-meta{font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%}
-.atlas-close-btn{flex-shrink:0;width:44px;height:44px;padding:0;border:0;border-radius:12px;background:var(--panel-hover);color:var(--text);font-size:24px;line-height:1;cursor:pointer;display:grid;place-items:center;align-self:flex-start;position:relative;z-index:2;margin-top:2px}
+.atlas-modal-top .atlas-modal-meta:empty{display:none}
+.atlas-modal-toolbar{display:flex;flex-wrap:wrap;align-items:center;justify-content:flex-end;gap:8px;flex:0 0 auto;min-width:0;max-width:100%}
+.atlas-modal-toolbar button{background:var(--panel-hover);color:var(--text);border:none;border-radius:10px;padding:8px 14px;cursor:pointer;font:inherit}
+.atlas-modal-toolbar #atlasStatus{font-size:12px;color:var(--muted);min-width:0;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.atlas-close-btn{flex-shrink:0;width:44px;height:44px;padding:0;border:0;border-radius:12px;background:var(--panel-hover);color:var(--text);font-size:24px;line-height:1;cursor:pointer;display:grid;place-items:center;align-self:center;position:relative;z-index:2}
 .atlas-modal-body{flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden}
-.atlas-modal-scroll{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:12px 14px 8px;box-sizing:border-box}
-.atlas-modal-scroll .atlasTextarea{min-height:min(52vh,420px);display:block;resize:vertical;max-width:100%}
-.atlas-modal-actions{flex-shrink:0;display:flex;flex-wrap:wrap;align-items:center;gap:10px;padding:12px 14px calc(12px + env(safe-area-inset-bottom,0px));background:var(--panel-soft);border-top:1px solid #2a2a2a;box-shadow:0 -8px 24px #0002}
-.atlas-modal-actions button{background:var(--panel-hover);color:var(--text);border:none;border-radius:10px;padding:10px 16px;cursor:pointer;font:inherit}
-.atlas-modal-actions #atlasStatus{flex:1;font-size:12px;color:var(--muted);min-width:0}
+.atlas-modal-scroll{flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden;padding:0;box-sizing:border-box}
+.atlas-modal-scroll .atlasTextarea{flex:1;min-height:0;resize:none;width:100%;box-sizing:border-box;white-space:pre-wrap;word-break:break-word;overflow-wrap:break-word;overflow-y:auto}
+.atlas-modal-actions{display:none}
 body.atlas-editor-open{overflow:hidden;touch-action:none}
 body.atlas-mobile header{display:none!important}
 body.atlas-mobile #wrap{height:100dvh;height:100vh;grid-template-columns:1fr!important;grid-template-rows:1fr!important}
@@ -222,7 +224,7 @@ body.atlas-mobile #wrap{grid-template-rows:1fr!important}
 <div id="atlasModalRoot" class="atlas-modal-root" hidden>
 <div class="atlas-modal-backdrop" aria-hidden="true"></div>
 <section class="atlas-modal-panel" role="dialog" aria-modal="true" aria-labelledby="atlasModalTitleLbl">
-<header class="atlas-modal-top"><div class="atlas-modal-title-wrap"><strong id="atlasModalTitleLbl"></strong><span class="atlas-modal-meta" id="atlasModalMeta"></span></div><button type="button" class="atlas-close-btn" id="atlasModalClose" aria-label="Закрыть">×</button></header>
+<header class="atlas-modal-top"><div class="atlas-modal-title-wrap"><strong id="atlasModalTitleLbl"></strong><span class="atlas-modal-meta" id="atlasModalMeta"></span></div><div class="atlas-modal-toolbar" id="atlasModalToolbar"></div><button type="button" class="atlas-close-btn" id="atlasModalClose" aria-label="Закрыть">×</button></header>
 <div class="atlas-modal-body" id="atlasModalBody"></div>
 </section>
 </div>
@@ -264,6 +266,7 @@ var graphDomBuilt=false;
 let activeId='';
 function size(n){if(n.isCore)return 30;return Math.max(10,Math.min(22,10+Math.sqrt(Math.max(n.size,1))/18))}
 function box(n){const label=(n.label||'').slice(0,32);const charW=n.isCore?8.2:7.2;const w=Math.max(70,Math.min(320,label.length*charW+22));const h=n.isCore?38:32;return {w,h}}
+function nodeTextColor(fill){const c=String(fill||'#ffffff').trim();const m=c.match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i);if(!m)return '#f1f1f1';let h=m[1];if(h.length===3)h=h.split('').map(ch=>ch+ch).join('');const r=parseInt(h.slice(0,2),16),g=parseInt(h.slice(2,4),16),b=parseInt(h.slice(4,6),16);const yiq=(r*299+g*587+b*114)/1000;return yiq>=160?'#111111':'#f1f1f1'}
 function loadPositions(){try{return JSON.parse(localStorage.getItem(POSKEY)||'{}')}catch{return {}}}
 function savePositions(){try{const out={};for(const n of nodes){out[n.id]={x:Math.round(n.x),y:Math.round(n.y)}}localStorage.setItem(POSKEY,JSON.stringify(out))}catch{}}
 const savedPos=loadPositions();
@@ -271,8 +274,8 @@ let nodes=ATLAS.graph.nodes.map((n,i)=>{const p=savedPos[n.id];return {...n,x:(p
 let links=ATLAS.graph.links.map(l=>({source:nodes.find(n=>n.id===l.source),target:nodes.find(n=>n.id===l.target),label:l.label})).filter(l=>l.source&&l.target);
 if(!nodes.length){svg.outerHTML='<div class="empty">Пока нет файлов базы знаний. Создай markdown в memory/notes, например projects/white_rabbit_spec.md.</div>'}
 else{if(mqMobile.matches){if(legend)legend.innerHTML=''}else{renderLegend()}}
-function openAtlasModal(n){if(!modalRoot||!modalBody)return;if(modalTitle)modalTitle.textContent=n.label||'';if(modalMeta)modalMeta.textContent=(n.file||'')+' · '+String(Math.round((n.size||0)/1024*10)/10)+' KB';const coreMob=n.isCore?'<p class="hint" style="margin:0 0 12px">Ядро маршрутизации — только ручные правки; Telegram-агент в этот файл не пишет.</p>':'';modalBody.innerHTML='<div class="atlas-modal-scroll">'+coreMob+'<h3>Редактирование</h3><label class="hint" for="atlasTa" style="display:block;margin:0 0 6px">Markdown, полная перезапись файла (не дописывание)</label><textarea id="atlasTa" class="atlasTextarea" wrap="off" spellcheck="false" autocomplete="off"></textarea></div><footer class="atlas-modal-actions"><button type="button" id="atlasSave">Сохранить</button><button type="button" id="atlasRevert">Сбросить</button><span id="atlasStatus"></span></footer>';const ta=document.getElementById('atlasTa');if(ta)ta.value=n.content||'';const sv=document.getElementById('atlasSave'),rv=document.getElementById('atlasRevert');if(sv)sv.addEventListener('click',function(){saveAtlas(n)});if(rv)rv.addEventListener('click',function(){revertAtlas(n)});modalRoot.hidden=false;document.body.classList.add('atlas-editor-open');document.body.style.overflow='hidden';}
-function closeAtlasModal(){if(!modalRoot)return;modalRoot.hidden=true;document.body.classList.remove('atlas-editor-open');document.body.style.overflow='';activeId='';draw()}
+function openAtlasModal(n){if(!modalRoot||!modalBody)return;if(modalTitle)modalTitle.textContent=n.file||n.label||'';if(modalMeta)modalMeta.textContent='';const tb=document.getElementById('atlasModalToolbar');if(tb)tb.innerHTML='<button type="button" id="atlasSave">Сохранить</button><button type="button" id="atlasRevert">Сбросить</button><span id="atlasStatus"></span>';modalBody.innerHTML='<div class="atlas-modal-scroll"><textarea id="atlasTa" class="atlasTextarea" wrap="soft" spellcheck="false" autocomplete="off"></textarea></div>';const ta=document.getElementById('atlasTa');if(ta)ta.value=n.content||'';const sv=document.getElementById('atlasSave'),rv=document.getElementById('atlasRevert');if(sv)sv.addEventListener('click',function(){saveAtlas(n)});if(rv)rv.addEventListener('click',function(){revertAtlas(n)});modalRoot.hidden=false;document.body.classList.add('atlas-editor-open');document.body.style.overflow='hidden';}
+function closeAtlasModal(){if(!modalRoot)return;const tb=document.getElementById('atlasModalToolbar');if(tb)tb.innerHTML='';if(modalBody)modalBody.innerHTML='';modalRoot.hidden=true;document.body.classList.remove('atlas-editor-open');document.body.style.overflow='';activeId='';draw()}
 const atlasCloseBtn=document.getElementById('atlasModalClose');if(atlasCloseBtn)atlasCloseBtn.addEventListener('click',closeAtlasModal);
 window.addEventListener('keydown',function(e){if(e.key==='Escape'&&modalRoot&&!modalRoot.hidden)closeAtlasModal()});
 function tick(){const w=W(),h=H();
@@ -316,6 +319,7 @@ t.setAttribute('dominant-baseline','middle');
 t.setAttribute('x',0);
 t.setAttribute('y',1);
 t.textContent=n.label.slice(0,32);
+t.setAttribute('fill',nodeTextColor(n.color||'#fff'));
 g.appendChild(t);
 svg.appendChild(g);
 }
@@ -342,6 +346,7 @@ n._r.setAttribute('width',b.w);
 n._r.setAttribute('height',b.h);
 n._r.setAttribute('fill',n.color||'#fff');
 n._t.textContent=n.label.slice(0,32);
+n._t.setAttribute('fill',nodeTextColor(n.color||'#fff'));
 }
 }
 function draw(){

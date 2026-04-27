@@ -114,6 +114,11 @@ h1 {
   overflow: auto;
 }
 
+/* When a full-screen reader/dialog is open, drop outer padding (modal covers the panel). */
+.content:has([role='dialog']) {
+  padding: 0;
+}
+
 .home {
   display: flex;
   flex-direction: column;
@@ -128,7 +133,7 @@ h1 {
   background:
     radial-gradient(circle at top left, var(--color-glow) 0, transparent 36%),
     linear-gradient(135deg, var(--color-surface-soft), var(--color-surface));
-  box-shadow: var(--shadow-soft);
+  box-shadow: none;
 }
 
 .hero h2 {
@@ -423,17 +428,23 @@ h1 {
 .item {
   display: block;
   width: 100%;
-  padding: 9px;
+  padding: 10px 12px;
   border: 0;
-  background: transparent;
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
   color: var(--text);
   text-align: left;
   cursor: pointer;
+  margin-bottom: 8px;
 }
 
 .item span {
   display: block;
   margin-top: 4px;
+}
+
+.item:last-child {
+  margin-bottom: 0;
 }
 
 .item:hover {
@@ -630,7 +641,8 @@ iframe {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 10px 16px;
+  padding: 0 8px;
+  min-height: 48px;
   background: var(--color-surface);
 }
 
@@ -663,7 +675,7 @@ iframe {
 
 .reader-body {
   overflow: auto;
-  padding: 18px;
+  padding: 0;
 }
 
 .reader-body pre {
@@ -897,7 +909,7 @@ button.calendar-cell:focus-visible {
     transform: translateX(-100%);
     transition: transform 180ms ease;
     border-right: 0;
-    box-shadow: 18px 0 50px var(--color-shadow);
+    box-shadow: none;
   }
 
   .side.open {

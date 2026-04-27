@@ -135,6 +135,35 @@ function formatSummaryTitleLabel(name) {
   return d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' });
 }
 
+function formatSummaryMetaLabel(name, mtime) {
+  const d = parseSummaryDate(name);
+  if (d) {
+    return d.toLocaleDateString('ru-RU', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+    });
+  }
+  return fmtTime(mtime);
+}
+
+function parseIsoDay(value) {
+  const m = String(value || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return null;
+  const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+function formatJournalDayLabel(value) {
+  const d = parseIsoDay(value);
+  if (!d) return value;
+  return d.toLocaleDateString('ru-RU', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  });
+}
+
 function sourceLabel(source) {
   return source === 'assistant' ? 'white rabbit' : 'Ты';
 }
@@ -423,7 +452,11 @@ function Home({ api, setStateText, setView }) {
           <div className="card">
             <div className="section-head">
               <h2>Latest insight</h2>
-              <span className="muted">{state.latestSummary?.name || 'no summary yet'}</span>
+              <span className="muted">
+                {state.latestSummary?.name
+                  ? formatSummaryTitleLabel(state.latestSummary.name)
+                  : 'no summary yet'}
+              </span>
             </div>
             <p>{state.summaryInsight || 'Инсайты появятся после первой вечерней сводки.'}</p>
           </div>
@@ -438,7 +471,7 @@ function Home({ api, setStateText, setView }) {
               {recentNotes.map((note) => (
                 <button className="mini-item" key={note.name} onClick={() => setView('notes')}>
                   <strong>{note.name}</strong>
-                  <span>{note.mtime || ''}</span>
+                  <span>{fmtTime(note.mtime)}</span>
                 </button>
               ))}
             </div>
@@ -500,7 +533,11 @@ function FileBrowser({ kind, api, desktopDetail = false }) {
             <strong>
               {kind === 'summary' ? formatSummaryMenuLabel(note.name) : note.name}
             </strong>
-            <span className="muted">{note.mtime || ''}</span>
+            <span className="muted">
+              {kind === 'summary'
+                ? formatSummaryMetaLabel(note.name, note.mtime)
+                : fmtTime(note.mtime)}
+            </span>
           </button>
         ))}
         {notes.length === 0 && <p className="muted">Файлов пока нет.</p>}
@@ -583,14 +620,14 @@ function Journal({ api }) {
             key={day}
             onClick={() => openDay(day)}
           >
-            {day}
+            {formatJournalDayLabel(day)}
           </button>
         ))}
         {days.length === 0 && <p className="muted">Журнал пока пуст.</p>}
       </div>
       <div className="desktop-reader">
         {entries ? (
-          <ReaderPane title={selectedDay} meta={entries.length + ' entries'}>
+          <ReaderPane title={formatJournalDayLabel(selectedDay)} meta={entries.length + ' entries'}>
             <JournalEntries entries={entries} />
           </ReaderPane>
         ) : (
@@ -602,7 +639,7 @@ function Journal({ api }) {
       {entries && (
         <ReaderModal
           className="mobile-reader"
-          title={selectedDay}
+          title={formatJournalDayLabel(selectedDay)}
           meta={entries.length + ' entries'}
           onClose={() => {
             setEntries(null);
