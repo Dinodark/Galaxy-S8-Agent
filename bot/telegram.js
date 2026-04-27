@@ -4,7 +4,7 @@ const fse = require('fs-extra');
 const axios = require('axios');
 const TelegramBot = require('node-telegram-bot-api');
 const config = require('../config');
-const { runAgent } = require('../core/agent');
+const { runAgent, buildMemoryInventoryReply } = require('../core/agent');
 const { checkKey } = require('../core/llm');
 const stt = require('../core/stt');
 const memory = require('../core/memory');
@@ -137,7 +137,7 @@ function start() {
         status.dailyReview.enabled
           ? `on (cron "${status.dailyReview.cron}", tz=${status.dailyReview.tz})`
           : 'off'
-      }\n\nCommands:\n/status — runtime status\n/settings — Settings Center buttons\n/set — change a setting by name\n/web — local web UI URL\n/atlas — build and send memory mindmap\n/atlas_status — memory atlas stats\n/ping — liveness check\n/diag — OpenRouter key status\n/battery — phone battery status\n/reminders — list pending reminders\n/summary — generate today's evening review now\n/silent — capture only, no replies (auto-exits at evening review)\n/chat — normal conversational mode\n/reset — wipe this chat's history`
+      }\n\nCommands:\n/status — runtime status\n/files — список всех .md в memory/notes (дерево)\n/settings — Settings Center buttons\n/set — change a setting by name\n/web — local web UI URL\n/atlas — build and send memory mindmap\n/atlas_status — memory atlas stats\n/ping — liveness check\n/diag — OpenRouter key status\n/battery — phone battery status\n/reminders — list pending reminders\n/summary — generate today's evening review now\n/silent — capture only, no replies (auto-exits at evening review)\n/chat — normal conversational mode\n/reset — wipe this chat's history`
     );
   });
 
@@ -209,6 +209,18 @@ function start() {
       });
     } catch (err) {
       await bot.sendMessage(msg.chat.id, 'status error: ' + err.message);
+    }
+  });
+
+  bot.onText(/^\/files$/, async (msg) => {
+    if (!isAllowed(msg.from && msg.from.id)) return replyUnauthorized(bot, msg);
+    try {
+      const files = await memory.listNotes();
+      const text = buildMemoryInventoryReply(files);
+      await sendLong(bot, msg.chat.id, text);
+    } catch (err) {
+      console.error('[files] error:', err);
+      await bot.sendMessage(msg.chat.id, 'files error: ' + err.message);
     }
   });
 

@@ -101,6 +101,21 @@ function fmtTime(ts) {
   }
 }
 
+/** getDay(): 0=Вс … 6=Сб — для заголовка модалки напоминаний */
+const WEEKDAYS_SHORT_RU = ['ВС', 'ПН', 'ВТ', 'СР', 'ЧТ', 'ПТ', 'СБ'];
+
+function formatReminderDayModalLabel(date) {
+  const d = date instanceof Date ? date : new Date(date);
+  if (Number.isNaN(d.getTime())) return '';
+  const wd = WEEKDAYS_SHORT_RU[d.getDay()];
+  const rest = d.toLocaleDateString('ru-RU', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  });
+  return `${wd}, ${rest}`;
+}
+
 function parseSummaryDate(name) {
   const m = String(name || '').match(/summary-(\d{4})-(\d{2})-(\d{2})\.md$/);
   if (!m) return null;
@@ -767,12 +782,6 @@ function Reminders({ api }) {
             const dayReminders = remindersByDay.get(key) || [];
             const count = dayReminders.length;
             const today = dayKey(new Date()) === key;
-            const dayTitle = date.toLocaleDateString('ru-RU', {
-              weekday: 'long',
-              day: 'numeric',
-              month: 'long',
-              year: 'numeric',
-            });
             return (
               <button
                 type="button"
@@ -780,7 +789,7 @@ function Reminders({ api }) {
                 className={'calendar-cell calendar-cell--btn' + (today ? ' today' : '')}
                 onClick={() =>
                   setDayModal({
-                    label: dayTitle.charAt(0).toUpperCase() + dayTitle.slice(1),
+                    label: formatReminderDayModalLabel(date),
                     items: dayReminders,
                   })
                 }

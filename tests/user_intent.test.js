@@ -27,6 +27,14 @@ test('userAskedForMemoryInventory: list-only without write', () => {
   assert.equal(userAskedToWriteMemory(q), false);
 });
 
+test('userAskedForMemoryInventory: "полный список" without the word "файл"', () => {
+  const q1 = 'дай полный список';
+  const q2 = 'какие у нас есть файлы? дай полный список';
+  assert.equal(userAskedForMemoryInventory(q1), true);
+  assert.equal(userAskedForMemoryInventory(q2), true);
+  assert.equal(userAskedToWriteMemory(q1), false);
+});
+
 test('userAskedForMemoryInventory: write wins over inventory keywords', () => {
   const m =
     'Сохрани в базу: а покажи ещё список файлов в базе знаний для справки';

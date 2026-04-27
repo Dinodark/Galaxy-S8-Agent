@@ -12,11 +12,24 @@ function userAskedToWriteMemory(text) {
 
 function userAskedForMemoryInventory(text) {
   const s = String(text || '').toLowerCase();
-  const asksWrite = userAskedToWriteMemory(s);
-  const asksInventory =
-    /какие|какой|какая|какое|список|покажи|показать|структур|дерев|что\s+есть|где\s+файл|какие\s+файл|memory|notes|list|что\s+в\s+базе/.test(s) &&
-    /файл|замет|баз[ауы]\s+знан|memory|notes/.test(s);
-  return asksInventory && !asksWrite;
+  if (userAskedToWriteMemory(s)) return false;
+
+  /** User wants a list / tree / inventory of notes (not a write). */
+  const wantsListing =
+    /какие|какой|какая|какое|перечисл|список|покажи|показать|структур|дерев|что\s+есть|где\s+файл|какие\s+файл|memory|notes|\blist\b|что\s+в\s+базе|полн(ого|ый|ая|ое)?\s*список|все\s+файл|файлов(ая|ую|ой)?\s*структур|каталог|memory\/notes|наблюд|контрол|проверь|просмотр|имеющ|находится\s+в\s+базе/.test(
+      s
+    );
+
+  /**
+   * Second leg: must relate to files / KB / tree. Includes "полный список" without the word "файл"
+   * (that case used to fail the old two-regex AND).
+   */
+  const aboutFilesOrKb =
+    /файл|замет|баз[ауы]\s+знан|memory|notes|memory\/notes|полн(ого|ый|ая|ое)?\s*список|список\s+файл|все\s+файл|файлов(ая|ую|ой)?\s*структур|каталог|дерев|папк|структур/.test(
+      s
+    );
+
+  return wantsListing && aboutFilesOrKb;
 }
 
 function userAskedForReminder(text) {

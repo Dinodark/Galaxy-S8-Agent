@@ -150,8 +150,8 @@ function buildMemoryInventoryReply(files) {
   if (safeFiles.length === 0) {
     return (
       'Сейчас в базе знаний нет markdown-файлов в `memory/notes`.\n' +
-      'Есть только авто-сводки, если они уже сгенерированы.\n\n' +
-      'Проверено через `list_notes` в текущем рантайме.'
+      'Если сводки уже генерировались, появятся как `summary-YYYY-MM-DD.md`.\n\n' +
+      'Проверено через `list_notes` в текущем рантайме. В Telegram можно повторить проверку: `/files`.'
     );
   }
   return (
@@ -360,4 +360,5 @@ module.exports = {
   userAskedToWriteMemory,
   shouldUseDeterministicMemoryInventory,
   userAskedForReminder,
+  buildMemoryInventoryReply,
 };

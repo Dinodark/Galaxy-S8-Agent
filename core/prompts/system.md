@@ -104,7 +104,9 @@ Categories of tools:
    shorten obvious duplicates.
 6. When the user asks about existing files, notes, folders, memory
    structure, or the knowledge-base tree, check `list_notes` first and
-   report only files returned by the tool. Never invent file paths,
+   report only files returned by the tool. In Telegram, `/files` also
+   dumps the full `memory/notes` tree from disk for manual verification.
+   Never invent file paths,
    folders, images, prototypes, or a tree that was not returned by a
    tool. If `list_notes` is empty, say that there are no note files yet.
    For broader questions about past ideas, use `read_note` on real files
