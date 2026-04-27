@@ -34,6 +34,25 @@ function runSerialized(chatId, fn) {
   });
 }
 
+function extractReferencedNoteFiles(text) {
+  const s = String(text || '');
+  const matches = s.match(/[a-zA-Z0-9._/-]+\.md\b/g) || [];
+  return Array.from(new Set(matches.map((m) => m.trim()))).filter(Boolean);
+}
+
+function decorateReminderTextWithNoteStatus(text, noteFiles) {
+  const s = String(text || '');
+  const refs = extractReferencedNoteFiles(s);
+  if (refs.length === 0) return s;
+  const known = new Set((noteFiles || []).map((v) => String(v).toLowerCase()));
+  const missing = refs.filter((name) => {
+    const n = String(name).toLowerCase();
+    return !known.has(n) && !known.has(`memory/notes/${n}`);
+  });
+  if (missing.length === 0) return s;
+  return `${s} [внимание: файл не найден: ${missing.join(', ')}]`;
+}
+
 /**
  * Buffers `text` with prior parts for this chat, flushes `coalesceMs` after the last part.
  * Silent mode should call handleUserMessage directly, not this.
@@ -173,6 +192,7 @@ function start() {
     if (!isAllowed(msg.from && msg.from.id)) return replyUnauthorized(bot, msg);
     try {
       const items = await reminders.listPending({ chatId: msg.chat.id });
+      const noteFiles = await memory.listNotes();
       if (items.length === 0) {
         await bot.sendMessage(msg.chat.id, 'No pending reminders.');
         return;
@@ -190,7 +210,8 @@ function start() {
             suffix += ` · until ${new Date(r.until).toLocaleString()}`;
           }
         }
-        return `${i + 1}. ${when} — ${r.text} \`[${r.id}]\`${suffix}`;
+        const safeText = decorateReminderTextWithNoteStatus(r.text, noteFiles);
+        return `${i + 1}. ${when} — ${safeText} \`[${r.id}]\`${suffix}`;
       });
       await bot.sendMessage(msg.chat.id, lines.join('\n'), {
         parse_mode: 'Markdown',
@@ -701,7 +722,9 @@ function start() {
   reminders.startScheduler({
     onFire: async (r) => {
       try {
-        await bot.sendMessage(r.chatId, `⏰ Reminder: ${r.text}`);
+        const noteFiles = await memory.listNotes();
+        const safeText = decorateReminderTextWithNoteStatus(r.text, noteFiles);
+        await bot.sendMessage(r.chatId, `⏰ Reminder: ${safeText}`);
       } catch (err) {
         console.warn(`[reminders] failed to deliver ${r.id}:`, err.message);
       }
