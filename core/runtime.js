@@ -68,6 +68,8 @@ async function buildStatus(chatId) {
       prevDays: s.dailyReview.prevDays,
       model: s.dailyReview.model || config.openrouter.model,
       next: nextReview,
+      inboxTriage: s.dailyReview.inboxTriage !== false,
+      inboxTriageMaxSteps: s.dailyReview.inboxTriageMaxSteps ?? 12,
     },
     journal: {
       today,
@@ -106,6 +108,7 @@ function formatStatus(status) {
     `Review next: ${next}`,
     `Review min messages: ${status.dailyReview.minMessages}`,
     `Review model: ${status.dailyReview.model}`,
+    `Inbox triage: ${status.dailyReview.inboxTriage ? 'on' : 'off'} (max steps ${status.dailyReview.inboxTriageMaxSteps})`,
     `Journal today: ${status.journal.entriesToday} entries (${status.journal.today})`,
     `Pending reminders: ${status.reminders.pending}`,
     `Battery watch: ${

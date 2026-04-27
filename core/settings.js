@@ -24,6 +24,8 @@ function defaults() {
       minMessages: config.dailyReview.minMessages,
       prevDays: config.dailyReview.prevDays,
       model: config.dailyReview.model,
+      inboxTriage: config.dailyReview.inboxTriage,
+      inboxTriageMaxSteps: config.dailyReview.inboxTriageMaxSteps,
     },
     silent: {
       reaction: '✍',
@@ -215,6 +217,10 @@ function validatePathValue(settingPath, value, mergedSettings) {
     return parseIntInRange(value, 0, 30, 'dailyReview.prevDays');
   }
   if (settingPath === 'dailyReview.model') return String(value || '').trim();
+  if (settingPath === 'dailyReview.inboxTriage') return parseBool(value);
+  if (settingPath === 'dailyReview.inboxTriageMaxSteps') {
+    return parseIntInRange(value, 1, 32, 'dailyReview.inboxTriageMaxSteps');
+  }
 
   if (settingPath === 'silent.reaction') {
     const emoji = String(value || '').trim();
@@ -266,6 +272,8 @@ function aliasToPath(alias, rawValue) {
     daily_review_min_messages: 'dailyReview.minMessages',
     daily_review_prev_days: 'dailyReview.prevDays',
     daily_review_model: 'dailyReview.model',
+    daily_review_inbox_triage: 'dailyReview.inboxTriage',
+    daily_review_inbox_triage_max_steps: 'dailyReview.inboxTriageMaxSteps',
     stt_enabled: 'stt.enabled',
     stt_language: 'stt.language',
     stt_max_duration_sec: 'stt.maxDurationSec',

@@ -72,6 +72,22 @@ function scheduleCoalescedTextMessage(chatId, text, { coalesceMs, onFlush }) {
   }, coalesceMs);
 }
 
+async function notifyInboxTriageResult(bot, chatId, result) {
+  const t = result && result.triage;
+  if (!t || t.skipped) return;
+  if (t.cleared) {
+    await bot.sendMessage(
+      chatId,
+      'Инбокс: ночной разбор выполнен, очередь очищена; снимок за день в архиве.'
+    );
+  } else if (t.error) {
+    await bot.sendMessage(
+      chatId,
+      'Инбокс: разбор прервался — сам файл инбокса не трогал. Снимок перед разбором в архиве на случай сбоя.'
+    );
+  }
+}
+
 async function setReaction(chatId, messageId, emoji) {
   try {
     await axios.post(
@@ -372,6 +388,7 @@ function start() {
             `🌙 Вечерняя сводка — ${result.today} (${result.entries} сообщений, ${result.model})`
           );
           await bot.sendDocument(msg.chat.id, result.file);
+          await notifyInboxTriageResult(bot, msg.chat.id, result);
         }
       } else if (action === 'status') {
         await bot.answerCallbackQuery(query.id);
@@ -438,6 +455,7 @@ function start() {
         `🌙 Вечерняя сводка — ${result.today} (${result.entries} сообщений, ${result.model})`
       );
       await bot.sendDocument(msg.chat.id, result.file);
+      await notifyInboxTriageResult(bot, msg.chat.id, result);
     } catch (err) {
       console.error('[daily-review] /summary error:', err);
       await bot.sendMessage(
@@ -692,6 +710,7 @@ function start() {
           `🌙 Вечерняя сводка — ${result.today} (${result.entries} сообщений, ${result.model})`
         );
         await bot.sendDocument(chatId, result.file);
+        await notifyInboxTriageResult(bot, chatId, result);
         if (wasSilent && autoExit) {
           await bot.sendMessage(
             chatId,

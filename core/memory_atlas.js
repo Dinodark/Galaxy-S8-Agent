@@ -98,6 +98,7 @@ async function readNotes() {
   for (const file of files) {
     const base = path.basename(file);
     if (base.startsWith('summary-')) continue;
+    if (String(file).replace(/\\/g, '/').includes('inbox/archive/')) continue;
     const full = path.join(config.paths.notesDir, file);
     const content = await fse.readFile(full, 'utf8');
     const stat = await fse.stat(full);

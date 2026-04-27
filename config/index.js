@@ -72,6 +72,8 @@ const config = {
     minMessages: Number(optional('DAILY_REVIEW_MIN_MESSAGES', '3')),
     prevDays: Number(optional('DAILY_REVIEW_PREV_DAYS', '3')),
     model: optional('DAILY_REVIEW_MODEL', ''),
+    inboxTriage: parseBool(process.env.DAILY_REVIEW_INBOX_TRIAGE, true),
+    inboxTriageMaxSteps: Number(optional('DAILY_REVIEW_INBOX_TRIAGE_MAX_STEPS', '12')),
   },
   paths: {
     memoryDir: 'memory',

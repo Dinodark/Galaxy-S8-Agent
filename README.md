@@ -245,6 +245,14 @@ self-disabling when its prerequisites are missing (e.g. no `termux-api`).
      `Мои мысли`, `На завтра`.
   5. Save to `memory/notes/summary-YYYY-MM-DD.md` (so the agent sees it
      as long-term memory going forward) and DM it as a markdown file.
+  6. **Inbox triage** (if enabled): snapshot `inbox.md` to
+     `memory/notes/inbox/archive/YYYY-MM-DD-inbox.md`, run a tool loop
+     (`list_notes` / `read_note` / `write_note`) with
+     `core/prompts/inbox_triage.md` to file backlog into project notes and
+     trim `inbox_conflicts.md`, then reset `inbox.md` to an empty scaffold.
+     On failure the inbox file is left unchanged; the snapshot still helps
+     recovery. Toggle with `DAILY_REVIEW_INBOX_TRIAGE` / `dailyReview.inboxTriage`
+     and step cap `DAILY_REVIEW_INBOX_TRIAGE_MAX_STEPS`.
 
   Tweak the tone/structure by editing `core/prompts/daily_review.md`.
   Trigger an early summary any time with `/summary`. Days with fewer

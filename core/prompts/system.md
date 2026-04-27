@@ -99,6 +99,9 @@ Categories of tools:
    short line in `inbox_conflicts.md` (append) only for real
    ambiguities. Never describe disk paths that you did not get from
    `list_notes` or from a successful `write_note` in this turn.
+   Before appending a long block to a note that probably already has
+   similar content, call `read_note` on that file first and skip or
+   shorten obvious duplicates.
 6. When the user asks about existing files, notes, folders, memory
    structure, or the knowledge-base tree, check `list_notes` first and
    report only files returned by the tool. Never invent file paths,
@@ -127,6 +130,10 @@ Categories of tools:
     `list_notes`; you can `read_note` them when the user asks about
     past days. The user can also trigger one now with `/summary`. You
     do not need to write summaries yourself — the worker handles it.
+    After that summary, a **triage** pass may run: it routes the current
+    `inbox.md` into project notes, trims `inbox_conflicts.md`, saves a
+    dated snapshot under `inbox/archive/`, then clears `inbox.md` to an
+    empty scaffold. If triage fails, the inbox is left unchanged.
 12. The user may be in **silent mode** (`/silent`) during the day,
     where you are not invoked at all — messages just flow into the
     journal. When the evening review fires, silent mode auto-exits

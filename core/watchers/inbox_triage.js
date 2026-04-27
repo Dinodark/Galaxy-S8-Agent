@@ -1,0 +1,193 @@
+const path = require('path');
+const fse = require('fs-extra');
+const config = require('../../config');
+const { chatCompletion } = require('../llm');
+const tools = require('../tools');
+const memory = require('../memory');
+const settings = require('../settings');
+const { loadProjectsIndex, planWriteOrchestration } = require('../knowledge_orchestrator');
+
+const PROMPT_FILE = path.join(__dirname, '..', 'prompts', 'inbox_triage.md');
+
+const TRIAGE_TOOL_NAMES = new Set(['list_notes', 'read_note', 'write_note']);
+
+const INBOX_REL = 'inbox.md';
+
+function withoutInboxArchive(files) {
+  return (files || []).filter(
+    (f) => !String(f).replace(/\\/g, '/').startsWith('inbox/archive/')
+  );
+}
+
+const INBOX_SCAFFOLD = `# Inbox
+
+_Пусто. Быстрые захваты до вечерней сводки; после сводки содержимое разбирается в базу знаний, снимок дня лежит в inbox/archive/._
+`;
+
+function triageToolSchemas() {
+  return tools.listSchemas().filter((s) => TRIAGE_TOOL_NAMES.has(s.function.name));
+}
+
+function isInboxAlreadyCleared(body) {
+  const t = String(body || '').trim().replace(/\r\n/g, '\n');
+  if (!t) return true;
+  if (t === INBOX_SCAFFOLD.trim()) return true;
+  return false;
+}
+
+async function archiveInboxSnapshot(today, body) {
+  const archiveDir = path.join(config.paths.notesDir, 'inbox', 'archive');
+  await fse.ensureDir(archiveDir);
+  const dest = path.join(archiveDir, `${today}-inbox.md`);
+  const header = `# Inbox snapshot — ${today}\n\n(перед ночным разбором)\n\n---\n\n`;
+  await fse.writeFile(dest, header + body + '\n', 'utf8');
+  return path.posix.join('inbox', 'archive', `${today}-inbox.md`);
+}
+
+async function clearInboxFile() {
+  await memory.writeNote(INBOX_REL, INBOX_SCAFFOLD, { append: false });
+}
+
+/**
+ * After the evening summary file exists: route inbox body into project notes, trim conflicts, then clear inbox.
+ * On failure, leaves inbox.md unchanged; snapshot under inbox/archive/ still exists for recovery.
+ */
+async function runInboxTriage({ chatId, today, log = console } = {}) {
+  const s = await settings.getSettings();
+  const dr = s.dailyReview || {};
+  if (dr.inboxTriage === false) {
+    return { skipped: true, reason: 'inboxTriage disabled' };
+  }
+
+  const raw = await memory.readNote(INBOX_REL);
+  const inboxBody = raw == null ? '' : String(raw).trim();
+  if (isInboxAlreadyCleared(inboxBody)) {
+    return { skipped: true, reason: 'inbox empty or already cleared' };
+  }
+
+  const archiveRel = await archiveInboxSnapshot(today, inboxBody);
+  log.log(`[inbox-triage] pre-clear snapshot → ${archiveRel}`);
+
+  let orchestrationHint = '';
+  try {
+    const files = withoutInboxArchive(await memory.listNotes());
+    const index = await loadProjectsIndex();
+    const sample =
+      inboxBody.length > 12_000
+        ? `${inboxBody.slice(0, 12_000)}\n\n…(truncated for routing score)…`
+        : inboxBody;
+    const plan = planWriteOrchestration(sample, files, index);
+    if (plan.systemMessage) orchestrationHint = plan.systemMessage;
+  } catch (err) {
+    log.warn('[inbox-triage] orchestration hint failed:', err.message);
+  }
+
+  const conflictsRaw = await memory.readNote('inbox_conflicts.md');
+  const conflictsBody = conflictsRaw == null ? '' : String(conflictsRaw).trim();
+
+  const promptSys = await fse.readFile(PROMPT_FILE, 'utf8');
+  const maxSteps = Number(dr.inboxTriageMaxSteps) > 0 ? Number(dr.inboxTriageMaxSteps) : 12;
+
+  const userPayload = [
+    `# ДАТА для заголовков в заметках: ${today}`,
+    '# INBOX (разложить по существующим путям из list_notes)',
+    inboxBody,
+    '# inbox_conflicts.md (сократить до открытых пунктов)',
+    conflictsBody || '(файла нет — создайте при необходимости)',
+    '# Подсказка маршрутизатора (не выдумывайте пути)',
+    orchestrationHint || '(нет)',
+  ].join('\n\n');
+
+  const modelOverride = dr.model || null;
+  const toolCtx = { chatId };
+  let messages = [
+    { role: 'system', content: promptSys },
+    { role: 'user', content: userPayload },
+  ];
+
+  const transcript = [];
+
+  try {
+    for (let step = 0; step < maxSteps; step++) {
+      const assistantMsg = await chatCompletion({
+        messages,
+        tools: triageToolSchemas(),
+        model: modelOverride,
+        timeoutMs: 120_000,
+      });
+
+      const pushed = [assistantMsg];
+
+      if (assistantMsg.tool_calls && assistantMsg.tool_calls.length > 0) {
+        for (const call of assistantMsg.tool_calls) {
+          const name = call.function && call.function.name;
+          let args = {};
+          try {
+            args =
+              call.function && call.function.arguments
+                ? JSON.parse(call.function.arguments)
+                : {};
+          } catch {
+            args = {};
+          }
+          if (!TRIAGE_TOOL_NAMES.has(name)) {
+            const bad = { ok: false, error: 'tool not allowed in inbox triage' };
+            transcript.push({ tool: name, args, result: bad });
+            pushed.push({
+              role: 'tool',
+              tool_call_id: call.id,
+              name,
+              content: JSON.stringify(bad),
+            });
+            continue;
+          }
+          const result = await tools.execute(name, args, toolCtx);
+          transcript.push({ tool: name, args, result });
+          pushed.push({
+            role: 'tool',
+            tool_call_id: call.id,
+            name,
+            content: JSON.stringify(result).slice(0, 8000),
+          });
+        }
+        messages = [...messages, ...pushed];
+        continue;
+      }
+
+      messages = [...messages, ...pushed];
+      break;
+    }
+
+    await clearInboxFile();
+    const writeCount = transcript.filter(
+      (t) => t.tool === 'write_note' && t.result && t.result.ok
+    ).length;
+    log.log(
+      `[inbox-triage] cleared ${INBOX_REL} (${writeCount} write_note ok, ${transcript.length} tool rows)`
+    );
+
+    return {
+      skipped: false,
+      cleared: true,
+      archivedRel: archiveRel,
+      writeNoteOk: writeCount,
+      toolRows: transcript.length,
+    };
+  } catch (err) {
+    log.warn('[inbox-triage] failed — inbox.md not cleared:', err.message);
+    return {
+      skipped: false,
+      cleared: false,
+      error: err.message,
+      archivedRel: archiveRel,
+      toolRows: transcript.length,
+    };
+  }
+}
+
+module.exports = {
+  runInboxTriage,
+  triageToolSchemas,
+  isInboxAlreadyCleared,
+  INBOX_SCAFFOLD,
+};

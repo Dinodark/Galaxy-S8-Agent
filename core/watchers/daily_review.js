@@ -6,6 +6,7 @@ const { chatCompletion } = require('../llm');
 const journal = require('../journal');
 const settings = require('../settings');
 const memory = require('../memory');
+const { runInboxTriage } = require('./inbox_triage');
 
 const PROMPT_FILE = path.join(__dirname, '..', 'prompts', 'daily_review.md');
 const SUMMARY_PREFIX = 'summary-';
@@ -50,11 +51,17 @@ function isSummaryFile(rel) {
   return path.basename(rel).startsWith(SUMMARY_PREFIX);
 }
 
+function isInboxArchiveRel(f) {
+  return String(f || '')
+    .replace(/\\/g, '/')
+    .startsWith('inbox/archive/');
+}
+
 async function loadLongTermNotes() {
   const dir = config.paths.notesDir;
   await fse.ensureDir(dir);
   const relFiles = (await memory.listNotes())
-    .filter((f) => !isSummaryFile(f))
+    .filter((f) => !isSummaryFile(f) && !isInboxArchiveRel(f))
     .sort();
   const parts = [];
   for (const f of relFiles) {
@@ -173,6 +180,14 @@ async function runReview(chatId, { log = console, force = false } = {}) {
   await fse.ensureDir(config.paths.notesDir);
   await fse.writeFile(file, summary);
 
+  let triage = { skipped: true, reason: 'not run' };
+  try {
+    triage = await runInboxTriage({ chatId, today, log });
+  } catch (err) {
+    log.warn('[daily-review] inbox triage crashed:', err.message);
+    triage = { skipped: false, cleared: false, error: err.message };
+  }
+
   return {
     skipped: false,
     today,
@@ -181,6 +196,7 @@ async function runReview(chatId, { log = console, force = false } = {}) {
     summary,
     entries: entries.length,
     model: modelOverride || config.openrouter.model,
+    triage,
   };
 }
 

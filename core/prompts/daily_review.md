@@ -11,7 +11,9 @@ You will receive three context blocks:
   (recursive), except auto daily summaries. Ground truth.
 - **INBOX** — unclassified or `needs_routing` captures that the orchestrator
   could not file cleanly; help the user resolve where these belong
-  (without inventing new projects).
+  (without inventing new projects). A separate **triage** worker may run
+  after this summary to move inbox text into notes and clear the inbox;
+  your job here is still only this reflection.
 - **AMBIGUITY LOG** — short optional log when the same thought touched two
   projects; you may suggest how to disambiguate in plain language.
 - **PREVIOUS SUMMARIES** — your own evening reviews from the last few
