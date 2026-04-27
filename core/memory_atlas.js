@@ -193,14 +193,14 @@ h2{margin:0 0 8px;font-size:18px}h3{margin:18px 0 8px;font-size:13px;color:var(-
 .atlas-modal-root[hidden]{display:none!important}
 .atlas-modal-backdrop{position:absolute;inset:0;background:var(--bg);z-index:0}
 .atlas-modal-panel{position:relative;z-index:1;display:flex;flex-direction:column;height:100%;min-height:100%;min-height:100dvh;max-height:100dvh;box-sizing:border-box;background:var(--bg);padding:env(safe-area-inset-top,0) env(safe-area-inset-right,0) 0 env(safe-area-inset-left,0)}
-.atlas-modal-top{display:flex;align-items:center;gap:10px;flex-wrap:nowrap;flex-shrink:0;padding:10px 14px;min-height:52px;box-sizing:border-box;background:var(--panel-soft);border-bottom:1px solid #2a2a2a;position:relative;z-index:2;overflow-x:auto;-webkit-overflow-scrolling:touch}
+.atlas-modal-top{display:flex;align-items:center;gap:10px;flex-wrap:nowrap;flex-shrink:0;padding:8px 14px;box-sizing:border-box;background:var(--panel-soft);border-bottom:1px solid #2a2a2a;position:relative;z-index:2;overflow:hidden}
 .atlas-modal-top .atlas-modal-title-wrap{display:flex;flex-direction:column;min-width:0;flex:1 1 0;justify-content:center}
 .atlas-modal-top strong{font-size:15px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%}
 .atlas-modal-top .atlas-modal-meta{font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%}
 .atlas-modal-top .atlas-modal-meta:empty{display:none}
-.atlas-modal-toolbar{display:flex;flex-wrap:nowrap;align-items:center;justify-content:flex-start;gap:8px;flex:0 0 auto;flex-shrink:0;min-width:min-content;max-width:none}
+.atlas-modal-toolbar{display:flex;flex-wrap:nowrap;align-items:center;justify-content:flex-start;gap:8px;flex:0 1 auto;min-width:0}
 .atlas-modal-toolbar button{flex-shrink:0;background:var(--panel-hover);color:var(--text);border:none;border-radius:10px;padding:8px 14px;cursor:pointer;font:inherit}
-.atlas-modal-toolbar #atlasStatus{flex:0 1 auto;flex-shrink:0;font-size:12px;color:var(--muted);min-width:0;max-width:min(200px,40vw);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.atlas-modal-toolbar #atlasStatus{flex:1 1 auto;min-width:0;font-size:12px;color:var(--muted);max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .atlas-close-btn{flex-shrink:0;width:44px;height:44px;padding:0;border:0;border-radius:12px;background:var(--panel-hover);color:var(--text);font-size:24px;line-height:1;cursor:pointer;display:grid;place-items:center;align-self:center;position:relative;z-index:2}
 .atlas-modal-body{flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden}
 .atlas-modal-scroll{flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden;padding:0;box-sizing:border-box}

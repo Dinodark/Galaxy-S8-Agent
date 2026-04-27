@@ -1000,7 +1000,7 @@ button.calendar-cell:focus-visible {
     overflow-x: hidden;
     overflow-y: auto;
     overscroll-behavior-x: none;
-    padding: 0;
+    padding: 16px;
     -webkit-overflow-scrolling: touch;
   }
 
