@@ -179,21 +179,32 @@ function renderHtml(index) {
 :root{color-scheme:dark;--bg:#111111;--panel:#171717;--panel-soft:#1d1d1d;--panel-hover:#242424;--muted:#9a9a9a;--text:#f1f1f1;--line:transparent;--accent:#d6d6d6}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);font:14px/1.45 system-ui,-apple-system,Segoe UI,sans-serif;color:var(--text);overflow:hidden}
 header{height:58px;display:flex;align-items:center;gap:16px;padding:0 18px;background:var(--bg)}
-h1{font-size:17px;margin:0}header span{color:var(--muted)}#wrap{display:grid;grid-template-columns:minmax(0,1fr) minmax(320px,38vw);height:calc(100vh - 58px)}#graphWrap{position:relative;background:var(--bg)}#graph{width:100%;height:100%}#side{background:var(--panel-soft);padding:18px;overflow:auto}
+h1{font-size:17px;margin:0}header span{color:var(--muted)}#wrap{display:grid;grid-template-columns:minmax(0,1fr) minmax(320px,38vw);height:calc(100vh - 58px);min-height:0}#graphWrap{position:relative;background:var(--bg);min-height:0}#graph{width:100%;height:100%}#side{background:var(--panel-soft);padding:18px;overflow:hidden;display:flex;flex-direction:column;min-height:0}
 .legend{position:absolute;left:14px;top:14px;max-width:280px;padding:10px 12px;border-radius:14px;background:var(--panel);box-shadow:0 12px 40px #0003}.legend strong{display:block;margin-bottom:6px}.legendItem{display:flex;align-items:center;gap:8px;color:var(--muted);margin:5px 0}.dot{width:10px;height:10px;border-radius:50%;display:inline-block}
 .pill{display:inline-block;border-radius:999px;padding:3px 8px;margin:2px;color:var(--muted);background:var(--panel-hover)}.node{cursor:pointer}.node rect{stroke:#fff3;stroke-width:1.3;rx:12;ry:12}.node.active rect{stroke:var(--text);stroke-width:2}.node.core rect{stroke:var(--text);stroke-width:2.1;filter:drop-shadow(0 0 10px #0004)}.node text{fill:var(--text);font-size:12px;text-shadow:0 1px 8px #000}.node.core text{fill:var(--text);font-size:13px}.link{stroke:#ffffff20;stroke-width:1}.hint{color:var(--muted)}.empty{max-width:520px;margin:10vh auto;color:var(--muted);font-size:18px}
 h2{margin:0 0 8px;font-size:18px}h3{margin:18px 0 8px;font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}pre{white-space:pre-wrap;font-family:inherit;color:var(--text);line-height:1.6}.filePath{color:var(--muted);word-break:break-all}.readerHead{position:sticky;top:0;margin:-18px -18px 16px;padding:18px;background:var(--panel-soft)}
-.atlasEdit{margin-top:8px}.atlasBar{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:0 0 8px}.atlasBar button{background:var(--panel-hover);color:var(--text);border:none;border-radius:10px;padding:8px 14px;cursor:pointer;font:inherit}.atlasBar button:disabled{opacity:0.45;cursor:default}#atlasStatus{flex:1;font-size:12px;color:var(--muted);min-width:120px}.atlasTextarea{width:100%;min-height:22vh;box-sizing:border-box;padding:12px 14px;border-radius:12px;border:1px solid #2a2a2a;background:var(--bg);color:var(--text);font:13px/1.5 ui-monospace,SFMono-Regular,Consolas,monospace;resize:vertical;min-height:40vh}
-.atlas-modal-root{position:fixed;inset:0;z-index:200;display:grid;place-items:stretch}
+.atlasEdit{margin-top:8px;display:flex;flex-direction:column;min-height:0;flex:1}.atlasBar{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:0 0 8px}.atlasBar button{background:var(--panel-hover);color:var(--text);border:none;border-radius:10px;padding:8px 14px;cursor:pointer;font:inherit}.atlasBar button:disabled{opacity:0.45;cursor:default}#atlasStatus{flex:1;font-size:12px;color:var(--muted);min-width:120px}
+.atlasTextarea{width:100%;min-height:180px;box-sizing:border-box;padding:12px 14px;border-radius:12px;border:1px solid #2a2a2a;background:var(--bg);color:var(--text);font:13px/1.5 ui-monospace,SFMono-Regular,Consolas,monospace;resize:vertical;min-height:35vh}
+#side .readerHead{flex-shrink:0}
+#side .atlas-side-main{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;padding-right:2px}
+#side .atlas-side-actions{flex-shrink:0;margin:12px -4px 0;padding-top:12px;border-top:1px solid #2a2a2a;background:var(--panel-soft)}
+#side .atlas-side-actions .atlasBar{margin:0}
+.atlas-modal-root{position:fixed;inset:0;z-index:9999;display:block;min-height:0}
 .atlas-modal-root[hidden]{display:none!important}
-.atlas-modal-backdrop{position:absolute;inset:0;background:var(--bg)}
-.atlas-modal-panel{position:relative;display:grid;grid-template-rows:52px minmax(0,1fr);height:100%;min-height:0;background:var(--bg)}
-.atlas-modal-top{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--panel-soft);border-bottom:1px solid #2a2a2a}
-.atlas-modal-top .atlas-back-btn{border:0;border-radius:10px;padding:10px 12px;background:var(--panel-hover);color:var(--text);font:inherit;cursor:pointer;flex-shrink:0}
-.atlas-modal-top .atlas-modal-title-wrap{display:flex;flex-direction:column;min-width:0;flex:1}
-.atlas-modal-top strong{font-size:16px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.atlas-modal-top .atlas-modal-meta{font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.atlas-modal-body{overflow:auto;padding:14px;-webkit-overflow-scrolling:touch;min-height:0}
+.atlas-modal-backdrop{position:absolute;inset:0;background:var(--bg);z-index:0}
+.atlas-modal-panel{position:relative;z-index:1;display:flex;flex-direction:column;height:100%;min-height:100%;min-height:100dvh;max-height:100dvh;box-sizing:border-box;background:var(--bg);padding:env(safe-area-inset-top,0) env(safe-area-inset-right,0) 0 env(safe-area-inset-left,0)}
+.atlas-modal-top{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:12px 14px 10px;flex-shrink:0;background:var(--panel-soft);border-bottom:1px solid #2a2a2a;min-height:48px;box-sizing:border-box}
+.atlas-modal-top .atlas-modal-title-wrap{display:flex;flex-direction:column;min-width:0;flex:1;padding-right:4px}
+.atlas-modal-top strong{font-size:16px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%}
+.atlas-modal-top .atlas-modal-meta{font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%}
+.atlas-close-btn{flex-shrink:0;width:44px;height:44px;padding:0;border:0;border-radius:12px;background:var(--panel-hover);color:var(--text);font-size:24px;line-height:1;cursor:pointer;display:grid;place-items:center;align-self:flex-start;position:relative;z-index:2;margin-top:2px}
+.atlas-modal-body{flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden}
+.atlas-modal-scroll{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:12px 14px 8px;box-sizing:border-box}
+.atlas-modal-scroll .atlasTextarea{min-height:min(52vh,420px);display:block;resize:vertical;max-width:100%}
+.atlas-modal-actions{flex-shrink:0;display:flex;flex-wrap:wrap;align-items:center;gap:10px;padding:12px 14px calc(12px + env(safe-area-inset-bottom,0px));background:var(--panel-soft);border-top:1px solid #2a2a2a;box-shadow:0 -8px 24px #0002}
+.atlas-modal-actions button{background:var(--panel-hover);color:var(--text);border:none;border-radius:10px;padding:10px 16px;cursor:pointer;font:inherit}
+.atlas-modal-actions #atlasStatus{flex:1;font-size:12px;color:var(--muted);min-width:0}
+body.atlas-editor-open{overflow:hidden;touch-action:none}
 body.atlas-mobile header{display:none!important}
 body.atlas-mobile #wrap{height:100dvh;height:100vh;grid-template-columns:1fr!important;grid-template-rows:1fr!important}
 body.atlas-mobile #side{display:none!important}
@@ -211,7 +222,7 @@ body.atlas-mobile #wrap{grid-template-rows:1fr!important}
 <div id="atlasModalRoot" class="atlas-modal-root" hidden>
 <div class="atlas-modal-backdrop" aria-hidden="true"></div>
 <section class="atlas-modal-panel" role="dialog" aria-modal="true" aria-labelledby="atlasModalTitleLbl">
-<header class="atlas-modal-top"><button type="button" class="atlas-back-btn" id="atlasModalBack">Назад</button><div class="atlas-modal-title-wrap"><strong id="atlasModalTitleLbl"></strong><span class="atlas-modal-meta" id="atlasModalMeta"></span></div></header>
+<header class="atlas-modal-top"><div class="atlas-modal-title-wrap"><strong id="atlasModalTitleLbl"></strong><span class="atlas-modal-meta" id="atlasModalMeta"></span></div><button type="button" class="atlas-close-btn" id="atlasModalClose" aria-label="Закрыть">×</button></header>
 <div class="atlas-modal-body" id="atlasModalBody"></div>
 </section>
 </div>
@@ -260,9 +271,9 @@ let nodes=ATLAS.graph.nodes.map((n,i)=>{const p=savedPos[n.id];return {...n,x:(p
 let links=ATLAS.graph.links.map(l=>({source:nodes.find(n=>n.id===l.source),target:nodes.find(n=>n.id===l.target),label:l.label})).filter(l=>l.source&&l.target);
 if(!nodes.length){svg.outerHTML='<div class="empty">Пока нет файлов базы знаний. Создай markdown в memory/notes, например projects/white_rabbit_spec.md.</div>'}
 else{if(mqMobile.matches){if(legend)legend.innerHTML=''}else{renderLegend()}}
-function openAtlasModal(n){if(!modalRoot||!modalBody)return;if(modalTitle)modalTitle.textContent=n.label||'';if(modalMeta)modalMeta.textContent=(n.file||'')+' · '+String(Math.round((n.size||0)/1024*10)/10)+' KB';const coreMob=n.isCore?'<p class="hint" style="margin:0 0 14px">Ядро маршрутизации — только ручные правки; Telegram-агент в этот файл не пишет.</p>':'';modalBody.innerHTML=coreMob+'<div class="atlasEdit"><h3>Редактирование</h3><div class="atlasBar"><button type="button" id="atlasSave">Сохранить</button><button type="button" id="atlasRevert">Сбросить</button><span id="atlasStatus"></span></div><label class="hint" for="atlasTa" style="display:block;margin-bottom:6px">Markdown, полная перезапись файла (не дописывание)</label><textarea id="atlasTa" class="atlasTextarea" rows="18" wrap="off" spellcheck="false" autocomplete="off"></textarea></div>';const ta=document.getElementById('atlasTa');if(ta)ta.value=n.content||'';const sv=document.getElementById('atlasSave'),rv=document.getElementById('atlasRevert');if(sv)sv.addEventListener('click',function(){saveAtlas(n)});if(rv)rv.addEventListener('click',function(){revertAtlas(n)});modalRoot.hidden=false;document.body.style.overflow='hidden';}
-function closeAtlasModal(){if(!modalRoot)return;modalRoot.hidden=true;document.body.style.overflow='';activeId='';draw()}
-const atlasBack=document.getElementById('atlasModalBack');if(atlasBack)atlasBack.addEventListener('click',closeAtlasModal);
+function openAtlasModal(n){if(!modalRoot||!modalBody)return;if(modalTitle)modalTitle.textContent=n.label||'';if(modalMeta)modalMeta.textContent=(n.file||'')+' · '+String(Math.round((n.size||0)/1024*10)/10)+' KB';const coreMob=n.isCore?'<p class="hint" style="margin:0 0 12px">Ядро маршрутизации — только ручные правки; Telegram-агент в этот файл не пишет.</p>':'';modalBody.innerHTML='<div class="atlas-modal-scroll">'+coreMob+'<h3>Редактирование</h3><label class="hint" for="atlasTa" style="display:block;margin:0 0 6px">Markdown, полная перезапись файла (не дописывание)</label><textarea id="atlasTa" class="atlasTextarea" wrap="off" spellcheck="false" autocomplete="off"></textarea></div><footer class="atlas-modal-actions"><button type="button" id="atlasSave">Сохранить</button><button type="button" id="atlasRevert">Сбросить</button><span id="atlasStatus"></span></footer>';const ta=document.getElementById('atlasTa');if(ta)ta.value=n.content||'';const sv=document.getElementById('atlasSave'),rv=document.getElementById('atlasRevert');if(sv)sv.addEventListener('click',function(){saveAtlas(n)});if(rv)rv.addEventListener('click',function(){revertAtlas(n)});modalRoot.hidden=false;document.body.classList.add('atlas-editor-open');document.body.style.overflow='hidden';}
+function closeAtlasModal(){if(!modalRoot)return;modalRoot.hidden=true;document.body.classList.remove('atlas-editor-open');document.body.style.overflow='';activeId='';draw()}
+const atlasCloseBtn=document.getElementById('atlasModalClose');if(atlasCloseBtn)atlasCloseBtn.addEventListener('click',closeAtlasModal);
 window.addEventListener('keydown',function(e){if(e.key==='Escape'&&modalRoot&&!modalRoot.hidden)closeAtlasModal()});
 function tick(){const w=W(),h=H();
 for(const l of links){const dx=l.target.x-l.source.x,dy=l.target.y-l.source.y,d=Math.hypot(dx,dy)||1,force=(d-200)*0.0006;if(!l.source.dragging){l.source.vx+=dx/d*force;l.source.vy+=dy/d*force}if(!l.target.dragging){l.target.vx-=dx/d*force;l.target.vy-=dy/d*force}}
@@ -340,7 +351,7 @@ syncGraphDom();
 }
 function show(n){activeId=n.id;draw();if(mqMobile.matches){openAtlasModal(n);return}
 const coreBanner=n.isCore?'<p class="hint" style="margin:10px 0 0;border-left:3px solid #c9a86b;padding-left:10px">Это <strong>ядро маршрутизации</strong>. Его вручную правите вы (в т.ч. ниже). Телеграм-агент в этот файл не пишет; веб с токеном из <code>/web</code> — можно.</p>':'';
-side.innerHTML=\`<div class="readerHead"><h2>\${escapeHtml(n.label)}</h2><div class="filePath">\${escapeHtml(n.file)}</div>\${coreBanner}<p class="hint">Папка: \${escapeHtml(n.folder)} · \${Math.round((n.size||0)/1024*10)/10} KB</p></div><h3>Ключевые темы</h3>\${(n.keywords||[]).slice(0,10).map(k=>\`<span class="pill">\${escapeHtml(k.word||k)}</span>\`).join('')||'<p class="hint">Нет</p>'}<div class="atlasEdit"><h3>Редактирование</h3><div class="atlasBar"><button type="button" id="atlasSave">Сохранить</button><button type="button" id="atlasRevert">Сбросить</button><span id="atlasStatus"></span></div><label class="hint" for="atlasTa" style="display:block;margin-bottom:6px">Markdown, полная перезапись файла (не дописывание)</label><textarea id="atlasTa" class="atlasTextarea" rows="20" wrap="off" spellcheck="false" autocomplete="off"></textarea></div>\`;
+side.innerHTML=\`<div class="readerHead"><h2>\${escapeHtml(n.label)}</h2><div class="filePath">\${escapeHtml(n.file)}</div>\${coreBanner}<p class="hint">Папка: \${escapeHtml(n.folder)} · \${Math.round((n.size||0)/1024*10)/10} KB</p></div><div class="atlas-side-main"><h3>Ключевые темы</h3>\${(n.keywords||[]).slice(0,10).map(k=>\`<span class="pill">\${escapeHtml(k.word||k)}</span>\`).join('')||'<p class="hint">Нет</p>'}<div class="atlasEdit"><h3>Редактирование</h3><label class="hint" for="atlasTa" style="display:block;margin-bottom:6px">Markdown, полная перезапись файла (не дописывание)</label><textarea id="atlasTa" class="atlasTextarea" rows="20" wrap="off" spellcheck="false" autocomplete="off"></textarea></div></div><div class="atlas-side-actions"><div class="atlasBar"><button type="button" id="atlasSave">Сохранить</button><button type="button" id="atlasRevert">Сбросить</button><span id="atlasStatus"></span></div></div>\`;
 const taEl=document.getElementById('atlasTa');
 if(taEl)taEl.value=n.content||'';
 document.getElementById('atlasSave')&&document.getElementById('atlasSave').addEventListener('click',()=>saveAtlas(n));
