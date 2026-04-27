@@ -280,7 +280,12 @@ svg.appendChild(line);
 }
 for(const n of nodes){
 const g=document.createElementNS('http://www.w3.org/2000/svg','g');
+g.setAttribute('tabindex','0');
+g.setAttribute('role','button');
+g.setAttribute('aria-label','Открыть '+(n.label||'файл'));
 g.addEventListener('pointerdown',function(e){onNodePointerDown(e,n);});
+g.addEventListener('click',function(){if(!n._justDraggedAt||Date.now()-n._justDraggedAt>280)show(n)});
+g.addEventListener('keydown',function(e){if(e.key==='Enter'||e.key===' '){e.preventDefault();show(n);}});
 n._g=g;
 const b=box(n);
 const r=document.createElementNS('http://www.w3.org/2000/svg','rect');
@@ -343,7 +348,7 @@ document.getElementById('atlasRevert')&&document.getElementById('atlasRevert').a
 }
 function renderLegend(){if(!legend)return;legend.innerHTML='<strong>Папки</strong>'+((ATLAS.graph.folders||[]).map(f=>\`<div class="legendItem"><span class="dot" style="background:\${escapeHtml(f.color)}"></span><span>\${escapeHtml(f.name)}</span></div>\`).join('')||'<div class="hint">Пока нет папок</div>')+'<div style="margin-top:12px"><strong>Роли узлов</strong></div><div class="legendItem"><span class="dot" style="width:14px;height:14px;min-width:14px;box-sizing:border-box;border:1.5px solid #f1f1f1;background:#c9a86b"></span><span>Ядро: маршруты (только владелец)</span></div>'}
 function escapeHtml(s){return String(s??'').replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]))}
-function onNodePointerDown(ev,n){if(ev.pointerType==='mouse'&&ev.button!==0)return;ev.preventDefault();const sx=ev.clientX,sy=ev.clientY;let moved=false;n.dragging=true;let lastX=n.x,lastY=n.y,lastT=performance.now();const el=ev.currentTarget;try{el.setPointerCapture(ev.pointerId)}catch(_){}function move(ev2){if(ev2.pointerId!==ev.pointerId)return;ev2.preventDefault();if(Math.hypot(ev2.clientX-sx,ev2.clientY-sy)>10)moved=true;const r=svg.getBoundingClientRect();const nx=ev2.clientX-r.left,ny=ev2.clientY-r.top,now=performance.now(),dt=Math.max(8,now-lastT);n.vx=(nx-lastX)/dt*16;n.vy=(ny-lastY)/dt*16;lastX=nx;lastY=ny;lastT=now;n.x=nx;n.y=ny;draw()}function up(ev2){if(ev2.pointerId!==ev.pointerId)return;n.dragging=false;savePositions();window.removeEventListener('pointermove',move);window.removeEventListener('pointerup',up);window.removeEventListener('pointercancel',up);try{el.releasePointerCapture(ev.pointerId)}catch(_){}if(!moved)show(n);else draw()}window.addEventListener('pointermove',move,{passive:false});window.addEventListener('pointerup',up);window.addEventListener('pointercancel',up)}
+function onNodePointerDown(ev,n){if(ev.pointerType==='mouse'&&ev.button!==0)return;ev.preventDefault();const sx=ev.clientX,sy=ev.clientY;const dragThreshold=(ev.pointerType==='touch'||ev.pointerType==='pen')?18:8;let moved=false;n.dragging=true;let lastX=n.x,lastY=n.y,lastT=performance.now();const el=ev.currentTarget;try{el.setPointerCapture(ev.pointerId)}catch(_){}function move(ev2){if(ev2.pointerId!==ev.pointerId)return;ev2.preventDefault();if(Math.hypot(ev2.clientX-sx,ev2.clientY-sy)>dragThreshold)moved=true;const r=svg.getBoundingClientRect();const nx=ev2.clientX-r.left,ny=ev2.clientY-r.top,now=performance.now(),dt=Math.max(8,now-lastT);n.vx=(nx-lastX)/dt*16;n.vy=(ny-lastY)/dt*16;lastX=nx;lastY=ny;lastT=now;n.x=nx;n.y=ny;draw()}function up(ev2){if(ev2.pointerId!==ev.pointerId)return;n.dragging=false;savePositions();window.removeEventListener('pointermove',move);window.removeEventListener('pointerup',up);window.removeEventListener('pointercancel',up);try{el.releasePointerCapture(ev.pointerId)}catch(_){}if(!moved){show(n)}else{n._justDraggedAt=Date.now();draw()}}window.addEventListener('pointermove',move,{passive:false});window.addEventListener('pointerup',up);window.addEventListener('pointercancel',up)}
 window.addEventListener('beforeunload',savePositions);
 tick();</script>
 </body></html>`;
