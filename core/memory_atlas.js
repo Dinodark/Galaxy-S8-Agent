@@ -193,18 +193,19 @@ h2{margin:0 0 8px;font-size:18px}h3{margin:18px 0 8px;font-size:13px;color:var(-
 .atlas-modal-root[hidden]{display:none!important}
 .atlas-modal-backdrop{position:absolute;inset:0;background:var(--bg);z-index:0}
 .atlas-modal-panel{position:relative;z-index:1;display:flex;flex-direction:column;height:100%;min-height:100%;min-height:100dvh;max-height:100dvh;box-sizing:border-box;background:var(--bg);padding:env(safe-area-inset-top,0) env(safe-area-inset-right,0) 0 env(safe-area-inset-left,0)}
-.atlas-modal-top{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:10px 14px;flex-shrink:0;background:var(--panel-soft);border-bottom:1px solid #2a2a2a;min-height:52px;box-sizing:border-box}
-.atlas-modal-top .atlas-modal-title-wrap{display:flex;flex-direction:column;min-width:0;flex:1 1 200px}
+.atlas-modal-top{display:flex;align-items:center;gap:10px;flex-wrap:nowrap;flex-shrink:0;padding:10px 14px;min-height:52px;box-sizing:border-box;background:var(--panel-soft);border-bottom:1px solid #2a2a2a;position:relative;z-index:2;overflow-x:auto;-webkit-overflow-scrolling:touch}
+.atlas-modal-top .atlas-modal-title-wrap{display:flex;flex-direction:column;min-width:0;flex:1 1 0;justify-content:center}
 .atlas-modal-top strong{font-size:15px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%}
 .atlas-modal-top .atlas-modal-meta{font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%}
 .atlas-modal-top .atlas-modal-meta:empty{display:none}
-.atlas-modal-toolbar{display:flex;flex-wrap:wrap;align-items:center;justify-content:flex-end;gap:8px;flex:0 0 auto;min-width:0;max-width:100%}
-.atlas-modal-toolbar button{background:var(--panel-hover);color:var(--text);border:none;border-radius:10px;padding:8px 14px;cursor:pointer;font:inherit}
-.atlas-modal-toolbar #atlasStatus{font-size:12px;color:var(--muted);min-width:0;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.atlas-modal-toolbar{display:flex;flex-wrap:nowrap;align-items:center;justify-content:flex-start;gap:8px;flex:0 0 auto;flex-shrink:0;min-width:min-content;max-width:none}
+.atlas-modal-toolbar button{flex-shrink:0;background:var(--panel-hover);color:var(--text);border:none;border-radius:10px;padding:8px 14px;cursor:pointer;font:inherit}
+.atlas-modal-toolbar #atlasStatus{flex:0 1 auto;flex-shrink:0;font-size:12px;color:var(--muted);min-width:0;max-width:min(200px,40vw);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .atlas-close-btn{flex-shrink:0;width:44px;height:44px;padding:0;border:0;border-radius:12px;background:var(--panel-hover);color:var(--text);font-size:24px;line-height:1;cursor:pointer;display:grid;place-items:center;align-self:center;position:relative;z-index:2}
 .atlas-modal-body{flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden}
 .atlas-modal-scroll{flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden;padding:0;box-sizing:border-box}
 .atlas-modal-scroll .atlasTextarea{flex:1;min-height:0;resize:none;width:100%;box-sizing:border-box;white-space:pre-wrap;word-break:break-word;overflow-wrap:break-word;overflow-y:auto}
+@media(max-width:900px){.atlas-modal-scroll .atlasTextarea{border-radius:0}}
 .atlas-modal-actions{display:none}
 body.atlas-editor-open{overflow:hidden;touch-action:none}
 body.atlas-mobile header{display:none!important}
@@ -224,7 +225,7 @@ body.atlas-mobile #wrap{grid-template-rows:1fr!important}
 <div id="atlasModalRoot" class="atlas-modal-root" hidden>
 <div class="atlas-modal-backdrop" aria-hidden="true"></div>
 <section class="atlas-modal-panel" role="dialog" aria-modal="true" aria-labelledby="atlasModalTitleLbl">
-<header class="atlas-modal-top"><div class="atlas-modal-title-wrap"><strong id="atlasModalTitleLbl"></strong><span class="atlas-modal-meta" id="atlasModalMeta"></span></div><div class="atlas-modal-toolbar" id="atlasModalToolbar"></div><button type="button" class="atlas-close-btn" id="atlasModalClose" aria-label="Закрыть">×</button></header>
+<header class="atlas-modal-top"><div class="atlas-modal-toolbar" id="atlasModalToolbar"></div><div class="atlas-modal-title-wrap"><strong id="atlasModalTitleLbl"></strong><span class="atlas-modal-meta" id="atlasModalMeta"></span></div><button type="button" class="atlas-close-btn" id="atlasModalClose" aria-label="Закрыть">×</button></header>
 <div class="atlas-modal-body" id="atlasModalBody"></div>
 </section>
 </div>
@@ -309,8 +310,8 @@ r.setAttribute('y',-b.h/2);
 r.setAttribute('width',b.w);
 r.setAttribute('height',b.h);
 r.setAttribute('fill',n.color||'#fff');
-r.setAttribute('rx',12);
-r.setAttribute('ry',12);
+r.setAttribute('rx',mqMobile.matches?0:12);
+r.setAttribute('ry',mqMobile.matches?0:12);
 g.appendChild(r);
 const t=document.createElementNS('http://www.w3.org/2000/svg','text');
 n._t=t;
@@ -345,6 +346,8 @@ n._r.setAttribute('y',-b.h/2);
 n._r.setAttribute('width',b.w);
 n._r.setAttribute('height',b.h);
 n._r.setAttribute('fill',n.color||'#fff');
+n._r.setAttribute('rx',mqMobile.matches?0:12);
+n._r.setAttribute('ry',mqMobile.matches?0:12);
 n._t.textContent=n.label.slice(0,32);
 n._t.setAttribute('fill',nodeTextColor(n.color||'#fff'));
 }

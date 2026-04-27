@@ -943,7 +943,7 @@ button.calendar-cell:focus-visible {
   }
 
   .content {
-    padding: 12px;
+    padding: 0;
   }
 
   .list-page {
