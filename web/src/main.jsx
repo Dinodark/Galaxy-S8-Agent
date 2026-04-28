@@ -712,35 +712,56 @@ function JournalEntries({ entries, onToggleExclude, excludedBusyId }) {
   if (entries.length === 0) return <p className="muted">No entries for this day.</p>;
   return (
     <div className="journal">
-      {entries.map((entry, index) => (
+      {entries.map((entry, index) => {
+        const busy = excludedBusyId === entry.id;
+        const excludeLabel = entry.excluded ? 'Вернуть в обработку' : 'Исключить из обработки';
+        return (
         <article
           className={
             'entry ' +
             (entry.source || 'user') +
             (entry.excluded ? ' entry-excluded' : '')
           }
-          key={index}
+          key={entry.id || index}
         >
+          {onToggleExclude && (
+            <button
+              type="button"
+              className={
+                'entry-exclude-btn' +
+                (entry.excluded ? ' entry-exclude-btn-restore' : '')
+              }
+              title={excludeLabel}
+              aria-label={excludeLabel}
+              disabled={busy}
+              onClick={() => onToggleExclude(entry)}
+            >
+              {entry.excluded ? (
+                <span className="entry-exclude-restore-glyph" aria-hidden>
+                  ↺
+                </span>
+              ) : (
+                <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
+                  <path
+                    stroke="currentColor"
+                    strokeLinecap="round"
+                    strokeWidth="1.6"
+                    fill="none"
+                    d="M4 4l8 8M12 4L4 12"
+                  />
+                </svg>
+              )}
+            </button>
+          )}
           <div className="entry-meta">
             <span className="badge">{sourceLabel(entry.source)}</span>
             <span>{fmtTime(entry.ts)}</span>
             <span>{viaLabel(entry.via)}</span>
           </div>
           <div className="entry-text">{entry.text}</div>
-          {onToggleExclude && (
-            <div className="entry-actions">
-              <button
-                type="button"
-                className="secondary"
-                disabled={excludedBusyId === entry.id}
-                onClick={() => onToggleExclude(entry)}
-              >
-                {entry.excluded ? 'Вернуть в обработку' : 'Исключить из обработки'}
-              </button>
-            </div>
-          )}
         </article>
-      ))}
+        );
+      })}
     </div>
   );
 }

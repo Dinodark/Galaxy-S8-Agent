@@ -9,8 +9,8 @@
   --color-subtle: #6f6f6f;
   --color-accent: #d6d6d6;
   --color-glow: #333333;
-  --color-user-mark: #777777;
-  --color-agent-mark: #555555;
+  --color-user-mark: #3a6ea8;
+  --color-agent-mark: #8b4db0;
   --color-danger-bg: #2a171a;
   --color-danger-text: #f0c8cf;
   --font-family-base: system-ui, -apple-system, Segoe UI, sans-serif;
@@ -761,17 +761,19 @@ iframe {
 }
 
 .entry {
+  position: relative;
   border-radius: var(--radius-md);
   padding: 12px;
+  padding-right: 42px;
   background: var(--color-surface);
 }
 
 .entry.user {
-  background: color-mix(in srgb, var(--color-surface) 82%, var(--color-user-mark) 18%);
+  background: color-mix(in srgb, var(--color-surface) 54%, var(--color-user-mark) 46%);
 }
 
 .entry.assistant {
-  background: color-mix(in srgb, var(--color-surface) 82%, var(--color-agent-mark) 18%);
+  background: color-mix(in srgb, var(--color-surface) 54%, var(--color-agent-mark) 46%);
 }
 
 .entry-meta {
@@ -797,12 +799,60 @@ iframe {
   line-height: 1.5;
 }
 
-.entry-actions {
-  margin-top: 10px;
+.entry-exclude-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--color-surface) 55%, transparent);
+  color: var(--color-muted);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.entry-exclude-btn:hover:not(:disabled) {
+  background: var(--color-surface-hover);
+  color: var(--color-text);
+}
+
+.entry-exclude-btn:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
+}
+
+.entry-exclude-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.entry-exclude-btn-restore {
+  color: var(--color-subtle);
+}
+
+.entry-exclude-btn-restore:hover:not(:disabled) {
+  color: var(--color-accent);
+}
+
+.entry-exclude-restore-glyph {
+  font-size: 15px;
+  line-height: 1;
 }
 
 .entry-excluded {
   opacity: 0.65;
+}
+
+.entry:not(:has(.entry-exclude-btn)) {
+  padding-right: 12px;
 }
 
 .desktop-reader {
