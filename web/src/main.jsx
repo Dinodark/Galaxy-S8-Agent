@@ -1241,6 +1241,16 @@ function App() {
     setMenuOpen(false);
   }
 
+  async function switchPreset(id) {
+    if (!id || !design || !design.activatePreset) return;
+    try {
+      await design.activatePreset(id);
+      setStateText('Тема применена');
+    } catch (err) {
+      setStateText('Ошибка темы: ' + (err && err.message ? err.message : String(err)));
+    }
+  }
+
   return (
     <div id="app">
       <aside className={'side ' + (menuOpen ? 'open' : '')}>
@@ -1256,6 +1266,31 @@ function App() {
             </button>
           ))}
         </div>
+        <section className="side-presets" aria-label="Пресеты темы">
+          <div className="side-presets-head">Пресеты</div>
+          {design.loading ? (
+            <p className="muted side-presets-empty">Загрузка…</p>
+          ) : (design.presets || []).length === 0 ? (
+            <p className="muted side-presets-empty">Пока только базовый пресет.</p>
+          ) : (
+            <ul className="side-presets-list">
+              {(design.presets || []).map((preset) => (
+                <li key={preset.id}>
+                  <button
+                    type="button"
+                    className={
+                      'side-preset-chip' +
+                      (design.activePresetId === preset.id ? ' side-preset-chip-active' : '')
+                    }
+                    onClick={() => switchPreset(preset.id)}
+                  >
+                    {preset.name}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
         <p className="muted side-footnote">Dashboard for notes, projects, journal, and agent state.</p>
       </aside>
       {menuOpen && <button className="drawer-backdrop" onClick={() => setMenuOpen(false)} aria-label="Close menu" />}
