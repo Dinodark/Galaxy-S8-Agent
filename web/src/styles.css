@@ -551,6 +551,35 @@ button.secondary {
   flex-wrap: wrap;
 }
 
+/* Update: log panel height-bounded, scroll inside; JS scrolls to end on load/refresh */
+.update-page {
+  min-height: 0;
+}
+
+.update-log-heading {
+  margin: 0 0 10px;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.update-log-scroll {
+  max-height: min(72vh, calc(100vh - 200px));
+  overflow: auto;
+  border-radius: var(--radius-md);
+  background: var(--color-bg);
+  border: 1px solid #2a2a2a;
+  scroll-behavior: auto;
+}
+
+.update-log-pre {
+  margin: 0;
+  padding: 12px 14px;
+  font-size: 12px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 pre {
   white-space: pre-wrap;
   font-family: ui-monospace, SFMono-Regular, Consolas, monospace;

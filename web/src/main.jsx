@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import './styles.css';
 import { SettingsPanel } from './settings_panel.jsx';
@@ -1054,6 +1054,10 @@ function Atlas({ api, token, setStateText }) {
 
 function UpdatePanel({ api }) {
   const [log, setLog] = useState(null);
+  const logScrollRef = useRef(null);
+
+  const displayLog =
+    (log?.running ? '[running]\n' : '') + (log?.content || 'No update log yet.');
 
   async function refreshLog() {
     setLog(await api.get('/api/actions/update-log'));
@@ -1074,8 +1078,16 @@ function UpdatePanel({ api }) {
     refreshLog();
   }, []);
 
+  useEffect(() => {
+    const el = logScrollRef.current;
+    if (!el) return;
+    requestAnimationFrame(() => {
+      el.scrollTop = el.scrollHeight;
+    });
+  }, [displayLog]);
+
   return (
-    <div className="stack">
+    <div className="stack update-page">
       <div className="card">
         <h2>Update & restart agent</h2>
         <p className="muted">
@@ -1087,8 +1099,11 @@ function UpdatePanel({ api }) {
           <button className="secondary" onClick={refreshLog}>Refresh log</button>
         </div>
       </div>
-      <div className="card">
-        <pre>{(log?.running ? '[running]\n' : '') + (log?.content || 'No update log yet.')}</pre>
+      <div className="card update-log-card">
+        <h3 className="update-log-heading">Лог обновления</h3>
+        <div className="update-log-scroll" ref={logScrollRef}>
+          <pre className="update-log-pre">{displayLog}</pre>
+        </div>
       </div>
     </div>
   );
