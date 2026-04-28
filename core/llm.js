@@ -115,17 +115,39 @@ function emptyUsage() {
   return { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0, cost: 0 };
 }
 
+async function checkKey() {
+  const res = await axios.get(`${config.openrouter.baseUrl}/key`, {
+    headers: { Authorization: `Bearer ${config.openrouter.apiKey}` },
+    timeout: 15_000,
+    validateStatus: () => true,
+  });
+  return { status: res.status, data: res.data };
+}
+
+/** GET /api/v1/credits — баланс аккаунта (куплено минус использовано). Часто нужен management key. */
+async function fetchCredits() {
+  const res = await axios.get(`${config.openrouter.baseUrl}/credits`, {
+    headers: { Authorization: `Bearer ${config.openrouter.apiKey}` },
+    timeout: 15_000,
+    validateStatus: () => true,
+  });
+  return { status: res.status, data: res.data };
+}
+
 /**
- * Credits / usage for the configured API key (GET /api/v1/key).
- * limit_remaining / limit / usage* are in USD per OpenRouter schema.
+ * Сводка: GET /api/v1/key (лимиты конкретного API-ключа) + GET /api/v1/credits (остаток на аккаунте).
+ * limit_remaining — остаток в рамках лимита ключа (например дневной $2).
+ * account_remaining — при доступном /credits: total_credits − total_usage (~общий остаток кошелька).
  */
 async function getOpenRouterKeySummary() {
   try {
-    const { status, data } = await checkKey();
-    if (status !== 200 || !data || typeof data !== 'object') {
-      return { ok: false, httpStatus: status };
+    const [keyRes, creditsRes] = await Promise.all([checkKey(), fetchCredits()]);
+
+    if (keyRes.status !== 200 || !keyRes.data || typeof keyRes.data !== 'object') {
+      return { ok: false, httpStatus: keyRes.status };
     }
-    const d = data.data != null ? data.data : data;
+
+    const d = keyRes.data.data != null ? keyRes.data.data : keyRes.data;
     const pick = {};
     const keys = [
       'label',
@@ -147,19 +169,46 @@ async function getOpenRouterKeySummary() {
     for (const k of keys) {
       if (d[k] !== undefined) pick[k] = d[k];
     }
-    return { ok: true, currency: 'USD', ...pick };
+
+    let accountCreditsOk = false;
+    let accountRemaining = null;
+    let accountTotalCredits = null;
+    let accountTotalUsage = null;
+    let accountCreditsHttpStatus = null;
+    let accountCreditsMessage = null;
+
+    if (creditsRes.status === 200 && creditsRes.data && creditsRes.data.data) {
+      const c = creditsRes.data.data;
+      accountTotalCredits = c.total_credits;
+      accountTotalUsage = c.total_usage;
+      const total = Number(c.total_credits);
+      const used = Number(c.total_usage);
+      if (Number.isFinite(total) && Number.isFinite(used)) {
+        accountRemaining = Math.max(0, total - used);
+      }
+      accountCreditsOk = true;
+    } else {
+      accountCreditsHttpStatus = creditsRes.status;
+      accountCreditsMessage =
+        creditsRes.status === 403
+          ? 'для /credits нужен management API key в OpenRouter'
+          : extractErrorMessage(creditsRes.data) || `HTTP ${creditsRes.status}`;
+    }
+
+    return {
+      ok: true,
+      currency: 'USD',
+      ...pick,
+      account_credits_ok: accountCreditsOk,
+      account_remaining: accountCreditsOk ? accountRemaining : null,
+      account_total_credits: accountCreditsOk ? accountTotalCredits : null,
+      account_total_usage: accountCreditsOk ? accountTotalUsage : null,
+      account_credits_http_status: accountCreditsOk ? null : accountCreditsHttpStatus,
+      account_credits_message: accountCreditsOk ? null : accountCreditsMessage,
+    };
   } catch (err) {
     return { ok: false, error: err && err.message ? err.message : String(err) };
   }
-}
-
-async function checkKey() {
-  const res = await axios.get(`${config.openrouter.baseUrl}/key`, {
-    headers: { Authorization: `Bearer ${config.openrouter.apiKey}` },
-    timeout: 15_000,
-    validateStatus: () => true,
-  });
-  return { status: res.status, data: res.data };
 }
 
 module.exports = {

@@ -144,19 +144,26 @@ function formatOpenRouterLines(or) {
     return [`OpenRouter key: ${err}`];
   }
   const lines = [];
+  if (or.account_credits_ok && or.account_remaining != null && or.account_remaining !== '') {
+    lines.push(`OpenRouter account remaining (USD): ${formatUsdPlain(or.account_remaining)}`);
+    lines.push(`OpenRouter account credits purchased (USD): ${formatUsdPlain(or.account_total_credits)}`);
+    lines.push(`OpenRouter account credits used (USD): ${formatUsdPlain(or.account_total_usage)}`);
+  } else if (or.account_credits_message) {
+    lines.push(`OpenRouter GET /credits: ${or.account_credits_message}`);
+  }
   if (or.limit_remaining != null && or.limit_remaining !== '') {
-    lines.push(`OpenRouter balance remaining (USD): ${formatUsdPlain(or.limit_remaining)}`);
+    lines.push(`OpenRouter key limit_remaining (USD): ${formatUsdPlain(or.limit_remaining)}`);
   } else {
-    lines.push('OpenRouter balance remaining (USD): unlimited (null)');
+    lines.push('OpenRouter key limit_remaining (USD): unlimited (null)');
   }
   if (or.limit != null && or.limit !== '') {
-    lines.push(`OpenRouter key limit (USD): ${formatUsdPlain(or.limit)}`);
+    lines.push(`OpenRouter key spending cap (USD): ${formatUsdPlain(or.limit)}`);
   }
   if (or.usage_daily != null && or.usage_daily !== '') {
-    lines.push(`OpenRouter usage today (USD): ${formatUsdPlain(or.usage_daily)}`);
+    lines.push(`OpenRouter key usage today (USD): ${formatUsdPlain(or.usage_daily)}`);
   }
   if (or.usage != null && or.usage !== '') {
-    lines.push(`OpenRouter usage total (USD): ${formatUsdPlain(or.usage)}`);
+    lines.push(`OpenRouter key usage total (USD): ${formatUsdPlain(or.usage)}`);
   }
   return lines;
 }

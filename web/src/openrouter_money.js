@@ -1,4 +1,4 @@
-/** Поля лимита/расхода с OpenRouter GET /api/v1/key — суммы в USD. */
+/** USD: `/key` — лимиты ключа; `/credits` — баланс аккаунта (куплено − списано). */
 
 export function formatUsd(value) {
   if (value === null || value === undefined || value === '') return null;
@@ -12,26 +12,38 @@ export function formatUsd(value) {
   }).format(x);
 }
 
-/** Остаток лимита по ключу (limit_remaining); null от API = без лимита по расходам. */
+/**
+ * Главная цифра: остаток на аккаунте (GET /credits), иначе остаток по лимиту ключа (GET /key).
+ */
 export function formatBalanceMain(or) {
   if (!or || !or.ok) return '—';
+  if (
+    or.account_credits_ok &&
+    or.account_remaining != null &&
+    Number.isFinite(Number(or.account_remaining))
+  ) {
+    return formatUsd(or.account_remaining);
+  }
   if (or.limit_remaining == null) {
     return 'без лимита';
   }
   return formatUsd(or.limit_remaining) ?? '—';
 }
 
-/** Вторая строка: расход за день и при необходимости лимит и BYOK. */
+/** Подпись: расход за день по ключу, остаток по лимиту ключа; если /credits недоступен — пояснение. */
 export function formatBalanceSubtitle(or) {
   if (!or || !or.ok) return null;
   const parts = [];
   if (or.usage_daily != null && or.usage_daily !== '') {
     const u = formatUsd(or.usage_daily);
-    if (u) parts.push(`расход за день ${u}`);
+    if (u) parts.push(`расход ключа за день ${u}`);
   }
-  if (or.limit != null && or.limit !== '') {
-    const lim = formatUsd(or.limit);
-    if (lim) parts.push(`лимит ${lim}`);
+  if (or.account_credits_ok && or.limit_remaining != null && or.limit_remaining !== '') {
+    const kr = formatUsd(or.limit_remaining);
+    if (kr) parts.push(`ещё по лимиту ключа ${kr}`);
+  }
+  if (!or.account_credits_ok && or.account_credits_message) {
+    parts.push(`аккаунт OpenRouter: ${or.account_credits_message}`);
   }
   if (or.byok_usage_daily != null && Number(or.byok_usage_daily) > 0) {
     const b = formatUsd(or.byok_usage_daily);

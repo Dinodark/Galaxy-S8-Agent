@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { TriageLogView } from './triage_log.jsx';
 import { JournalIngestLogView } from './journal_ingest_log.jsx';
 import { BatterySnapshotBlock } from './battery_snapshot.jsx';
-import { formatBalanceMain, formatUsd } from './openrouter_money.js';
+import { formatUsd } from './openrouter_money.js';
 
 function TabButton({ id, active, children, onClick }) {
   return (
@@ -99,24 +99,37 @@ function StatusOverview({ s }) {
             </Row>
           ) : (
             <>
-              <Row label="Остаток средств (USD)">{formatBalanceMain(s.openrouter)}</Row>
-              <Row label="Лимит ключа (USD)">
-                {s.openrouter.limit != null && s.openrouter.limit !== ''
-                  ? formatUsd(s.openrouter.limit) ?? '—'
+              <Row label="Остаток на аккаунте (USD)">
+                {s.openrouter.account_credits_ok &&
+                formatUsd(s.openrouter.account_remaining) != null
+                  ? formatUsd(s.openrouter.account_remaining)
                   : '—'}
               </Row>
-              <Row label="Расход за день (USD)">
-                {formatUsd(s.openrouter.usage_daily) ?? '—'}
-              </Row>
-              <Row label="Расход всего (USD)">{formatUsd(s.openrouter.usage) ?? '—'}</Row>
+              {s.openrouter.account_credits_ok ? (
+                <>
+                  <Row label="Пополнено на аккаунте (всего)">
+                    {formatUsd(s.openrouter.account_total_credits) ?? '—'}
+                  </Row>
+                  <Row label="Списано с аккаунта (всего)">
+                    {formatUsd(s.openrouter.account_total_usage) ?? '—'}
+                  </Row>
+                </>
+              ) : (
+                <Row label="GET /credits">{s.openrouter.account_credits_message || '—'}</Row>
+              )}
+              <Row label="Остаток по лимиту ключа">{formatUsd(s.openrouter.limit_remaining) ?? '—'}</Row>
+              <Row label="Потолок лимита ключа">{formatUsd(s.openrouter.limit) ?? '—'}</Row>
+              <Row label="Расход ключа за день">{formatUsd(s.openrouter.usage_daily) ?? '—'}</Row>
+              <Row label="Расход ключа всего">{formatUsd(s.openrouter.usage) ?? '—'}</Row>
               {s.openrouter.label && (
                 <Row label="Метка ключа">{String(s.openrouter.label)}</Row>
               )}
               <p className="muted status-footnote">
-                Остаток и расход — в долларах США по данным{' '}
-                <code>GET /api/v1/key</code> для текущего API-ключа. Значение «без лимита» —
-                когда у ключа не задан потолок расходов (<code>limit_remaining</code> = null).
-                Разбивка по одному запросу чата — в токенах после «Обработать день» в журнале.
+                Карточка объединяет два запроса:{' '}
+                <code>GET /api/v1/credits</code> — общий остаток на аккаунте (куплено минус использовано), и{' '}
+                <code>GET /api/v1/key</code> — лимиты именно этого API-ключа (например дневной потолок $2). Если{' '}
+                <code>/credits</code> вернёт 403, добавьте в .env ключ с типом{' '}
+                <i>management</i> или смотрите только строки «по ключу». Токены одного запроса чата — в журнале после «Обработать день».
               </p>
             </>
           )}
