@@ -16,6 +16,10 @@
   --radius-lg: 18px;
   --radius-md: 12px;
 
+  /* Scrollbars — трек прозрачный, только ползунок; следуют палитре (меняются с «Настроением»). */
+  --scrollbar-thumb: color-mix(in srgb, var(--color-muted) 44%, transparent);
+  --scrollbar-thumb-hover: color-mix(in srgb, var(--color-accent) 26%, var(--color-muted) 54%);
+
   /* Legacy aliases while the dashboard evolves. */
   --bg: var(--color-bg);
   --panel: var(--color-surface);
@@ -28,10 +32,47 @@
 
 * {
   box-sizing: border-box;
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb) transparent;
 }
 
 html {
   background: var(--color-bg);
+}
+
+*::-webkit-scrollbar {
+  width: 9px;
+  height: 9px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-thumb-hover);
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+/* Убираем стрелки / кнопки скролла в WebKit/Chromium */
+*::-webkit-scrollbar-button {
+  display: none;
+  width: 0;
+  min-width: 0;
+  height: 0;
+  min-height: 0;
+}
+
+*::-webkit-scrollbar-corner {
+  background: transparent;
 }
 
 body {
@@ -565,19 +606,21 @@ button.secondary {
 .update-log-scroll {
   max-height: min(72vh, calc(100vh - 200px));
   overflow: auto;
-  border-radius: var(--radius-md);
-  background: var(--color-bg);
-  border: 1px solid #2a2a2a;
   scroll-behavior: auto;
+  background: transparent;
+  border: none;
+  margin: 0 -4px;
+  padding: 0 4px 4px;
 }
 
 .update-log-pre {
   margin: 0;
-  padding: 12px 14px;
+  padding: 4px 2px 8px 0;
   font-size: 12px;
-  line-height: 1.45;
+  line-height: 1.55;
   white-space: pre-wrap;
   word-break: break-word;
+  color: color-mix(in srgb, var(--color-text) 92%, transparent);
 }
 
 pre {
