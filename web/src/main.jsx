@@ -20,6 +20,7 @@ const navItems = [
 
 const PALETTE_STORAGE_KEY = 'galaxy-dashboard-palette-v2';
 const PALETTE_PRESETS_KEY = 'galaxy-dashboard-palette-presets';
+const PALETTE_ACTIVE_PRESET_KEY = 'galaxy-dashboard-active-preset';
 
 const basePalette = {
   '--color-bg': '#111111',
@@ -1019,12 +1020,33 @@ function MoodPalette() {
   }));
   const [presets, setPresets] = useState(() => readJsonStorage(PALETTE_PRESETS_KEY, []));
   const [presetName, setPresetName] = useState('');
+  const [activePresetName, setActivePresetName] = useState(() =>
+    readJsonStorage(PALETTE_ACTIVE_PRESET_KEY, '')
+  );
 
   useEffect(() => {
     applyPalette(palette);
   }, [palette]);
 
+  function clearActivePresetMark() {
+    setActivePresetName('');
+    try {
+      localStorage.removeItem(PALETTE_ACTIVE_PRESET_KEY);
+    } catch {
+      /* ignore */
+    }
+  }
+
+  function persistActivePresetName(name) {
+    try {
+      localStorage.setItem(PALETTE_ACTIVE_PRESET_KEY, JSON.stringify(name));
+    } catch {
+      /* ignore */
+    }
+  }
+
   function updateColor(name, value) {
+    clearActivePresetMark();
     setPalette((current) => ({ ...current, [name]: value }));
   }
 
@@ -1035,6 +1057,7 @@ function MoodPalette() {
   function resetBase() {
     setPalette(basePalette);
     localStorage.removeItem(PALETTE_STORAGE_KEY);
+    clearActivePresetMark();
   }
 
   function savePreset() {
@@ -1046,61 +1069,95 @@ function MoodPalette() {
     setPresets(next);
     localStorage.setItem(PALETTE_PRESETS_KEY, JSON.stringify(next));
     setPresetName('');
+    setActivePresetName(name);
+    persistActivePresetName(name);
   }
 
   function loadPreset(preset) {
     setPalette({ ...basePalette, ...preset.palette });
+    setActivePresetName(preset.name);
+    persistActivePresetName(preset.name);
   }
 
   function deletePreset(name) {
     const next = presets.filter((preset) => preset.name !== name);
     setPresets(next);
     localStorage.setItem(PALETTE_PRESETS_KEY, JSON.stringify(next));
+    if (activePresetName === name) clearActivePresetMark();
   }
 
   return (
-    <details className="mood">
-      <summary>Настроение</summary>
-      <div className="mood-panel">
-        <div className="palette-grid">
-          {Object.entries(palette).map(([name, value]) => (
-            <label className="color-field" key={name}>
-              <span>{paletteLabels[name] || name}</span>
-              <input
-                type="color"
-                value={value}
-                onChange={(event) => updateColor(name, event.target.value)}
-              />
-              <code>{value}</code>
-            </label>
-          ))}
-        </div>
+    <>
+      <section className="side-presets" aria-label="Пресеты темы">
+        <div className="side-presets-head">Пресеты</div>
+        {presets.length === 0 ? (
+          <p className="muted side-presets-empty">Добавьте в «Настроение» ниже.</p>
+        ) : (
+          <ul className="side-presets-list">
+            {presets.map((preset) => (
+              <li key={preset.name}>
+                <button
+                  type="button"
+                  className={
+                    'side-preset-chip' +
+                    (activePresetName === preset.name ? ' side-preset-chip-active' : '')
+                  }
+                  onClick={() => loadPreset(preset)}
+                >
+                  {preset.name}
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
 
-        <div className="mood-actions">
-          <button className="secondary" onClick={saveCurrent}>Сохранить текущую</button>
-          <button className="secondary" onClick={resetBase}>Базовая</button>
-        </div>
+      <details className="mood">
+        <summary>Настроение</summary>
+        <div className="mood-panel">
+          <div className="palette-grid">
+            {Object.entries(palette).map(([name, value]) => (
+              <label className="color-field" key={name}>
+                <span>{paletteLabels[name] || name}</span>
+                <input
+                  type="color"
+                  value={value}
+                  onChange={(event) => updateColor(name, event.target.value)}
+                />
+                <code>{value}</code>
+              </label>
+            ))}
+          </div>
 
-        <div className="preset-form">
-          <input
-            value={presetName}
-            onChange={(event) => setPresetName(event.target.value)}
-            placeholder="Название пресета"
-          />
-          <button className="secondary" onClick={savePreset}>Сохранить пресет</button>
-        </div>
+          <div className="mood-actions">
+            <button className="secondary" onClick={saveCurrent}>Сохранить текущую</button>
+            <button className="secondary" onClick={resetBase}>Базовая</button>
+          </div>
 
-        <div className="presets">
-          {presets.length === 0 && <p className="muted">Пресетов пока нет.</p>}
-          {presets.map((preset) => (
-            <div className="preset-row" key={preset.name}>
-              <button onClick={() => loadPreset(preset)}>{preset.name}</button>
-              <button onClick={() => deletePreset(preset.name)}>×</button>
-            </div>
-          ))}
+          <div className="preset-form">
+            <input
+              value={presetName}
+              onChange={(event) => setPresetName(event.target.value)}
+              placeholder="Название пресета"
+            />
+            <button className="secondary" onClick={savePreset}>Сохранить пресет</button>
+          </div>
+
+          <p className="muted mood-presets-hint">Удаление и повторное применение из списка:</p>
+          <div className="presets">
+            {presets.length === 0 && <p className="muted">Пресетов пока нет.</p>}
+            {presets.map((preset) => (
+              <div className="preset-row" key={preset.name}>
+                <button type="button" onClick={() => loadPreset(preset)}>{preset.name}</button>
+                <button type="button" onClick={() => deletePreset(preset.name)} aria-label={'Удалить ' + preset.name}>
+                  ×
+                </button>
+              </div>
+            ))}
+          </div>
         </div>
-      </div>
-    </details>
+      </details>
+    </>
   );
 }
 
@@ -1136,8 +1193,8 @@ function App() {
             </button>
           ))}
         </div>
-        <p className="muted">Dashboard for notes, projects, journal, and agent state.</p>
         <MoodPalette />
+        <p className="muted side-footnote">Dashboard for notes, projects, journal, and agent state.</p>
       </aside>
       {menuOpen && <button className="drawer-backdrop" onClick={() => setMenuOpen(false)} aria-label="Close menu" />}
       <main className="main">
