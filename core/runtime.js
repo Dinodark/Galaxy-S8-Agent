@@ -70,6 +70,7 @@ async function buildStatus(chatId) {
       next: nextReview,
       inboxTriage: s.dailyReview.inboxTriage !== false,
       inboxTriageMaxSteps: s.dailyReview.inboxTriageMaxSteps ?? 12,
+      clearInboxOnlyAfterWrites: s.dailyReview.clearInboxOnlyAfterWrites !== false,
     },
     journal: {
       today,
@@ -109,6 +110,7 @@ function formatStatus(status) {
     `Review min messages: ${status.dailyReview.minMessages}`,
     `Review model: ${status.dailyReview.model}`,
     `Inbox triage: ${status.dailyReview.inboxTriage ? 'on' : 'off'} (max steps ${status.dailyReview.inboxTriageMaxSteps})`,
+    `Clear inbox only after writes: ${status.dailyReview.clearInboxOnlyAfterWrites ? 'yes' : 'no (legacy)'}`,
     `Journal today: ${status.journal.entriesToday} entries (${status.journal.today})`,
     `Pending reminders: ${status.reminders.pending}`,
     `Battery watch: ${

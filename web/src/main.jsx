@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import './styles.css';
+import { SettingsPanel } from './settings_panel.jsx';
 
 const navItems = [
   ['home', 'Home'],
@@ -81,8 +82,13 @@ function useApi() {
         if (!response.ok) throw new Error(response.status + ' ' + response.statusText);
         return response.json();
       },
-      post: async (path) => {
-        const response = await fetch(withToken(path), { method: 'POST' });
+      post: async (path, body) => {
+        const opts = { method: 'POST' };
+        if (body !== undefined) {
+          opts.headers = { 'Content-Type': 'application/json' };
+          opts.body = JSON.stringify(body);
+        }
+        const response = await fetch(withToken(path), opts);
         if (!response.ok) throw new Error(response.status + ' ' + response.statusText);
         return response.json();
       },
@@ -1048,9 +1054,6 @@ function App() {
     if (view === 'status') {
       api.get('/api/status').then(setData).catch((err) => setError(err.message));
     }
-    if (view === 'settings') {
-      api.get('/api/settings').then(setData).catch((err) => setError(err.message));
-    }
   }, [api, view]);
 
   const title = navItems.find(([id]) => id === view)?.[1] || 'Dashboard';
@@ -1091,7 +1094,7 @@ function App() {
           {error && <pre>{error}</pre>}
           {view === 'home' && <Home api={api} setStateText={setStateText} setView={setView} />}
           {!error && view === 'status' && data && <JsonCard data={data} />}
-          {!error && view === 'settings' && data && <JsonCard data={data} />}
+          {view === 'settings' && <SettingsPanel api={api} />}
           {view === 'atlas' && <Atlas api={api} token={api.token} setStateText={setStateText} />}
           {view === 'notes' && <FileBrowser api={api} kind="note" desktopDetail />}
           {view === 'summaries' && <FileBrowser api={api} kind="summary" desktopDetail />}

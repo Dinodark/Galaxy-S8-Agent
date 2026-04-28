@@ -74,6 +74,11 @@ const config = {
     model: optional('DAILY_REVIEW_MODEL', ''),
     inboxTriage: parseBool(process.env.DAILY_REVIEW_INBOX_TRIAGE, true),
     inboxTriageMaxSteps: Number(optional('DAILY_REVIEW_INBOX_TRIAGE_MAX_STEPS', '12')),
+    /** If true, inbox.md is cleared only after ≥1 successful write_note during triage. */
+    clearInboxOnlyAfterWrites: parseBool(
+      process.env.DAILY_REVIEW_CLEAR_INBOX_ONLY_AFTER_WRITES,
+      true
+    ),
   },
   paths: {
     memoryDir: 'memory',

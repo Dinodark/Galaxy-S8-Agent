@@ -94,10 +94,17 @@ function scheduleCoalescedTextMessage(chatId, text, { coalesceMs, onFlush }) {
 async function notifyInboxTriageResult(bot, chatId, result) {
   const t = result && result.triage;
   if (!t || t.skipped) return;
+  const snap = t.archivedRel ? `Снимок: \`${t.archivedRel}\`.` : '';
   if (t.cleared) {
+    const n = typeof t.writeNoteOk === 'number' ? t.writeNoteOk : '?';
     await bot.sendMessage(
       chatId,
-      'Инбокс: ночной разбор выполнен, очередь очищена; снимок за день в архиве.'
+      `Инбокс: ночной разбор выполнен (${n} успешных write_note), очередь очищена. ${snap}`.trim()
+    );
+  } else if (t.reason === 'no_successful_write_note') {
+    await bot.sendMessage(
+      chatId,
+      `Инбокс: модель не сделала ни одного успешного write_note — инбокс не очищал (текст остался в inbox.md). ${snap} Повтори /summary или разбери вручную.`.trim()
     );
   } else if (t.error) {
     await bot.sendMessage(
@@ -358,6 +365,7 @@ function start() {
           '/set daily_review_tz Europe/Moscow',
           '/set daily_review_min_messages 1',
           '/set daily_review_model qwen/qwen-2.5-72b-instruct',
+          '/set daily_review_clear_inbox_only_after_writes true',
           '/set stt_enabled false',
           '/set stt_language ru',
         ].join('\n')

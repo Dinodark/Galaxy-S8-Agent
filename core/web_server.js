@@ -231,6 +231,33 @@ async function handleApi(req, res, url) {
     return json(res, 200, await settings.getPublicSettings());
   }
 
+  if (pathname === '/api/settings/set' && req.method === 'POST') {
+    let body;
+    try {
+      body = await readJsonBody(req);
+    } catch {
+      return json(res, 400, { error: 'invalid JSON body' });
+    }
+    if (!body || typeof body.path !== 'string' || !body.path.trim()) {
+      return json(res, 400, { error: 'expected JSON { path, value }' });
+    }
+    try {
+      const normalized = await settings.set(
+        body.path.trim(),
+        body.value,
+        { type: 'web', ip: req.socket && req.socket.remoteAddress }
+      );
+      return json(res, 200, {
+        ok: true,
+        path: body.path.trim(),
+        value: normalized,
+        settings: await settings.getPublicSettings(),
+      });
+    } catch (err) {
+      return json(res, 400, { error: err.message || String(err) });
+    }
+  }
+
   if (pathname === '/api/atlas') {
     const result = await atlas.buildAtlas({ chatId });
     return json(res, 200, result.index);

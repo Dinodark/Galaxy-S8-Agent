@@ -26,6 +26,7 @@ function defaults() {
       model: config.dailyReview.model,
       inboxTriage: config.dailyReview.inboxTriage,
       inboxTriageMaxSteps: config.dailyReview.inboxTriageMaxSteps,
+      clearInboxOnlyAfterWrites: config.dailyReview.clearInboxOnlyAfterWrites,
     },
     silent: {
       reaction: '✍',
@@ -221,6 +222,9 @@ function validatePathValue(settingPath, value, mergedSettings) {
   if (settingPath === 'dailyReview.inboxTriageMaxSteps') {
     return parseIntInRange(value, 1, 32, 'dailyReview.inboxTriageMaxSteps');
   }
+  if (settingPath === 'dailyReview.clearInboxOnlyAfterWrites') {
+    return parseBool(value);
+  }
 
   if (settingPath === 'silent.reaction') {
     const emoji = String(value || '').trim();
@@ -274,6 +278,8 @@ function aliasToPath(alias, rawValue) {
     daily_review_model: 'dailyReview.model',
     daily_review_inbox_triage: 'dailyReview.inboxTriage',
     daily_review_inbox_triage_max_steps: 'dailyReview.inboxTriageMaxSteps',
+    daily_review_clear_inbox_only_after_writes:
+      'dailyReview.clearInboxOnlyAfterWrites',
     stt_enabled: 'stt.enabled',
     stt_language: 'stt.language',
     stt_max_duration_sec: 'stt.maxDurationSec',

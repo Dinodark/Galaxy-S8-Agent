@@ -50,7 +50,7 @@ async function clearInboxFile() {
 
 /**
  * After the evening summary file exists: route inbox body into project notes, trim conflicts, then clear inbox.
- * On failure, leaves inbox.md unchanged; snapshot under inbox/archive/ still exists for recovery.
+ * On failure, or when no write_note succeeded (if clearInboxOnlyAfterWrites): leaves inbox.md unchanged; snapshot under inbox/archive/ still exists for recovery.
  */
 async function runInboxTriage({ chatId, today, log = console } = {}) {
   const s = await settings.getSettings();
@@ -158,20 +158,29 @@ async function runInboxTriage({ chatId, today, log = console } = {}) {
       break;
     }
 
-    await clearInboxFile();
     const writeCount = transcript.filter(
       (t) => t.tool === 'write_note' && t.result && t.result.ok
     ).length;
-    log.log(
-      `[inbox-triage] cleared ${INBOX_REL} (${writeCount} write_note ok, ${transcript.length} tool rows)`
-    );
+    const requireWrites = dr.clearInboxOnlyAfterWrites !== false;
+    const cleared = shouldClearInboxAfterTriage(writeCount, requireWrites);
+    if (cleared) {
+      await clearInboxFile();
+      log.log(
+        `[inbox-triage] cleared ${INBOX_REL} (${writeCount} write_note ok, ${transcript.length} tool rows)`
+      );
+    } else {
+      log.warn(
+        `[inbox-triage] inbox not cleared — 0 successful write_note (${transcript.length} tool rows); ${INBOX_REL} left as-is; snapshot ${archiveRel}`
+      );
+    }
 
     return {
       skipped: false,
-      cleared: true,
+      cleared,
       archivedRel: archiveRel,
       writeNoteOk: writeCount,
       toolRows: transcript.length,
+      ...(cleared ? {} : { reason: 'no_successful_write_note' }),
     };
   } catch (err) {
     log.warn('[inbox-triage] failed — inbox.md not cleared:', err.message);
@@ -180,9 +189,18 @@ async function runInboxTriage({ chatId, today, log = console } = {}) {
       cleared: false,
       error: err.message,
       archivedRel: archiveRel,
+      writeNoteOk: transcript.filter(
+        (t) => t.tool === 'write_note' && t.result && t.result.ok
+      ).length,
       toolRows: transcript.length,
     };
   }
+}
+
+/** When `requireWritesBeforeClear` is false, always clear (legacy). When true, clear only if writeOkCount > 0. */
+function shouldClearInboxAfterTriage(writeOkCount, requireWritesBeforeClear) {
+  if (requireWritesBeforeClear === false) return true;
+  return writeOkCount > 0;
 }
 
 module.exports = {
@@ -190,4 +208,5 @@ module.exports = {
   triageToolSchemas,
   isInboxAlreadyCleared,
   INBOX_SCAFFOLD,
+  shouldClearInboxAfterTriage,
 };
