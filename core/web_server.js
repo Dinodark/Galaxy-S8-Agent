@@ -374,7 +374,10 @@ async function handleApi(req, res, url) {
     if (!chatId) return json(res, 200, { days: [], entries: [] });
     const day = url.searchParams.get('day');
     if (day) {
-      const entries = await journal.readDay(chatId, day);
+      const includeExcluded = ['1', 'true', 'yes'].includes(
+        String(url.searchParams.get('includeExcluded') || '').toLowerCase()
+      );
+      const entries = await journal.readDay(chatId, day, { includeExcluded });
       const lastRow = await journalIngestLog.lastIngestForDay(day);
       const lastJournalIngest = lastRow
         ? {
@@ -386,6 +389,29 @@ async function handleApi(req, res, url) {
       return json(res, 200, { day, entries, lastJournalIngest });
     }
     return json(res, 200, { days: await journal.listDays(chatId) });
+  }
+
+  if (pathname === '/api/journal/exclude' && req.method === 'POST') {
+    if (!chatId) return json(res, 400, { error: 'no owner chat configured' });
+    let body;
+    try {
+      body = await readJsonBody(req);
+    } catch {
+      return json(res, 400, { error: 'invalid JSON body' });
+    }
+    const day = body && typeof body.day === 'string' ? body.day.trim() : '';
+    const entryId = body && typeof body.entryId === 'string' ? body.entryId.trim() : '';
+    const excluded = body ? body.excluded !== false : true;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) {
+      return json(res, 400, { error: 'invalid day (expected YYYY-MM-DD)' });
+    }
+    if (!entryId) return json(res, 400, { error: 'entryId is required' });
+    try {
+      await journal.setExcluded(chatId, day, entryId, excluded);
+      return json(res, 200, { ok: true, day, entryId, excluded });
+    } catch (err) {
+      return json(res, 400, { error: err.message || String(err) });
+    }
   }
 
   if (pathname === '/api/reminders') {

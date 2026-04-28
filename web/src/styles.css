@@ -802,6 +802,14 @@ iframe {
   line-height: 1.5;
 }
 
+.entry-actions {
+  margin-top: 10px;
+}
+
+.entry-excluded {
+  opacity: 0.65;
+}
+
 .desktop-reader {
   min-width: 0;
 }

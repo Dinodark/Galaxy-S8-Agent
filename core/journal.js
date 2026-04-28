@@ -1,4 +1,5 @@
 const path = require('path');
+const crypto = require('crypto');
 const fse = require('fs-extra');
 const config = require('../config');
 const settings = require('./settings');
@@ -21,6 +22,10 @@ function dirFor(chatId) {
 
 function fileFor(chatId, dateStr) {
   return path.join(dirFor(chatId), `${dateStr}.jsonl`);
+}
+
+function excludedFileFor(chatId, dateStr) {
+  return path.join(dirFor(chatId), `${dateStr}.excluded.json`);
 }
 
 function dateInTz(date, tz) {
@@ -49,6 +54,7 @@ async function append(chatId, entry) {
   const file = fileFor(chatId, dateStr);
   await fse.ensureDir(dirFor(chatId));
   const record = {
+    id: entry.id || `j_${Date.now().toString(36)}_${crypto.randomBytes(4).toString('hex')}`,
     ts: entry.ts || new Date().toISOString(),
     source: entry.source, // 'user' | 'assistant'
     via: entry.via || 'text', // 'text' | 'voice' | 'audio' | 'video_note'
@@ -57,21 +63,68 @@ async function append(chatId, entry) {
   await fse.appendFile(file, JSON.stringify(record) + '\n');
 }
 
-async function readDay(chatId, dateStr) {
+function fallbackEntryId(e, i) {
+  const seed = `${e.ts || ''}|${e.source || ''}|${e.via || ''}|${e.text || ''}|${i}`;
+  return `legacy_${crypto.createHash('sha1').update(seed).digest('hex').slice(0, 16)}`;
+}
+
+async function readExcluded(chatId, dateStr) {
+  const file = excludedFileFor(chatId, dateStr);
+  if (!(await fse.pathExists(file))) return new Set();
+  try {
+    const data = await fse.readJson(file);
+    const ids = Array.isArray(data && data.ids) ? data.ids : [];
+    return new Set(ids.map((x) => String(x)).filter(Boolean));
+  } catch {
+    return new Set();
+  }
+}
+
+async function writeExcluded(chatId, dateStr, idsSet) {
+  const file = excludedFileFor(chatId, dateStr);
+  const ids = [...idsSet].map(String).filter(Boolean).sort();
+  await fse.ensureDir(dirFor(chatId));
+  await fse.writeJson(
+    file,
+    {
+      updatedAt: new Date().toISOString(),
+      ids,
+    },
+    { spaces: 2 }
+  );
+}
+
+async function readDay(chatId, dateStr, { includeExcluded = false } = {}) {
   const file = fileFor(chatId, dateStr);
   if (!(await fse.pathExists(file))) return [];
   const raw = await fse.readFile(file, 'utf8');
-  return raw
+  const excluded = await readExcluded(chatId, dateStr);
+  const rows = raw
     .split('\n')
     .filter(Boolean)
-    .map((line) => {
+    .map((line, i) => {
       try {
-        return JSON.parse(line);
+        const e = JSON.parse(line);
+        if (!e || typeof e !== 'object') return null;
+        const id = String(e.id || fallbackEntryId(e, i));
+        const row = { ...e, id, excluded: excluded.has(id) };
+        return row;
       } catch {
         return null;
       }
     })
     .filter(Boolean);
+  if (includeExcluded) return rows;
+  return rows.filter((e) => !e.excluded);
+}
+
+async function setExcluded(chatId, dateStr, entryId, excluded) {
+  const id = String(entryId || '').trim();
+  if (!id) throw new Error('entry id is required');
+  const set = await readExcluded(chatId, dateStr);
+  if (excluded) set.add(id);
+  else set.delete(id);
+  await writeExcluded(chatId, dateStr, set);
 }
 
 async function listDays(chatId) {
@@ -87,6 +140,8 @@ async function listDays(chatId) {
 module.exports = {
   append,
   readDay,
+  readExcluded,
+  setExcluded,
   listDays,
   todayStr,
   shiftDay,
@@ -94,4 +149,5 @@ module.exports = {
   systemTz,
   dirFor,
   fileFor,
+  excludedFileFor,
 };

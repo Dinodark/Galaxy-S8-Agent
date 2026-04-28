@@ -708,18 +708,37 @@ function FileBrowser({ kind, api, desktopDetail = false }) {
   );
 }
 
-function JournalEntries({ entries }) {
+function JournalEntries({ entries, onToggleExclude, excludedBusyId }) {
   if (entries.length === 0) return <p className="muted">No entries for this day.</p>;
   return (
     <div className="journal">
       {entries.map((entry, index) => (
-        <article className={'entry ' + (entry.source || 'user')} key={index}>
+        <article
+          className={
+            'entry ' +
+            (entry.source || 'user') +
+            (entry.excluded ? ' entry-excluded' : '')
+          }
+          key={index}
+        >
           <div className="entry-meta">
             <span className="badge">{sourceLabel(entry.source)}</span>
             <span>{fmtTime(entry.ts)}</span>
             <span>{viaLabel(entry.via)}</span>
           </div>
           <div className="entry-text">{entry.text}</div>
+          {onToggleExclude && (
+            <div className="entry-actions">
+              <button
+                type="button"
+                className="secondary"
+                disabled={excludedBusyId === entry.id}
+                onClick={() => onToggleExclude(entry)}
+              >
+                {entry.excluded ? 'Вернуть в обработку' : 'Исключить из обработки'}
+              </button>
+            </div>
+          )}
         </article>
       ))}
     </div>
@@ -735,6 +754,8 @@ function Journal({ api }) {
   const [ingestErr, setIngestErr] = useState('');
   const [ingestDetail, setIngestDetail] = useState(null);
   const [lastJournalIngest, setLastJournalIngest] = useState(null);
+  const [showExcluded, setShowExcluded] = useState(false);
+  const [excludeBusyId, setExcludeBusyId] = useState('');
   const selectedDayStorageKey = 'galaxy-dashboard-selected-journal-day';
 
   useEffect(() => {
@@ -749,7 +770,11 @@ function Journal({ api }) {
   }, [days]);
 
   async function openDay(day) {
-    const data = await api.get('/api/journal?day=' + encodeURIComponent(day));
+    const data = await api.get(
+      '/api/journal?day=' +
+        encodeURIComponent(day) +
+        (showExcluded ? '&includeExcluded=1' : '')
+    );
     setSelectedDay(day);
     localStorage.setItem(selectedDayStorageKey, day);
     setEntries(data.entries);
@@ -757,6 +782,23 @@ function Journal({ api }) {
     setIngestMsg('');
     setIngestErr('');
     setIngestDetail(null);
+  }
+
+  async function toggleExclude(entry) {
+    if (!selectedDay || !entry || !entry.id) return;
+    setExcludeBusyId(entry.id);
+    try {
+      await api.post('/api/journal/exclude', {
+        day: selectedDay,
+        entryId: entry.id,
+        excluded: !entry.excluded,
+      });
+      await openDay(selectedDay);
+    } catch (e) {
+      setIngestErr(e.message || String(e));
+    } finally {
+      setExcludeBusyId('');
+    }
   }
 
   async function runDayIngest() {
@@ -835,6 +877,26 @@ function Journal({ api }) {
         >
           {ingestBusy ? 'Обработка…' : lastJournalIngest ? 'Обработать снова' : 'Обработать день'}
         </button>
+        <button
+          type="button"
+          className="secondary"
+          disabled={!selectedDay || ingestBusy}
+          onClick={async () => {
+            const next = !showExcluded;
+            setShowExcluded(next);
+            if (selectedDay) {
+              const data = await api.get(
+                '/api/journal?day=' +
+                  encodeURIComponent(selectedDay) +
+                  (next ? '&includeExcluded=1' : '')
+              );
+              setEntries(data.entries);
+              setLastJournalIngest(data.lastJournalIngest || null);
+            }
+          }}
+        >
+          {showExcluded ? 'Скрыть исключённые' : 'Показать исключённые'}
+        </button>
       </div>
     ) : null;
 
@@ -893,7 +955,11 @@ function Journal({ api }) {
             actions={ingestActions}
           >
             {ingestBanner}
-            <JournalEntries entries={entries} />
+            <JournalEntries
+              entries={entries}
+              onToggleExclude={toggleExclude}
+              excludedBusyId={excludeBusyId}
+            />
           </ReaderPane>
         ) : (
           <div className="card reader-empty">
@@ -913,7 +979,11 @@ function Journal({ api }) {
           }}
         >
           {ingestBanner}
-          <JournalEntries entries={entries} />
+          <JournalEntries
+            entries={entries}
+            onToggleExclude={toggleExclude}
+            excludedBusyId={excludeBusyId}
+          />
         </ReaderModal>
       )}
     </div>
