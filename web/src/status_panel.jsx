@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { TriageLogView } from './triage_log.jsx';
 import { JournalIngestLogView } from './journal_ingest_log.jsx';
 import { BatterySnapshotBlock } from './battery_snapshot.jsx';
+import { formatBalanceMain, formatUsd } from './openrouter_money.js';
 
 function TabButton({ id, active, children, onClick }) {
   return (
@@ -98,25 +99,24 @@ function StatusOverview({ s }) {
             </Row>
           ) : (
             <>
-              <Row label="Остаток лимита">
-                {s.openrouter.limit_remaining != null && s.openrouter.limit_remaining !== ''
-                  ? String(s.openrouter.limit_remaining)
+              <Row label="Остаток средств (USD)">{formatBalanceMain(s.openrouter)}</Row>
+              <Row label="Лимит ключа (USD)">
+                {s.openrouter.limit != null && s.openrouter.limit !== ''
+                  ? formatUsd(s.openrouter.limit) ?? '—'
                   : '—'}
               </Row>
-              <Row label="Расход за день">
-                {s.openrouter.usage_daily != null && s.openrouter.usage_daily !== ''
-                  ? String(s.openrouter.usage_daily)
-                  : '—'}
+              <Row label="Расход за день (USD)">
+                {formatUsd(s.openrouter.usage_daily) ?? '—'}
               </Row>
-              <Row label="Расход всего">
-                {s.openrouter.usage != null && s.openrouter.usage !== ''
-                  ? String(s.openrouter.usage)
-                  : '—'}
-              </Row>
+              <Row label="Расход всего (USD)">{formatUsd(s.openrouter.usage) ?? '—'}</Row>
+              {s.openrouter.label && (
+                <Row label="Метка ключа">{String(s.openrouter.label)}</Row>
+              )}
               <p className="muted status-footnote">
-                Суммы и лимиты приходят с OpenRouter{' '}
-                <code>GET /api/v1/auth/key</code> по вашему ключу. Это не разбивка по моделям за один чат — для
-                конкретного прогона смотрите токены после «Обработать день» в журнале.
+                Остаток и расход — в долларах США по данным{' '}
+                <code>GET /api/v1/key</code> для текущего API-ключа. Значение «без лимита» —
+                когда у ключа не задан потолок расходов (<code>limit_remaining</code> = null).
+                Разбивка по одному запросу чата — в токенах после «Обработать день» в журнале.
               </p>
             </>
           )}

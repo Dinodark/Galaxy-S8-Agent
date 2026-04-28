@@ -131,6 +131,13 @@ function formatStatus(status) {
   ].join('\n');
 }
 
+function formatUsdPlain(n) {
+  if (n === null || n === undefined || n === '') return null;
+  const x = Number(n);
+  if (Number.isNaN(x)) return String(n);
+  return `$${x.toFixed(4)}`;
+}
+
 function formatOpenRouterLines(or) {
   if (!or || !or.ok) {
     const err = or && or.error ? or.error : or && or.httpStatus ? `HTTP ${or.httpStatus}` : 'unavailable';
@@ -138,12 +145,19 @@ function formatOpenRouterLines(or) {
   }
   const lines = [];
   if (or.limit_remaining != null && or.limit_remaining !== '') {
-    lines.push(`OpenRouter limit remaining: ${or.limit_remaining}`);
+    lines.push(`OpenRouter balance remaining (USD): ${formatUsdPlain(or.limit_remaining)}`);
+  } else {
+    lines.push('OpenRouter balance remaining (USD): unlimited (null)');
+  }
+  if (or.limit != null && or.limit !== '') {
+    lines.push(`OpenRouter key limit (USD): ${formatUsdPlain(or.limit)}`);
   }
   if (or.usage_daily != null && or.usage_daily !== '') {
-    lines.push(`OpenRouter usage (daily): ${or.usage_daily}`);
+    lines.push(`OpenRouter usage today (USD): ${formatUsdPlain(or.usage_daily)}`);
   }
-  if (lines.length === 0) lines.push('OpenRouter: OK (no balance fields in /auth/key response)');
+  if (or.usage != null && or.usage !== '') {
+    lines.push(`OpenRouter usage total (USD): ${formatUsdPlain(or.usage)}`);
+  }
   return lines;
 }
 

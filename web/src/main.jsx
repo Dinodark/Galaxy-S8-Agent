@@ -4,6 +4,7 @@ import './styles.css';
 import { SettingsPanel } from './settings_panel.jsx';
 import { AgentFlowDiagram } from './agent_flow.jsx';
 import { StatusPanel } from './status_panel.jsx';
+import { formatBalanceMain, formatBalanceSubtitle, formatUsd } from './openrouter_money.js';
 
 const navItems = [
   ['home', 'Home'],
@@ -195,21 +196,6 @@ function formatAggUsage(u) {
   const parts = [`вход ${pt} · выход ${ct} · всего ${tt}`];
   if (Number(u.cost) > 0) parts.push(`≈ $${Number(u.cost).toFixed(5)}`);
   return parts.join(' · ');
-}
-
-/** Вторая строка карточки OpenRouter на главной (расход за период из GET /auth/key). */
-function openRouterSubtitle(or) {
-  if (!or || !or.ok) return null;
-  if (or.usage_daily != null && or.usage_daily !== '') {
-    return `расход за день: ${String(or.usage_daily)}`;
-  }
-  if (or.usage_weekly != null && or.usage_weekly !== '') {
-    return `за неделю: ${String(or.usage_weekly)}`;
-  }
-  if (or.usage != null && or.usage !== '') {
-    return `всего: ${String(or.usage)}`;
-  }
-  return null;
 }
 
 function sourceLabel(source) {
@@ -471,19 +457,16 @@ function Home({ api, setStateText, setView }) {
           <small>daily reviews</small>
         </div>
         <div className="stat-card">
-          <span>OpenRouter</span>
-          <strong title="limit_remaining из API ключа (GET /auth/key)">
-            {state.status.openrouter?.ok
-              ? state.status.openrouter.limit_remaining != null &&
-                state.status.openrouter.limit_remaining !== ''
-                ? String(state.status.openrouter.limit_remaining)
-                : 'OK'
-              : '—'}
+          <span>Остаток OpenRouter</span>
+          <strong title="limit_remaining, USD (GET /api/v1/key)">
+            {formatBalanceMain(state.status.openrouter)}
           </strong>
           <small>
             {state.status.openrouter?.ok
-              ? openRouterSubtitle(state.status.openrouter) ||
-                'лимит / расход с панели ключа'
+              ? formatBalanceSubtitle(state.status.openrouter) ||
+                (state.status.openrouter.currency === 'USD'
+                  ? 'суммы в USD с панели ключа'
+                  : 'лимит / расход')
               : state.status.openrouter?.error || 'данные ключа недоступны'}
           </small>
         </div>
@@ -544,12 +527,13 @@ function Home({ api, setStateText, setView }) {
               STT: {state.status.stt.enabled ? 'on' : 'off'} · Daily review:{' '}
               {state.status.dailyReview.enabled ? 'on' : 'off'} · Reminders:{' '}
               {state.status.reminders.pending}
-              {state.status.openrouter?.ok && state.status.openrouter.limit_remaining != null && (
+              {state.status.openrouter?.ok && (
                 <>
                   {' '}
-                  · OR: остаток {String(state.status.openrouter.limit_remaining)}
-                  {state.status.openrouter.usage_daily != null &&
-                    ` · день ${String(state.status.openrouter.usage_daily)}`}
+                  · баланс {formatBalanceMain(state.status.openrouter)}
+                  {formatUsd(state.status.openrouter.usage_daily) && (
+                    <> · сегодня {formatUsd(state.status.openrouter.usage_daily)}</>
+                  )}
                 </>
               )}
             </p>

@@ -116,8 +116,8 @@ function emptyUsage() {
 }
 
 /**
- * Credits / usage for the configured API key (GET /auth/key).
- * Shape varies; we only expose non-sensitive bookkeeping fields for the dashboard.
+ * Credits / usage for the configured API key (GET /api/v1/key).
+ * limit_remaining / limit / usage* are in USD per OpenRouter schema.
  */
 async function getOpenRouterKeySummary() {
   try {
@@ -128,25 +128,33 @@ async function getOpenRouterKeySummary() {
     const d = data.data != null ? data.data : data;
     const pick = {};
     const keys = [
+      'label',
       'limit',
       'limit_remaining',
+      'limit_reset',
       'usage',
       'usage_daily',
       'usage_weekly',
       'usage_monthly',
       'rate_limit',
+      'is_free_tier',
+      'include_byok_in_limit',
+      'byok_usage',
+      'byok_usage_daily',
+      'byok_usage_weekly',
+      'byok_usage_monthly',
     ];
     for (const k of keys) {
       if (d[k] !== undefined) pick[k] = d[k];
     }
-    return { ok: true, ...pick };
+    return { ok: true, currency: 'USD', ...pick };
   } catch (err) {
     return { ok: false, error: err && err.message ? err.message : String(err) };
   }
 }
 
 async function checkKey() {
-  const res = await axios.get(`${config.openrouter.baseUrl}/auth/key`, {
+  const res = await axios.get(`${config.openrouter.baseUrl}/key`, {
     headers: { Authorization: `Bearer ${config.openrouter.apiKey}` },
     timeout: 15_000,
     validateStatus: () => true,
