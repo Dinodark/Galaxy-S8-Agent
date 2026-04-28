@@ -1,4 +1,9 @@
+const path = require('path');
+
 require('dotenv').config();
+
+/** Absolute base so reads/writes do not depend on process.cwd(). */
+const PROJECT_ROOT = path.resolve(__dirname, '..');
 
 function required(name) {
   const v = process.env[name];
@@ -81,12 +86,12 @@ const config = {
     ),
   },
   paths: {
-    memoryDir: 'memory',
-    historyDir: 'memory/history',
-    journalDir: 'memory/journal',
-    notesDir: 'memory/notes',
-    tmpDir: 'memory/tmp',
-    logsDir: 'logs',
+    memoryDir: path.join(PROJECT_ROOT, 'memory'),
+    historyDir: path.join(PROJECT_ROOT, 'memory', 'history'),
+    journalDir: path.join(PROJECT_ROOT, 'memory', 'journal'),
+    notesDir: path.join(PROJECT_ROOT, 'memory', 'notes'),
+    tmpDir: path.join(PROJECT_ROOT, 'memory', 'tmp'),
+    logsDir: path.join(PROJECT_ROOT, 'logs'),
   },
   logLevel: optional('LOG_LEVEL', 'info'),
 };

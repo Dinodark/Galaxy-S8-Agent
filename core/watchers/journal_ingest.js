@@ -5,6 +5,7 @@ const tools = require('../tools');
 const memory = require('../memory');
 const settings = require('../settings');
 const journal = require('../journal');
+const config = require('../../config');
 const { loadProjectsIndex, planWriteOrchestration } = require('../knowledge_orchestrator');
 const { logJournalIngestRun } = require('../journal_ingest_log');
 
@@ -183,6 +184,7 @@ async function runJournalIngest({ chatId, day, log = console } = {}) {
     const result = {
       skipped: false,
       day: dayStr,
+      resolvedNotesDir: config.paths.notesDir,
       writeNoteOk: writeCount,
       toolRows: transcript.length,
       entryCount: entries.length,
@@ -199,6 +201,7 @@ async function runJournalIngest({ chatId, day, log = console } = {}) {
     const result = {
       skipped: false,
       day: dayStr,
+      resolvedNotesDir: config.paths.notesDir,
       error: err.message,
       writeNoteOk: transcript.filter(
         (t) => t.tool === 'write_note' && t.result && t.result.ok
