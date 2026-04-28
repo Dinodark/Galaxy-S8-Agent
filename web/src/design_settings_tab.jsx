@@ -26,6 +26,7 @@ function TokenField({ token, label, type, value, onChange }) {
 }
 
 export function DesignSettingsTab({ design }) {
+  const [groupTab, setGroupTab] = useState('colors');
   const [draft, setDraft] = useState(mergeTokens(design && design.activeTokens));
   const [presetName, setPresetName] = useState('');
   const [saveError, setSaveError] = useState('');
@@ -134,7 +135,7 @@ export function DesignSettingsTab({ design }) {
   }
 
   return (
-    <section className="card settings-card">
+    <section className="card settings-card design-tab">
       <h2>Дизайн</h2>
       <p className="muted settings-lead">
         Единая тема для всего интерфейса. Изменения применяются сразу и доступны на всех ваших устройствах.
@@ -179,8 +180,19 @@ export function DesignSettingsTab({ design }) {
           </div>
         ))}
       </div>
-
-      {TOKEN_GROUPS.map((group) => (
+      <div className="settings-tabs" role="tablist" aria-label="Разделы дизайна">
+        {TOKEN_GROUPS.map((group) => (
+          <button
+            key={group.id}
+            type="button"
+            className={'settings-tab' + (groupTab === group.id ? ' settings-tab-active' : '')}
+            onClick={() => setGroupTab(group.id)}
+          >
+            {group.title}
+          </button>
+        ))}
+      </div>
+      {TOKEN_GROUPS.filter((group) => group.id === groupTab).map((group) => (
         <div key={group.id} className="settings-battery-card">
           <h3 className="settings-subtitle">{group.title}</h3>
           <div className="palette-grid">
