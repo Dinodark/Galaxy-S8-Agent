@@ -795,6 +795,31 @@ iframe {
   color: #ff8a8a;
 }
 
+.journal-ingest-banner {
+  margin-bottom: 14px;
+}
+
+.journal-ingest-files-label {
+  margin: 10px 0 6px;
+  font-size: 12px;
+}
+
+.journal-ingest-files {
+  margin: 0 0 10px;
+  padding-left: 18px;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.journal-ingest-files code {
+  font-size: 12px;
+}
+
+.journal-ingest-usage {
+  margin: 0;
+  font-size: 12px;
+}
+
 .reader-body pre {
   max-width: 920px;
   margin: 0 auto;

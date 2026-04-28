@@ -186,6 +186,32 @@ function formatJournalDayLabel(value) {
   });
 }
 
+/** Суммарный usage из нескольких вызовов chat (ingest / агент). */
+function formatAggUsage(u) {
+  if (!u || typeof u !== 'object') return '';
+  const pt = Number(u.prompt_tokens) || 0;
+  const ct = Number(u.completion_tokens) || 0;
+  const tt = Number(u.total_tokens) || pt + ct || 0;
+  const parts = [`вход ${pt} · выход ${ct} · всего ${tt}`];
+  if (Number(u.cost) > 0) parts.push(`≈ $${Number(u.cost).toFixed(5)}`);
+  return parts.join(' · ');
+}
+
+/** Вторая строка карточки OpenRouter на главной (расход за период из GET /auth/key). */
+function openRouterSubtitle(or) {
+  if (!or || !or.ok) return null;
+  if (or.usage_daily != null && or.usage_daily !== '') {
+    return `расход за день: ${String(or.usage_daily)}`;
+  }
+  if (or.usage_weekly != null && or.usage_weekly !== '') {
+    return `за неделю: ${String(or.usage_weekly)}`;
+  }
+  if (or.usage != null && or.usage !== '') {
+    return `всего: ${String(or.usage)}`;
+  }
+  return null;
+}
+
 function sourceLabel(source) {
   return source === 'assistant' ? 'white rabbit' : 'Ты';
 }
@@ -444,6 +470,23 @@ function Home({ api, setStateText, setView }) {
           <strong>{summariesCount}</strong>
           <small>daily reviews</small>
         </div>
+        <div className="stat-card">
+          <span>OpenRouter</span>
+          <strong title="limit_remaining из API ключа (GET /auth/key)">
+            {state.status.openrouter?.ok
+              ? state.status.openrouter.limit_remaining != null &&
+                state.status.openrouter.limit_remaining !== ''
+                ? String(state.status.openrouter.limit_remaining)
+                : 'OK'
+              : '—'}
+          </strong>
+          <small>
+            {state.status.openrouter?.ok
+              ? openRouterSubtitle(state.status.openrouter) ||
+                'лимит / расход с панели ключа'
+              : state.status.openrouter?.error || 'данные ключа недоступны'}
+          </small>
+        </div>
       </section>
 
       <section className="home-grid">
@@ -501,6 +544,14 @@ function Home({ api, setStateText, setView }) {
               STT: {state.status.stt.enabled ? 'on' : 'off'} · Daily review:{' '}
               {state.status.dailyReview.enabled ? 'on' : 'off'} · Reminders:{' '}
               {state.status.reminders.pending}
+              {state.status.openrouter?.ok && state.status.openrouter.limit_remaining != null && (
+                <>
+                  {' '}
+                  · OR: остаток {String(state.status.openrouter.limit_remaining)}
+                  {state.status.openrouter.usage_daily != null &&
+                    ` · день ${String(state.status.openrouter.usage_daily)}`}
+                </>
+              )}
             </p>
           </div>
         </div>
@@ -612,6 +663,7 @@ function Journal({ api }) {
   const [ingestBusy, setIngestBusy] = useState(false);
   const [ingestMsg, setIngestMsg] = useState('');
   const [ingestErr, setIngestErr] = useState('');
+  const [ingestDetail, setIngestDetail] = useState(null);
   const selectedDayStorageKey = 'galaxy-dashboard-selected-journal-day';
 
   useEffect(() => {
@@ -632,6 +684,7 @@ function Journal({ api }) {
     setEntries(data.entries);
     setIngestMsg('');
     setIngestErr('');
+    setIngestDetail(null);
   }
 
   async function runDayIngest() {
@@ -639,6 +692,7 @@ function Journal({ api }) {
     setIngestBusy(true);
     setIngestMsg('');
     setIngestErr('');
+    setIngestDetail(null);
     try {
       const r = await api.post('/api/journal/ingest', { day: selectedDay });
       if (r.skipped && r.reason === 'empty_day') {
@@ -647,6 +701,11 @@ function Journal({ api }) {
         const w = r.writeNoteOk != null ? r.writeNoteOk : 0;
         const t = r.toolRows != null ? r.toolRows : 0;
         setIngestMsg(`Готово: успешных записей в заметки — ${w}, вызовов инструментов — ${t}.`);
+        const usageLine = formatAggUsage(r.usage);
+        setIngestDetail({
+          writtenNotes: Array.isArray(r.writtenNotes) ? r.writtenNotes : [],
+          usageLine: usageLine || '',
+        });
       }
     } catch (e) {
       setIngestErr(e.message || String(e));
@@ -669,12 +728,34 @@ function Journal({ api }) {
       </div>
     ) : null;
 
-  const ingestBanner =
-    ingestMsg || ingestErr ? (
-      <p className={'journal-ingest-msg ' + (ingestErr ? 'err' : 'ok')}>
-        {ingestErr || ingestMsg}
-      </p>
-    ) : null;
+  const showIngestBanner =
+    ingestErr ||
+    ingestMsg ||
+    (ingestDetail &&
+      ((ingestDetail.writtenNotes && ingestDetail.writtenNotes.length > 0) ||
+        ingestDetail.usageLine));
+
+  const ingestBanner = showIngestBanner ? (
+    <div className="journal-ingest-banner">
+      {ingestErr && <p className="journal-ingest-msg err">{ingestErr}</p>}
+      {!ingestErr && ingestMsg && <p className="journal-ingest-msg ok">{ingestMsg}</p>}
+      {!ingestErr && ingestDetail?.writtenNotes?.length > 0 && (
+        <>
+          <p className="journal-ingest-files-label muted">Обновлённые файлы:</p>
+          <ul className="journal-ingest-files">
+            {ingestDetail.writtenNotes.map((name) => (
+              <li key={name}>
+                <code>{name}</code>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+      {!ingestErr && ingestDetail?.usageLine ? (
+        <p className="journal-ingest-usage muted">{ingestDetail.usageLine}</p>
+      ) : null}
+    </div>
+  ) : null;
 
   return (
     <div className="split-page">

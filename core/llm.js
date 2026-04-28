@@ -86,7 +86,63 @@ async function chatCompletion({
       { raw: res.data }
     );
   }
-  return choice.message;
+  return {
+    message: choice.message,
+    usage: res.data && res.data.usage ? res.data.usage : null,
+    model: res.data && res.data.model,
+  };
+}
+
+/** Sum token counts across multi-step agent / ingest loops. */
+function mergeUsage(acc, usage) {
+  if (!usage || typeof usage !== 'object') return acc;
+  acc.prompt_tokens += Number(usage.prompt_tokens) || 0;
+  acc.completion_tokens += Number(usage.completion_tokens) || 0;
+  acc.total_tokens += Number(usage.total_tokens) || 0;
+  const topCost =
+    typeof usage.total_cost === 'number'
+      ? usage.total_cost
+      : typeof usage.cost === 'number'
+        ? usage.cost
+        : typeof usage.native_tokens_cost === 'number'
+          ? usage.native_tokens_cost
+          : null;
+  if (typeof topCost === 'number') acc.cost += topCost;
+  return acc;
+}
+
+function emptyUsage() {
+  return { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0, cost: 0 };
+}
+
+/**
+ * Credits / usage for the configured API key (GET /auth/key).
+ * Shape varies; we only expose non-sensitive bookkeeping fields for the dashboard.
+ */
+async function getOpenRouterKeySummary() {
+  try {
+    const { status, data } = await checkKey();
+    if (status !== 200 || !data || typeof data !== 'object') {
+      return { ok: false, httpStatus: status };
+    }
+    const d = data.data != null ? data.data : data;
+    const pick = {};
+    const keys = [
+      'limit',
+      'limit_remaining',
+      'usage',
+      'usage_daily',
+      'usage_weekly',
+      'usage_monthly',
+      'rate_limit',
+    ];
+    for (const k of keys) {
+      if (d[k] !== undefined) pick[k] = d[k];
+    }
+    return { ok: true, ...pick };
+  } catch (err) {
+    return { ok: false, error: err && err.message ? err.message : String(err) };
+  }
 }
 
 async function checkKey() {
@@ -98,4 +154,11 @@ async function checkKey() {
   return { status: res.status, data: res.data };
 }
 
-module.exports = { chatCompletion, checkKey, OpenRouterError };
+module.exports = {
+  chatCompletion,
+  checkKey,
+  mergeUsage,
+  emptyUsage,
+  getOpenRouterKeySummary,
+  OpenRouterError,
+};

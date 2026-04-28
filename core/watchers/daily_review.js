@@ -166,7 +166,7 @@ async function runReview(chatId, { log = console, force = false } = {}) {
   );
 
   const modelOverride = s.dailyReview.model || null;
-  const resp = await chatCompletion({
+  const { message: resp } = await chatCompletion({
     messages,
     model: modelOverride,
   });

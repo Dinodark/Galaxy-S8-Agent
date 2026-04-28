@@ -270,7 +270,7 @@ async function runAgent({ chatId, userMessage }) {
   }
 
   for (let step = 0; step < config.agent.maxSteps; step++) {
-    const assistantMsg = await chatCompletion({
+    const { message: assistantMsg } = await chatCompletion({
       messages: [...withRuntimeContext(history), ...turnContext],
       tools: toolSchemas,
     });

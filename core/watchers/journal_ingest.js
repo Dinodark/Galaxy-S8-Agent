@@ -1,6 +1,6 @@
 const path = require('path');
 const fse = require('fs-extra');
-const { chatCompletion } = require('../llm');
+const { chatCompletion, mergeUsage, emptyUsage } = require('../llm');
 const tools = require('../tools');
 const memory = require('../memory');
 const settings = require('../settings');
@@ -43,6 +43,20 @@ function formatJournalBlock(entries, tz) {
 
 function triageToolSchemas() {
   return tools.listSchemas().filter((s) => INGEST_TOOL_NAMES.has(s.function.name));
+}
+
+/** Successful write_note paths in order (deduped). */
+function collectWrittenNotes(transcript) {
+  const out = [];
+  const seen = new Set();
+  for (const row of transcript) {
+    if (row.tool !== 'write_note' || !row.result || !row.result.ok) continue;
+    const saved = row.result.result && row.result.result.saved;
+    if (!saved || seen.has(saved)) continue;
+    seen.add(saved);
+    out.push(saved);
+  }
+  return out;
 }
 
 /**
@@ -107,15 +121,17 @@ async function runJournalIngest({ chatId, day, log = console } = {}) {
   ];
 
   const transcript = [];
+  let usageTotal = emptyUsage();
 
   try {
     for (let step = 0; step < maxSteps; step++) {
-      const assistantMsg = await chatCompletion({
+      const { message: assistantMsg, usage } = await chatCompletion({
         messages,
         tools: triageToolSchemas(),
         model: modelOverride,
         timeoutMs: 120_000,
       });
+      mergeUsage(usageTotal, usage);
 
       const pushed = [assistantMsg];
 
@@ -162,6 +178,7 @@ async function runJournalIngest({ chatId, day, log = console } = {}) {
     const writeCount = transcript.filter(
       (t) => t.tool === 'write_note' && t.result && t.result.ok
     ).length;
+    const writtenNotes = collectWrittenNotes(transcript);
 
     const result = {
       skipped: false,
@@ -169,6 +186,8 @@ async function runJournalIngest({ chatId, day, log = console } = {}) {
       writeNoteOk: writeCount,
       toolRows: transcript.length,
       entryCount: entries.length,
+      writtenNotes,
+      usage: usageTotal,
     };
     await logJournalIngestRun({ chatId, day: dayStr, result });
     log.log(
@@ -186,6 +205,8 @@ async function runJournalIngest({ chatId, day, log = console } = {}) {
       ).length,
       toolRows: transcript.length,
       entryCount: entries.length,
+      writtenNotes: collectWrittenNotes(transcript),
+      usage: usageTotal,
     };
     await logJournalIngestRun({ chatId, day: dayStr, result });
     throw err;

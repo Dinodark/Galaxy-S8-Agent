@@ -114,7 +114,7 @@ async function runInboxTriage({ chatId, today, log = console } = {}) {
 
   try {
     for (let step = 0; step < maxSteps; step++) {
-      const assistantMsg = await chatCompletion({
+      const { message: assistantMsg } = await chatCompletion({
         messages,
         tools: triageToolSchemas(),
         model: modelOverride,

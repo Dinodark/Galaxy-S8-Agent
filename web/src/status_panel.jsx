@@ -87,6 +87,43 @@ function StatusOverview({ s }) {
       </section>
 
       <section className="card status-card">
+        <h3 className="status-card-title">OpenRouter</h3>
+        <div className="status-card-body">
+          {!s.openrouter?.ok ? (
+            <Row label="Ключ">
+              {s.openrouter?.error ||
+                (s.openrouter?.httpStatus
+                  ? `HTTP ${s.openrouter.httpStatus}`
+                  : 'нет данных — проверьте OPENROUTER_API_KEY')}
+            </Row>
+          ) : (
+            <>
+              <Row label="Остаток лимита">
+                {s.openrouter.limit_remaining != null && s.openrouter.limit_remaining !== ''
+                  ? String(s.openrouter.limit_remaining)
+                  : '—'}
+              </Row>
+              <Row label="Расход за день">
+                {s.openrouter.usage_daily != null && s.openrouter.usage_daily !== ''
+                  ? String(s.openrouter.usage_daily)
+                  : '—'}
+              </Row>
+              <Row label="Расход всего">
+                {s.openrouter.usage != null && s.openrouter.usage !== ''
+                  ? String(s.openrouter.usage)
+                  : '—'}
+              </Row>
+              <p className="muted status-footnote">
+                Суммы и лимиты приходят с OpenRouter{' '}
+                <code>GET /api/v1/auth/key</code> по вашему ключу. Это не разбивка по моделям за один чат — для
+                конкретного прогона смотрите токены после «Обработать день» в журнале.
+              </p>
+            </>
+          )}
+        </div>
+      </section>
+
+      <section className="card status-card">
         <h3 className="status-card-title">Голос (STT)</h3>
         <div className="status-card-body">
           <Row label="Состояние">

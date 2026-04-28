@@ -6,6 +6,7 @@ const reminders = require('./reminders');
 const modes = require('./modes');
 const { startDailyReviewer } = require('./watchers/daily_review');
 const { readBatterySnapshot } = require('./watchers/battery');
+const { getOpenRouterKeySummary } = require('./llm');
 
 function systemTz() {
   try {
@@ -49,6 +50,12 @@ async function buildStatus(chatId) {
   const pendingReminders = await reminders.listPending({ chatId });
   const nextReview = await nextDailyReviewFire();
   const batterySample = await readBatterySnapshot();
+  let openrouter = { ok: false };
+  try {
+    openrouter = await getOpenRouterKeySummary();
+  } catch (e) {
+    openrouter = { ok: false, error: e && e.message ? e.message : String(e) };
+  }
 
   return {
     mode,
@@ -87,6 +94,7 @@ async function buildStatus(chatId) {
       pollIntervalMs: config.battery.pollIntervalMs,
       sample: batterySample,
     },
+    openrouter,
   };
 }
 
@@ -116,10 +124,27 @@ function formatStatus(status) {
     `Clear inbox only after writes: ${status.dailyReview.clearInboxOnlyAfterWrites ? 'yes' : 'no (legacy)'}`,
     `Journal today: ${status.journal.entriesToday} entries (${status.journal.today})`,
     `Pending reminders: ${status.reminders.pending}`,
+    ...formatOpenRouterLines(status.openrouter),
     `Battery watch: ${
       status.battery.enabled ? `on (<${status.battery.lowThreshold}%)` : 'off'
     }`,
   ].join('\n');
+}
+
+function formatOpenRouterLines(or) {
+  if (!or || !or.ok) {
+    const err = or && or.error ? or.error : or && or.httpStatus ? `HTTP ${or.httpStatus}` : 'unavailable';
+    return [`OpenRouter key: ${err}`];
+  }
+  const lines = [];
+  if (or.limit_remaining != null && or.limit_remaining !== '') {
+    lines.push(`OpenRouter limit remaining: ${or.limit_remaining}`);
+  }
+  if (or.usage_daily != null && or.usage_daily !== '') {
+    lines.push(`OpenRouter usage (daily): ${or.usage_daily}`);
+  }
+  if (lines.length === 0) lines.push('OpenRouter: OK (no balance fields in /auth/key response)');
+  return lines;
 }
 
 function createDailyReviewController({ chatIds, onReview, log = console }) {
