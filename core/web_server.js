@@ -10,6 +10,7 @@ const atlas = require('./memory_atlas');
 const memory = require('./memory');
 const journal = require('./journal');
 const reminders = require('./reminders');
+const inboxTriageLog = require('./inbox_triage_log');
 
 const UPDATE_LOG_FILE = path.join(config.paths.tmpDir, 'update-restart.log');
 const UPDATE_PID_FILE = path.join(config.paths.tmpDir, 'update-restart.pid');
@@ -229,6 +230,11 @@ async function handleApi(req, res, url) {
 
   if (pathname === '/api/settings') {
     return json(res, 200, await settings.getPublicSettings());
+  }
+
+  if (pathname === '/api/logs/inbox-triage') {
+    const limit = Number(url.searchParams.get('limit'));
+    return json(res, 200, await inboxTriageLog.readRecent(limit));
   }
 
   if (pathname === '/api/settings/set' && req.method === 'POST') {

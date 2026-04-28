@@ -1148,3 +1148,242 @@ button.calendar-cell:focus-visible {
 .settings-saving {
   margin: 0;
 }
+
+/* --- Agent flow diagram --- */
+.flow-page .flow-intro h2 {
+  margin: 0 0 8px;
+  font-size: 20px;
+}
+
+.flow-columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .flow-columns {
+    grid-template-columns: 1fr;
+  }
+}
+
+.flow-column-title {
+  margin: 0 0 8px;
+  font-size: 17px;
+}
+
+.flow-column-lead {
+  margin: 0 0 14px;
+}
+
+.flow-block {
+  padding: 12px 14px;
+  border-radius: var(--radius-md);
+  background: var(--color-surface-soft);
+  border: 1px solid #2a2a2a;
+}
+
+.flow-block-accent {
+  border-color: var(--color-muted);
+}
+
+.flow-block-title {
+  display: block;
+  font-size: 14px;
+  margin-bottom: 6px;
+}
+
+.flow-block-body {
+  font-size: 13px;
+  color: var(--color-text);
+  line-height: 1.45;
+}
+
+.flow-block-body code {
+  font-size: 12px;
+}
+
+.flow-arrow {
+  text-align: center;
+  color: var(--color-muted);
+  padding: 4px 0;
+  font-size: 18px;
+  user-select: none;
+}
+
+.flow-side {
+  margin: 10px 0 0;
+  font-size: 12px;
+  color: var(--color-muted);
+  line-height: 1.45;
+}
+
+/* --- Triage log table --- */
+.triage-log-lead {
+  margin: 0 0 16px;
+  line-height: 1.45;
+}
+
+.triage-log-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.triage-log-limit {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+}
+
+.triage-log-limit input {
+  width: 72px;
+  padding: 6px 8px;
+  border-radius: var(--radius-md);
+  border: 1px solid #2a2a2a;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font: inherit;
+}
+
+.triage-log-error {
+  background: var(--color-danger-bg);
+  color: var(--color-danger-text);
+  padding: 10px;
+  border-radius: var(--radius-md);
+  font-size: 13px;
+}
+
+.triage-table-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.triage-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.triage-table th,
+.triage-table td {
+  padding: 8px 10px;
+  text-align: left;
+  border-bottom: 1px solid #2a2a2a;
+  vertical-align: top;
+}
+
+.triage-table th {
+  color: var(--color-muted);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.triage-cell-mono {
+  font-size: 11px;
+  word-break: break-all;
+  max-width: 180px;
+}
+
+.triage-cell-note {
+  font-size: 12px;
+  color: var(--color-muted);
+  max-width: 220px;
+}
+
+/* --- Status panel (tabs + overview) --- */
+.status-overview {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 14px;
+  align-items: start;
+}
+
+.status-card-title {
+  margin: 0 0 12px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--color-text);
+  padding-bottom: 8px;
+  border-bottom: 1px solid #2a2a2a;
+}
+
+.status-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.status-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
+  gap: 8px 12px;
+  font-size: 13px;
+  line-height: 1.4;
+  align-items: start;
+}
+
+.status-row-label {
+  color: var(--color-muted);
+  font-size: 12px;
+}
+
+.status-row-value {
+  word-break: break-word;
+}
+
+.status-code {
+  font-size: 12px;
+  background: var(--color-bg);
+  padding: 2px 6px;
+  border-radius: 6px;
+}
+
+.status-load-error {
+  max-width: 480px;
+}
+
+.status-panel {
+  max-width: 1200px;
+}
+
+.status-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 4px;
+}
+
+.status-toolbar-refresh {
+  flex-shrink: 0;
+}
+
+.triage-log-embedded {
+  margin-top: 0;
+}
+
+.triage-log-embedded-wrap {
+  margin-top: 0;
+}
+
+.triage-log-title-embedded {
+  margin: 0 0 8px;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.triage-log-lead-tight {
+  margin-bottom: 10px;
+}
+
+@media (max-width: 600px) {
+  .status-row {
+    grid-template-columns: 1fr;
+  }
+}

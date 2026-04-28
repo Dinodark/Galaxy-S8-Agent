@@ -2,9 +2,12 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import './styles.css';
 import { SettingsPanel } from './settings_panel.jsx';
+import { AgentFlowDiagram } from './agent_flow.jsx';
+import { StatusPanel } from './status_panel.jsx';
 
 const navItems = [
   ['home', 'Home'],
+  ['flow', 'Схема'],
   ['atlas', 'Memory Atlas'],
   ['summaries', 'Summaries'],
   ['notes', 'Notes'],
@@ -202,14 +205,6 @@ function atlasThemeQuery() {
     .filter(([, value]) => value)
     .map(([key, value]) => 'theme_' + key + '=' + encodeURIComponent(value))
     .join('&');
-}
-
-function JsonCard({ data }) {
-  return (
-    <div className="card">
-      <pre>{JSON.stringify(data, null, 2)}</pre>
-    </div>
-  );
 }
 
 function ReaderModal({ title, meta, onClose, children, className = '' }) {
@@ -1044,17 +1039,10 @@ function App() {
   const [view, setView] = useState('home');
   const [menuOpen, setMenuOpen] = useState(false);
   const [stateText, setStateText] = useState('');
-  const [data, setData] = useState(null);
-  const [error, setError] = useState('');
 
   useEffect(() => {
-    setError('');
-    setData(null);
     setStateText('');
-    if (view === 'status') {
-      api.get('/api/status').then(setData).catch((err) => setError(err.message));
-    }
-  }, [api, view]);
+  }, [view]);
 
   const title = navItems.find(([id]) => id === view)?.[1] || 'Dashboard';
 
@@ -1091,9 +1079,9 @@ function App() {
           <span className="muted">{stateText}</span>
         </div>
         <div className="content">
-          {error && <pre>{error}</pre>}
           {view === 'home' && <Home api={api} setStateText={setStateText} setView={setView} />}
-          {!error && view === 'status' && data && <JsonCard data={data} />}
+          {view === 'flow' && <AgentFlowDiagram />}
+          {view === 'status' && <StatusPanel api={api} />}
           {view === 'settings' && <SettingsPanel api={api} />}
           {view === 'atlas' && <Atlas api={api} token={api.token} setStateText={setStateText} />}
           {view === 'notes' && <FileBrowser api={api} kind="note" desktopDetail />}

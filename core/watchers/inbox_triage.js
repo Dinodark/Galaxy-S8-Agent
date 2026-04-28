@@ -6,6 +6,7 @@ const tools = require('../tools');
 const memory = require('../memory');
 const settings = require('../settings');
 const { loadProjectsIndex, planWriteOrchestration } = require('../knowledge_orchestrator');
+const { logTriageRun } = require('../inbox_triage_log');
 
 const PROMPT_FILE = path.join(__dirname, '..', 'prompts', 'inbox_triage.md');
 
@@ -56,13 +57,17 @@ async function runInboxTriage({ chatId, today, log = console } = {}) {
   const s = await settings.getSettings();
   const dr = s.dailyReview || {};
   if (dr.inboxTriage === false) {
-    return { skipped: true, reason: 'inboxTriage disabled' };
+    const result = { skipped: true, reason: 'inboxTriage disabled' };
+    await logTriageRun({ chatId, today, result });
+    return result;
   }
 
   const raw = await memory.readNote(INBOX_REL);
   const inboxBody = raw == null ? '' : String(raw).trim();
   if (isInboxAlreadyCleared(inboxBody)) {
-    return { skipped: true, reason: 'inbox empty or already cleared' };
+    const result = { skipped: true, reason: 'inbox empty or already cleared' };
+    await logTriageRun({ chatId, today, result });
+    return result;
   }
 
   const archiveRel = await archiveInboxSnapshot(today, inboxBody);
@@ -174,7 +179,7 @@ async function runInboxTriage({ chatId, today, log = console } = {}) {
       );
     }
 
-    return {
+    const result = {
       skipped: false,
       cleared,
       archivedRel: archiveRel,
@@ -182,9 +187,11 @@ async function runInboxTriage({ chatId, today, log = console } = {}) {
       toolRows: transcript.length,
       ...(cleared ? {} : { reason: 'no_successful_write_note' }),
     };
+    await logTriageRun({ chatId, today, result });
+    return result;
   } catch (err) {
     log.warn('[inbox-triage] failed — inbox.md not cleared:', err.message);
-    return {
+    const result = {
       skipped: false,
       cleared: false,
       error: err.message,
@@ -194,6 +201,8 @@ async function runInboxTriage({ chatId, today, log = console } = {}) {
       ).length,
       toolRows: transcript.length,
     };
+    await logTriageRun({ chatId, today, result });
+    return result;
   }
 }
 
