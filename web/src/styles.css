@@ -181,11 +181,6 @@ h1 {
   overflow: auto;
 }
 
-/* When a full-screen reader/dialog is open, drop outer padding (modal covers the panel). */
-.content:has([role='dialog']) {
-  padding: 0;
-}
-
 .home {
   display: flex;
   flex-direction: column;
@@ -1317,6 +1312,7 @@ button.calendar-cell:focus-visible {
     z-index: 40;
     box-shadow: none;
     filter: none;
+    padding: max(12px, env(safe-area-inset-top, 0px)) 16px 12px;
   }
 
   .stats,
