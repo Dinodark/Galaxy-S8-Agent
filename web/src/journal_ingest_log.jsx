@@ -18,6 +18,24 @@ function flag(v) {
   return '—';
 }
 
+function fmtToolCounts(tc) {
+  if (!tc || typeof tc !== 'object') return '—';
+  const parts = [];
+  if (tc.list_notes) parts.push(`list×${tc.list_notes}`);
+  if (tc.read_note) parts.push(`read×${tc.read_note}`);
+  if (tc.write_note) parts.push(`write×${tc.write_note}`);
+  return parts.length ? parts.join(', ') : '—';
+}
+
+function fmtDiskVsOk(row) {
+  const v = row.writeNoteVerified;
+  const o = row.writeNoteOk;
+  const vs = v != null ? String(v) : '—';
+  const os = o != null ? String(o) : '—';
+  if (v === undefined && o === undefined) return '—';
+  return `${vs} / ${os}`;
+}
+
 /** Лог ручной «Обработать день» из веб-журнала — тот же смысл, что triage: разложить сырой лог по заметкам. */
 export function JournalIngestLogView({ api, embedded = false }) {
   const [data, setData] = useState(null);
@@ -87,7 +105,12 @@ export function JournalIngestLogView({ api, embedded = false }) {
                   <th>День</th>
                   <th>Пропуск</th>
                   <th>Причина</th>
-                  <th>write_note OK</th>
+                  <th title="Подтверждено на диске / успешных write_note по обработчику">
+                    Записи диск / OK
+                  </th>
+                  <th title="list_notes, read_note, write_note по числу вызовов">
+                    Инструменты
+                  </th>
                   <th>Шагов инстр.</th>
                   <th>Сообщ. в логе</th>
                   <th>Примечание</th>
@@ -100,7 +123,8 @@ export function JournalIngestLogView({ api, embedded = false }) {
                     <td>{row.day || '—'}</td>
                     <td>{flag(row.skipped)}</td>
                     <td>{row.reason || '—'}</td>
-                    <td>{row.writeNoteOk != null ? row.writeNoteOk : '—'}</td>
+                    <td>{fmtDiskVsOk(row)}</td>
+                    <td className="triage-cell-note">{fmtToolCounts(row.toolCounts)}</td>
                     <td>{row.toolRows != null ? row.toolRows : '—'}</td>
                     <td>{row.entryCount != null ? row.entryCount : '—'}</td>
                     <td className="triage-cell-note">

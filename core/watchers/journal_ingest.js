@@ -64,6 +64,18 @@ function collectWrittenNotesReported(transcript) {
  * After the run, confirm each reported path exists under notesDir (same tree as list_notes).
  * Rows count = per successful tool call (duplicates ok).
  */
+/** Per-tool rows in the ingest transcript (one row per executed tool call). */
+function countToolsInTranscript(transcript) {
+  const c = { list_notes: 0, read_note: 0, write_note: 0 };
+  for (const row of transcript || []) {
+    const t = row.tool;
+    if (t === 'list_notes' || t === 'read_note' || t === 'write_note') {
+      c[t] += 1;
+    }
+  }
+  return c;
+}
+
 async function verifyWrittenNotesOnDisk(transcript, notesRoot) {
   let verifiedRows = 0;
   const missing = [];
@@ -227,6 +239,7 @@ async function runJournalIngest({ chatId, day, log = console } = {}) {
       skipped: false,
       day: dayStr,
       resolvedNotesDir: config.paths.notesDir,
+      toolCounts: countToolsInTranscript(transcript),
       /** Successful write_note executions (handler returned ok — before disk check). */
       writeNoteOk: writeCount,
       /** write_note rows where the file exists under resolvedNotesDir after the run. */
@@ -270,6 +283,7 @@ async function runJournalIngest({ chatId, day, log = console } = {}) {
       skipped: false,
       day: dayStr,
       resolvedNotesDir: config.paths.notesDir,
+      toolCounts: countToolsInTranscript(transcript),
       error: err.message,
       writeNoteOk: writeCount,
       writeNoteVerified: disk.verifiedRows,

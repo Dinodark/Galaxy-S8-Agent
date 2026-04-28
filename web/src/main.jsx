@@ -200,6 +200,16 @@ function formatJournalIngestHumanDate(iso) {
   }
 }
 
+/** Разбор вызовов разбора дня (list/read/write) для подписи в баннере. */
+function formatJournalIngestToolCounts(tc) {
+  if (!tc || typeof tc !== 'object') return '';
+  const parts = [];
+  if (tc.list_notes) parts.push(`list_notes×${tc.list_notes}`);
+  if (tc.read_note) parts.push(`read_note×${tc.read_note}`);
+  if (tc.write_note) parts.push(`write_note×${tc.write_note}`);
+  return parts.join(', ');
+}
+
 /** Суммарный usage из нескольких вызовов chat (ingest / агент). */
 function formatAggUsage(u) {
   if (!u || typeof u !== 'object') return '';
@@ -821,11 +831,24 @@ function Journal({ api }) {
         const verified =
           r.writeNoteVerified != null ? r.writeNoteVerified : toolOk;
         const t = r.toolRows != null ? r.toolRows : 0;
+        const tc = formatJournalIngestToolCounts(r.toolCounts);
         let msg = `Готово: подтверждено на диске — ${verified} записей`;
         if (r.verificationMismatch && toolOk !== verified) {
           msg += ` (инструмент сообщил об успехе ${toolOk} раз — проверьте каталог заметок или лог)`;
         }
-        msg += `; вызовов инструментов — ${t}.`;
+        msg += `; вызовов инструментов — ${t}`;
+        if (tc) msg += ` (${tc})`;
+        msg += '.';
+        if (
+          verified === 0 &&
+          toolOk === 0 &&
+          r.toolCounts &&
+          r.toolCounts.list_notes > 0 &&
+          (!r.toolCounts.write_note || r.toolCounts.write_note === 0)
+        ) {
+          msg +=
+            ' Был только просмотр списка заметок — новых записей не делали (часто так при повторной обработке, если всё уже разнесено).';
+        }
         setIngestMsg(msg);
         const usageLine = formatAggUsage(r.usage);
         const missingNote =
@@ -869,7 +892,7 @@ function Journal({ api }) {
     ingestErr ||
     ingestMsg ||
     (ingestDetail &&
-      (    (ingestDetail.writtenNotes && ingestDetail.writtenNotes.length > 0) ||
+      ((ingestDetail.writtenNotes && ingestDetail.writtenNotes.length > 0) ||
         ingestDetail.usageLine ||
         ingestDetail.verificationWarning));
 
