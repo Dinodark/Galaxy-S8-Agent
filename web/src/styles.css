@@ -13,8 +13,30 @@
   --color-agent-mark: #555555;
   --color-danger-bg: #2a171a;
   --color-danger-text: #f0c8cf;
+  --font-family-base: system-ui, -apple-system, Segoe UI, sans-serif;
+  --font-size-body: 14px;
+  --font-size-small: 12px;
+  --font-size-h1: 17px;
+  --font-size-h2: 18px;
+  --line-height-body: 1.45;
+  --space-1: 8px;
+  --space-2: 12px;
+  --space-3: 16px;
+  --space-4: 24px;
+  --radius-sm: 8px;
   --radius-lg: 18px;
   --radius-md: 12px;
+  --scrollbar-size: 9px;
+  --button-padding-y: 10px;
+  --button-padding-x: 12px;
+  --button-radius: 12px;
+  --tab-padding-y: 8px;
+  --tab-padding-x: 14px;
+  --tab-radius: 12px;
+  --card-padding: 14px;
+  --input-padding-y: 8px;
+  --input-padding-x: 10px;
+  --input-radius: 12px;
 
   /* Scrollbars — трек прозрачный, только ползунок; следуют палитре (меняются с «Настроением»). */
   --scrollbar-thumb: color-mix(in srgb, var(--color-muted) 44%, transparent);
@@ -41,8 +63,8 @@ html {
 }
 
 *::-webkit-scrollbar {
-  width: 9px;
-  height: 9px;
+  width: var(--scrollbar-size);
+  height: var(--scrollbar-size);
 }
 
 *::-webkit-scrollbar-track {
@@ -79,7 +101,9 @@ body {
   margin: 0;
   background: var(--color-bg);
   color: var(--text);
-  font: 14px/1.45 system-ui, -apple-system, Segoe UI, sans-serif;
+  font-family: var(--font-family-base);
+  font-size: var(--font-size-body);
+  line-height: var(--line-height-body);
 }
 
 button {
@@ -105,7 +129,7 @@ button {
 }
 
 h1 {
-  font-size: 17px;
+  font-size: var(--font-size-h1);
   margin: 0 0 16px;
 }
 
@@ -116,8 +140,8 @@ h1 {
   background: transparent;
   color: var(--text);
   border: 0;
-  border-radius: var(--radius-md);
-  padding: 10px;
+  border-radius: var(--tab-radius);
+  padding: var(--tab-padding-y) var(--tab-padding-x);
   margin: 8px 0;
   cursor: pointer;
 }
@@ -590,7 +614,7 @@ section.hero.card {
 .card {
   background: var(--color-surface-soft);
   border-radius: var(--radius-lg);
-  padding: 14px;
+  padding: var(--card-padding);
   box-shadow: none;
 }
 
@@ -624,7 +648,7 @@ section.hero.card {
 .item {
   display: block;
   width: 100%;
-  padding: 10px 12px;
+  padding: var(--button-padding-y) var(--button-padding-x);
   border: 0;
   border-radius: var(--radius-md);
   background: var(--color-surface);
@@ -655,8 +679,8 @@ button.danger {
   background: var(--color-danger-bg);
   color: var(--color-danger-text);
   border: 0;
-  border-radius: var(--radius-md);
-  padding: 10px 12px;
+  border-radius: var(--button-radius);
+  padding: var(--button-padding-y) var(--button-padding-x);
   cursor: pointer;
 }
 
@@ -664,8 +688,8 @@ button.secondary {
   background: var(--color-surface);
   color: var(--text);
   border: 0;
-  border-radius: var(--radius-md);
-  padding: 10px 12px;
+  border-radius: var(--button-radius);
+  padding: var(--button-padding-y) var(--button-padding-x);
   cursor: pointer;
 }
 
@@ -812,7 +836,7 @@ iframe {
 
 .reader-pane-body {
   overflow: auto;
-  padding: 18px;
+  padding: 18px 24px;
 }
 
 .reader-pane-body pre {
@@ -1329,8 +1353,8 @@ button.calendar-cell:focus-visible {
 
 .settings-tab {
   border: 1px solid #2a2a2a;
-  border-radius: var(--radius-md);
-  padding: 8px 14px;
+  border-radius: var(--tab-radius);
+  padding: var(--tab-padding-y) var(--tab-padding-x);
   background: var(--color-surface);
   color: var(--color-text);
   font: inherit;
@@ -1348,7 +1372,7 @@ button.calendar-cell:focus-visible {
 
 .settings-card h2 {
   margin: 0 0 8px;
-  font-size: 18px;
+  font-size: var(--font-size-h2);
 }
 
 .settings-lead {
@@ -1382,7 +1406,7 @@ button.calendar-cell:focus-visible {
 
 .settings-hint {
   margin: 0 0 8px;
-  font-size: 12px;
+  font-size: var(--font-size-small);
   color: var(--color-muted);
   line-height: 1.45;
 }
@@ -1400,8 +1424,8 @@ button.calendar-cell:focus-visible {
 
 .settings-input {
   width: 120px;
-  padding: 8px 10px;
-  border-radius: var(--radius-md);
+  padding: var(--input-padding-y) var(--input-padding-x);
+  border-radius: var(--input-radius);
   border: 1px solid #2a2a2a;
   background: var(--color-bg);
   color: var(--color-text);

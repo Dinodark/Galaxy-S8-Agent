@@ -10,6 +10,7 @@ const atlas = require('./memory_atlas');
 const memory = require('./memory');
 const journal = require('./journal');
 const reminders = require('./reminders');
+const designSystem = require('./design_system');
 const inboxTriageLog = require('./inbox_triage_log');
 const journalIngestLog = require('./journal_ingest_log');
 const { runJournalIngest } = require('./watchers/journal_ingest');
@@ -232,6 +233,61 @@ async function handleApi(req, res, url) {
 
   if (pathname === '/api/settings') {
     return json(res, 200, await settings.getPublicSettings());
+  }
+
+  if (pathname === '/api/design') {
+    if (!chatId) return json(res, 400, { error: 'no owner chat configured' });
+    return json(res, 200, await designSystem.getDesign(chatId));
+  }
+
+  if (pathname === '/api/design/preset/save' && req.method === 'POST') {
+    if (!chatId) return json(res, 400, { error: 'no owner chat configured' });
+    let body;
+    try {
+      body = await readJsonBody(req);
+    } catch {
+      return json(res, 400, { error: 'invalid JSON body' });
+    }
+    try {
+      return json(res, 200, await designSystem.savePreset(chatId, body || {}));
+    } catch (err) {
+      return json(res, 400, { error: err.message || String(err) });
+    }
+  }
+
+  if (pathname === '/api/design/preset/delete' && req.method === 'POST') {
+    if (!chatId) return json(res, 400, { error: 'no owner chat configured' });
+    let body;
+    try {
+      body = await readJsonBody(req);
+    } catch {
+      return json(res, 400, { error: 'invalid JSON body' });
+    }
+    try {
+      return json(res, 200, await designSystem.deletePreset(chatId, body && body.id));
+    } catch (err) {
+      return json(res, 400, { error: err.message || String(err) });
+    }
+  }
+
+  if (pathname === '/api/design/activate' && req.method === 'POST') {
+    if (!chatId) return json(res, 400, { error: 'no owner chat configured' });
+    let body;
+    try {
+      body = await readJsonBody(req);
+    } catch {
+      return json(res, 400, { error: 'invalid JSON body' });
+    }
+    try {
+      return json(res, 200, await designSystem.activatePreset(chatId, body && body.id));
+    } catch (err) {
+      return json(res, 400, { error: err.message || String(err) });
+    }
+  }
+
+  if (pathname === '/api/design/reset-base' && req.method === 'POST') {
+    if (!chatId) return json(res, 400, { error: 'no owner chat configured' });
+    return json(res, 200, await designSystem.resetBase(chatId));
   }
 
   if (pathname === '/api/logs/inbox-triage') {

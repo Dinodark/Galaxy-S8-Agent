@@ -102,7 +102,10 @@ async function fallbackSaveUserMessage({
     fallback: true,
   });
   if (result && result.ok && result.result && result.result.saved) {
-    return `Сохранил в память: \`memory/notes/${result.result.saved}\`.\n(Фолбэк-сохранение, потому что модель не вызвала write_note сама.)`;
+    const saved = result.result.saved;
+    return (
+      `Записал в \`memory/notes/${saved}\` (инбокс, запасной путь без write_note от модели).`
+    );
   }
   return (
     'Не удалось сохранить в память автоматически: ' +
@@ -181,17 +184,27 @@ async function buildMemoryInventoryContext(toolCtx) {
 }
 
 function extractJsonObjectFromMarkdown(text) {
-  const s = String(text || '').trim();
-  const fenced = s.match(/^```(?:json)?\s*([\s\S]*?)\s*```/i);
-  const raw = fenced ? fenced[1] : s;
-  try {
-    const parsed = JSON.parse(raw);
-    return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
-      ? parsed
-      : null;
-  } catch {
-    return null;
+  const s = String(text || '');
+  const fenced = /```(?:json)?\s*([\s\S]*?)\s*```/gi;
+  let match;
+  while ((match = fenced.exec(s)) !== null) {
+    try {
+      const parsed = JSON.parse(match[1].trim());
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) return parsed;
+    } catch {
+      /* try next fence */
+    }
   }
+  const trimmed = s.trim();
+  if (trimmed.startsWith('{')) {
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) return parsed;
+    } catch {
+      /* ignore */
+    }
+  }
+  return null;
 }
 
 function recoverReminderArgs(userMessage, assistantContent) {
@@ -218,6 +231,33 @@ function recoveredReminderReply(result) {
     hour12: false,
   });
   return `Напоминание установлено: ${r.text}\nКогда: ${when}\nID: ${r.id}`;
+}
+
+/** When the model prints write_note-shaped JSON instead of calling the tool — execute it. */
+function recoverWriteNoteArgs(userMessage, assistantContent) {
+  if (!userAskedToWriteMemory(userMessage)) return null;
+  const obj = extractJsonObjectFromMarkdown(assistantContent);
+  if (!obj) return null;
+  if (obj.fire_at != null || obj.cron != null) return null;
+  const name = typeof obj.name === 'string' ? obj.name.trim() : '';
+  const content =
+    typeof obj.content === 'string'
+      ? obj.content
+      : obj.content === null || obj.content === undefined
+        ? ''
+        : String(obj.content);
+  if (!name || content === '') return null;
+  const append = obj.append === false ? false : true;
+  return { name, content, append };
+}
+
+function briefWriteNoteReply(result, append) {
+  if (!result || !result.ok || !result.result || !result.result.saved) {
+    return 'Не удалось записать: ' + (result && result.error ? result.error : 'unknown error');
+  }
+  const saved = result.result.saved;
+  const how = append === false ? 'сохранил' : 'дописал';
+  return `Готово: \`memory/notes/${saved}\` — ${how}.`;
 }
 
 async function runAgent({ chatId, userMessage }) {
@@ -314,6 +354,44 @@ async function runAgent({ chatId, userMessage }) {
         recovered: true,
       });
       const reply = recoveredReminderReply(result);
+      history = await memory.appendToHistory(chatId, [{ role: 'assistant', content: reply }]);
+      return {
+        reply,
+        toolCalls: transcript,
+        steps: step + 1,
+      };
+    }
+
+    const recoveredWriteArgs = recoverWriteNoteArgs(userMessage, assistantMsg.content);
+    if (writeIntent && recoveredWriteArgs && !hasSuccessfulWriteCall(transcript)) {
+      let nameForWrite = recoveredWriteArgs.name.trim();
+      if (isKnowledgeCoreIndexPath(memory.sanitizeName(nameForWrite))) {
+        nameForWrite = 'inbox.md';
+      }
+      const execArgs = {
+        name: nameForWrite,
+        content: recoveredWriteArgs.content,
+        append: recoveredWriteArgs.append,
+      };
+      const result = await tools.execute('write_note', execArgs, toolCtx);
+      transcript.push({
+        tool: 'write_note',
+        args: execArgs,
+        result,
+        recoveredFromJson: true,
+      });
+      if (!(result && result.ok)) {
+        const errText = result && result.error ? String(result.error) : 'ошибка';
+        const reply =
+          `В ответе был JSON как у write_note, но запись не прошла: ${errText}. Попробуй ещё раз или сформулируй короче.`;
+        history = await memory.appendToHistory(chatId, [{ role: 'assistant', content: reply }]);
+        return {
+          reply,
+          toolCalls: transcript,
+          steps: step + 1,
+        };
+      }
+      const reply = briefWriteNoteReply(result, execArgs.append);
       history = await memory.appendToHistory(chatId, [{ role: 'assistant', content: reply }]);
       return {
         reply,

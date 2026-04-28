@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { BatterySnapshotBlock } from './battery_snapshot.jsx';
+import { DesignSettingsTab } from './design_settings_tab.jsx';
 
 function TabButton({ id, active, children, onClick }) {
   return (
@@ -91,7 +92,7 @@ function TextRow({ label, hint, value, disabled, onSave, placeholder, path }) {
   );
 }
 
-export function SettingsPanel({ api }) {
+export function SettingsPanel({ api, design }) {
   const [tab, setTab] = useState('easy');
   const [data, setData] = useState(null);
   const [agentStatus, setAgentStatus] = useState(null);
@@ -172,6 +173,9 @@ export function SettingsPanel({ api }) {
         </TabButton>
         <TabButton id="schedule" active={tab === 'schedule'} onClick={setTab}>
           Расписание и ИИ
+        </TabButton>
+        <TabButton id="design" active={tab === 'design'} onClick={setTab}>
+          Дизайн
         </TabButton>
         <TabButton id="json" active={tab === 'json'} onClick={setTab}>
           Весь набор (JSON)
@@ -316,6 +320,8 @@ export function SettingsPanel({ api }) {
           </div>
         </section>
       )}
+
+      {tab === 'design' && <DesignSettingsTab design={design} />}
 
       {tab === 'json' && (
         <section className="card">
