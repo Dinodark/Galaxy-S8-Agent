@@ -243,7 +243,7 @@ self-disabling when its prerequisites are missing (e.g. no `termux-api`).
   4. Ask the LLM (optionally a stronger model via Settings Center)
      for a reflective markdown summary: `Главное за день`, `Связи`,
      `Мои мысли`, `На завтра`.
-  5. Save to `memory/notes/summary-YYYY-MM-DD.md` (so the agent sees it
+  5. Save to `memory/notes/summaries/summary-YYYY-MM-DD.md` (so the agent sees it
      as long-term memory going forward) and DM it as a markdown file.
   6. **Inbox triage** (if enabled): snapshot `inbox.md` to
      `memory/notes/inbox/archive/YYYY-MM-DD-inbox.md`, run a tool loop
@@ -268,7 +268,7 @@ Anything else goes through the agent.
 and sends it to Telegram as a file. It is generated locally from:
 
 - `memory/notes/*.md`
-- `memory/notes/summary-YYYY-MM-DD.md`
+- `memory/notes/summaries/summary-YYYY-MM-DD.md`
 - the last few journal days for the current chat
 
 The first MVP does not call an LLM, so it is fast and cheap. It extracts

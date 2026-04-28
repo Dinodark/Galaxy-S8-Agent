@@ -140,6 +140,15 @@ function start() {
     console.warn('[knowledge] bootstrap require failed:', e.message);
   }
 
+  try {
+    const { migrateLegacySummariesToSummariesDir } = require('../core/migrate_summaries');
+    migrateLegacySummariesToSummariesDir(console).catch((e) =>
+      console.warn('[migrate_summaries] failed:', e.message)
+    );
+  } catch (e) {
+    console.warn('[migrate_summaries] require failed:', e.message);
+  }
+
   const bot = new TelegramBot(config.telegram.token, { polling: true });
   let dailyReviewController = null;
 

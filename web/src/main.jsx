@@ -184,6 +184,85 @@ function viaLabel(via) {
   }[via || 'text'] || via || 'text';
 }
 
+/** posix parent directory; '' если файл в корне memory/notes */
+function noteFolderKey(name) {
+  const norm = String(name || '').replace(/\\/g, '/');
+  const i = norm.lastIndexOf('/');
+  return i <= 0 ? '' : norm.slice(0, i);
+}
+
+/** Имя файла из относительного пути posix */
+function basenamePosix(norm) {
+  const n = String(norm || '').replace(/\\/g, '/');
+  const i = n.lastIndexOf('/');
+  return i < 0 ? n : n.slice(i + 1);
+}
+
+const NOTE_FOLDER_LABELS = {
+  '': 'Корень',
+  projects: 'Проекты',
+  archive: 'Архив',
+  summaries: 'Сводки по дням',
+  inbox: 'Инбокс и системные',
+};
+
+function labelForFolder(folder) {
+  if (folder === '' || folder === '.') return NOTE_FOLDER_LABELS[''];
+  const known = NOTE_FOLDER_LABELS[folder];
+  if (known) return known;
+  const top = folder.split('/')[0];
+  const tl = NOTE_FOLDER_LABELS[top];
+  const rest = folder.slice(top.length).replace(/^\//, '');
+  if (tl && rest) return `${tl} → ${rest.replace(/_/g, ' ')}`;
+  return folder.replace(/_/g, ' ');
+}
+
+/** Заголовки в списке Notes / заголовок панели чтения (без .md-хаков) */
+function humanizeSlugBase(baseSansMd) {
+  const s = String(baseSansMd || '')
+    .replace(/[_-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!s) return baseSansMd;
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+function formatNoteBrowserTitle(note, kind) {
+  if (kind === 'summary') return formatSummaryMenuLabel(note.name);
+  const bn = basenamePosix(note.name);
+  const base = bn.replace(/\.md$/i, '');
+  return humanizeSlugBase(base);
+}
+
+function formatNoteReaderTitle(name, kind) {
+  if (kind === 'summary') return formatSummaryTitleLabel(name);
+  const base = basenamePosix(name).replace(/\.md$/i, '');
+  return humanizeSlugBase(base);
+}
+
+/** Группы для левого списка Notes / Summaries (папки первого уровня и вложенные) */
+function groupNotesByFolderForBrowser(notes) {
+  const map = new Map();
+  for (const note of notes) {
+    const folder =
+      typeof note.folder === 'string'
+        ? note.folder
+        : noteFolderKey(note.name);
+    if (!map.has(folder)) map.set(folder, []);
+    map.get(folder).push(note);
+  }
+  const folders = [...map.keys()].sort((a, b) => {
+    if (a === '') return -1;
+    if (b === '') return 1;
+    return a.localeCompare(b, 'ru');
+  });
+  return folders.map((folder) => ({
+    folder,
+    label: labelForFolder(folder),
+    notes: map.get(folder).sort((x, y) => String(x.name).localeCompare(String(y.name), 'ru')),
+  }));
+}
+
 function cssVar(name) {
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 }
@@ -303,7 +382,7 @@ function excerpt(text, max = 220) {
   return clean.length > max ? clean.slice(0, max - 1) + '…' : clean;
 }
 
-/** Текст секции «Мои мысли» … до «На завтра» в сводке (файл memory/notes/summary-*.md). */
+/** Текст секции «Мои мысли» … до «На завтра» в сводке (summaries/summary-*.md). */
 function extractInsightsSection(text) {
   const lines = String(text || '')
     .split(/\r?\n/)
@@ -636,14 +715,17 @@ function FileBrowser({ kind, api, desktopDetail = false }) {
   const [content, setContent] = useState('');
   const kindLabel = kind === 'summary' ? 'сводку' : 'файл';
   const selectedStorageKey = 'galaxy-dashboard-selected-' + kind;
-  const selectedDisplayTitle =
-    kind === 'summary' ? formatSummaryTitleLabel(selected) : selected;
+  const selectedDisplayTitle = selected
+    ? formatNoteReaderTitle(selected, kind)
+    : '';
 
   useEffect(() => {
     api.get('/api/notes').then((data) => {
       setNotes(data.notes.filter((note) => note.kind === kind));
     });
   }, [api, kind]);
+
+  const groups = useMemo(() => groupNotesByFolderForBrowser(notes), [notes]);
 
   useEffect(() => {
     if (!notes.length) return;
@@ -662,23 +744,37 @@ function FileBrowser({ kind, api, desktopDetail = false }) {
 
   return (
     <div className={desktopDetail ? 'split-page' : ''}>
-      <div className="card list-page">
-        {notes.map((note) => (
-          <button
-            className={'item ' + (selected === note.name ? 'active' : '')}
-            key={note.name}
-            onClick={() => openNote(note.name)}
-          >
-            <strong>
-              {kind === 'summary' ? formatSummaryMenuLabel(note.name) : note.name}
-            </strong>
-            <span className="muted">
-              {kind === 'summary'
-                ? formatSummaryMetaLabel(note.name, note.mtime)
-                : fmtTime(note.mtime)}
-            </span>
-          </button>
-        ))}
+      <div className="card list-page file-browser-list">
+        {groups.length > 0 &&
+          groups.map((group) => (
+            <section key={group.folder || '__root__'} className="file-browser-group">
+              <h3 className="file-browser-group-title">{group.label}</h3>
+              <div className="file-browser-group-items">
+                {group.notes.map((note) => (
+                  <button
+                    type="button"
+                    className={'item ' + (selected === note.name ? 'active' : '')}
+                    key={note.name}
+                    onClick={() => openNote(note.name)}
+                  >
+                    <div className="item-title-line">
+                      <strong>{formatNoteBrowserTitle(note, kind)}</strong>
+                      <span className="item-meta-right">
+                        {kind === 'summary'
+                          ? formatSummaryMetaLabel(note.name, note.mtime)
+                          : fmtTime(note.mtime)}
+                      </span>
+                    </div>
+                    {noteFolderKey(note.name) !== '' && (
+                      <span className="item-note-path" title={note.name}>
+                        {note.name}
+                      </span>
+                    )}
+                  </button>
+                ))}
+              </div>
+            </section>
+          ))}
         {notes.length === 0 && <p className="muted">Файлов пока нет.</p>}
       </div>
       {desktopDetail && (

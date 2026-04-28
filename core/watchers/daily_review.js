@@ -9,8 +9,13 @@ const memory = require('../memory');
 const { runInboxTriage } = require('./inbox_triage');
 
 const PROMPT_FILE = path.join(__dirname, '..', 'prompts', 'daily_review.md');
-const SUMMARY_PREFIX = 'summary-';
-const SUMMARY_SUFFIX = '.md';
+const {
+  SUMMARY_PREFIX,
+  SUMMARY_SUFFIX,
+  isSummaryFilename,
+  summariesRelForDay,
+  legacySummaryRelForDay,
+} = require('../notes_paths');
 
 const MAX_JOURNAL_CHARS = 60_000;
 const MAX_NOTE_CHARS = 10_000;
@@ -48,7 +53,7 @@ function truncateHead(s, maxChars) {
 }
 
 function isSummaryFile(rel) {
-  return path.basename(rel).startsWith(SUMMARY_PREFIX);
+  return isSummaryFilename(path.basename(rel));
 }
 
 function isInboxArchiveRel(f) {
@@ -95,18 +100,20 @@ async function loadInboxConflictsExcerpt() {
 async function loadPreviousSummaries(upToN, todayStr) {
   const dir = config.paths.notesDir;
   await fse.ensureDir(dir);
-  const files = (await fse.readdir(dir))
-    .filter(
-      (f) =>
-        f.startsWith(SUMMARY_PREFIX) &&
-        f.endsWith(SUMMARY_SUFFIX) &&
-        !f.includes(todayStr)
-    )
-    .sort()
+  const all = await memory.listNotes();
+  const todayBase = `${SUMMARY_PREFIX}${todayStr}${SUMMARY_SUFFIX}`;
+  const files = all
+    .filter((rel) => {
+      const b = path.basename(rel);
+      if (!isSummaryFilename(b)) return false;
+      if (b === todayBase) return false;
+      return true;
+    })
+    .sort((a, b) => String(a).localeCompare(String(b)))
     .slice(-upToN);
   const parts = [];
-  for (const f of files) {
-    const content = (await fse.readFile(path.join(dir, f), 'utf8')).trim();
+  for (const rel of files) {
+    const content = (await fse.readFile(path.join(dir, rel), 'utf8')).trim();
     if (!content) continue;
     parts.push(truncateHead(content, MAX_PREV_SUMMARY_CHARS));
   }
@@ -175,9 +182,10 @@ async function runReview(chatId, { log = console, force = false } = {}) {
     throw new Error('empty summary from model');
   }
 
-  const fname = `${SUMMARY_PREFIX}${today}${SUMMARY_SUFFIX}`;
-  const file = path.join(config.paths.notesDir, fname);
-  await fse.ensureDir(config.paths.notesDir);
+  const rel = summariesRelForDay(today);
+  const fname = rel;
+  const file = path.join(config.paths.notesDir, rel);
+  await fse.ensureDir(path.dirname(file));
   await fse.writeFile(file, summary);
 
   let triage = { skipped: true, reason: 'not run' };
@@ -216,11 +224,10 @@ async function fireForAll(chatIds, onReview, log) {
 }
 
 async function hasTodaysSummary(todayStr) {
-  const file = path.join(
-    config.paths.notesDir,
-    `${SUMMARY_PREFIX}${todayStr}${SUMMARY_SUFFIX}`
-  );
-  return fse.pathExists(file);
+  const dir = config.paths.notesDir;
+  const cur = path.join(dir, summariesRelForDay(todayStr));
+  const legacy = path.join(dir, legacySummaryRelForDay(todayStr));
+  return (await fse.pathExists(cur)) || (await fse.pathExists(legacy));
 }
 
 function startDailyReviewer({ chatIds, onReview, log = console }) {
@@ -236,7 +243,7 @@ function startDailyReviewer({ chatIds, onReview, log = console }) {
   let tz = null;
 
   // Catch-up: if the bot just booted AFTER the scheduled fire time for
-  // today, and there is no summary-YYYY-MM-DD.md yet, run a missed
+  // today, and there is no summaries/summary-YYYY-MM-DD.md yet (or legacy root), run a missed
   // review shortly after startup. Prevents losing the day's summary
   // just because the bot was restarted/offline at the cron time.
   async function scheduleCatchupIfMissed() {

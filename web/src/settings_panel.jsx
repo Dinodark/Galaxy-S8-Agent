@@ -191,7 +191,7 @@ export function SettingsPanel({ api, design }) {
 
           <ToggleRow
             label="Вечерняя сводка в Telegram"
-            hint="В заданное время бот читает журнал дня, пишет файл summary-ГГГГ-ММ-ДД.md и присылает его вам."
+            hint="В заданное время бот читает журнал дня, пишет summaries/summary-ГГГГ-ММ-ДД.md и присылает его вам."
             checked={dr.enabled !== false}
             disabled={saving}
             onChange={(v) => patch('dailyReview.enabled', v)}

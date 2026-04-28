@@ -83,7 +83,7 @@ export function AgentFlowDiagram() {
 
           <Block title="Сводка за день">
             Модель читает журнал и прошлые summary → файл{' '}
-            <code>memory/notes/summary-YYYY-MM-DD.md</code> и документ в Telegram.
+            <code>memory/notes/summaries/summary-YYYY-MM-DD.md</code> и документ в Telegram.
           </Block>
           <Arrow />
 

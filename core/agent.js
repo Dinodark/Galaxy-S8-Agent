@@ -153,7 +153,7 @@ function buildMemoryInventoryReply(files) {
   if (safeFiles.length === 0) {
     return (
       'Сейчас в базе знаний нет markdown-файлов в `memory/notes`.\n' +
-      'Если сводки уже генерировались, появятся как `summary-YYYY-MM-DD.md`.\n\n' +
+      'Если сводки уже генерировались, появятся как `summaries/summary-YYYY-MM-DD.md`.\n\n' +
       'Проверено через `list_notes` в текущем рантайме. В Telegram можно повторить проверку: `/files`.'
     );
   }

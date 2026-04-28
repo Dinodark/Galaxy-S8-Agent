@@ -13,6 +13,7 @@ const reminders = require('./reminders');
 const designSystem = require('./design_system');
 const inboxTriageLog = require('./inbox_triage_log');
 const journalIngestLog = require('./journal_ingest_log');
+const { isSummaryFilename } = require('./notes_paths');
 const { runJournalIngest } = require('./watchers/journal_ingest');
 
 const UPDATE_LOG_FILE = path.join(config.paths.tmpDir, 'update-restart.log');
@@ -195,16 +196,24 @@ async function startUpdateRestart() {
   return { ok: true, started: true, pid: child.pid, logFile: UPDATE_LOG_FILE };
 }
 
+function noteFolderRel(relPosix) {
+  const norm = String(relPosix || '').replace(/\\/g, '/');
+  if (!norm.includes('/')) return '';
+  return path.posix.dirname(norm);
+}
+
 async function listNotesDetailed() {
   const files = await memory.listNotes();
   const out = [];
   for (const file of files.sort()) {
     const full = path.join(config.paths.notesDir, file);
     const stat = await fse.stat(full).catch(() => null);
-    const base = path.basename(file);
+    const base = path.basename(file.replace(/\\/g, '/'));
+    const kind = isSummaryFilename(base) ? 'summary' : 'note';
     out.push({
       name: file,
-      kind: base.startsWith('summary-') ? 'summary' : 'note',
+      folder: noteFolderRel(file),
+      kind,
       size: stat ? stat.size : 0,
       mtime: stat ? stat.mtime.toISOString() : null,
     });
@@ -526,6 +535,16 @@ async function startServer() {
     }
   } catch (e) {
     console.warn('[web] knowledge bootstrap failed:', e.message);
+  }
+
+  try {
+    const { migrateLegacySummariesToSummariesDir } = require('./migrate_summaries');
+    const { moved } = await migrateLegacySummariesToSummariesDir(console);
+    if (moved && moved.length > 0) {
+      console.log(`[web] migrated ${moved.length} evening summary file(s) to notes/summaries/`);
+    }
+  } catch (e) {
+    console.warn('[web] summary migration failed:', e.message);
   }
 
   const server = http.createServer(async (req, res) => {
