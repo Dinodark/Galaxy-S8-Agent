@@ -692,11 +692,11 @@ section.hero.card {
 }
 
 .file-browser-list {
-  padding-top: 2px;
+  padding-block: var(--space-2);
 }
 
 .file-browser-group + .file-browser-group {
-  margin-top: 4px;
+  margin-top: var(--space-2);
 }
 
 .file-browser-group-title {
