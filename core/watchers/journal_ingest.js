@@ -46,8 +46,8 @@ function triageToolSchemas() {
   return tools.listSchemas().filter((s) => INGEST_TOOL_NAMES.has(s.function.name));
 }
 
-/** Successful write_note paths in order (deduped). */
-function collectWrittenNotes(transcript) {
+/** Paths the tool handler returned as `saved` (deduped; does not prove file on disk). */
+function collectWrittenNotesReported(transcript) {
   const out = [];
   const seen = new Set();
   for (const row of transcript) {
@@ -58,6 +58,45 @@ function collectWrittenNotes(transcript) {
     out.push(saved);
   }
   return out;
+}
+
+/**
+ * After the run, confirm each reported path exists under notesDir (same tree as list_notes).
+ * Rows count = per successful tool call (duplicates ok).
+ */
+async function verifyWrittenNotesOnDisk(transcript, notesRoot) {
+  let verifiedRows = 0;
+  const missing = [];
+  const verifiedPathsDedup = [];
+  const seenPath = new Set();
+
+  for (const row of transcript) {
+    if (row.tool !== 'write_note' || !row.result || !row.result.ok) continue;
+    const saved = row.result.result && row.result.result.saved;
+    if (!saved) continue;
+    const full = path.join(notesRoot, saved);
+    try {
+      const st = await fse.stat(full);
+      if (st.isFile()) {
+        verifiedRows += 1;
+        if (!seenPath.has(saved)) {
+          seenPath.add(saved);
+          verifiedPathsDedup.push(saved);
+        }
+      } else {
+        missing.push(saved);
+      }
+    } catch {
+      missing.push(saved);
+    }
+  }
+
+  const uniqueMissing = [...new Set(missing)];
+  return {
+    verifiedRows,
+    writtenNotes: verifiedPathsDedup.sort(),
+    writtenNotesMissing: uniqueMissing.length ? uniqueMissing : undefined,
+  };
 }
 
 /**
@@ -179,36 +218,68 @@ async function runJournalIngest({ chatId, day, log = console } = {}) {
     const writeCount = transcript.filter(
       (t) => t.tool === 'write_note' && t.result && t.result.ok
     ).length;
-    const writtenNotes = collectWrittenNotes(transcript);
+    const writtenNotesReported = collectWrittenNotesReported(transcript);
+    const disk = await verifyWrittenNotesOnDisk(transcript, config.paths.notesDir);
+    const verificationMismatch =
+      writeCount !== disk.verifiedRows || (disk.writtenNotesMissing && disk.writtenNotesMissing.length > 0);
 
     const result = {
       skipped: false,
       day: dayStr,
       resolvedNotesDir: config.paths.notesDir,
+      /** Successful write_note executions (handler returned ok — before disk check). */
       writeNoteOk: writeCount,
+      /** write_note rows where the file exists under resolvedNotesDir after the run. */
+      writeNoteVerified: disk.verifiedRows,
       toolRows: transcript.length,
       entryCount: entries.length,
-      writtenNotes,
+      /** Deduped paths that exist as files (use this for inventory). */
+      writtenNotes: disk.writtenNotes,
+      writtenNotesReported,
+      verificationMismatch,
+      ...(disk.writtenNotesMissing ? { writtenNotesMissing: disk.writtenNotesMissing } : {}),
       usage: usageTotal,
     };
     await logJournalIngestRun({ chatId, day: dayStr, result });
     log.log(
-      `[journal-ingest] day=${dayStr} (${writeCount} write_note ok, ${transcript.length} tool rows)`
+      `[journal-ingest] day=${dayStr} (write_note ok=${writeCount}, verified on disk=${disk.verifiedRows}, ${transcript.length} tool rows)`
     );
+    if (verificationMismatch) {
+      log.warn(
+        '[journal-ingest] verification mismatch — tool ok vs disk:',
+        writeCount,
+        'vs',
+        disk.verifiedRows,
+        disk.writtenNotesMissing || ''
+      );
+    }
     return result;
   } catch (err) {
     log.warn('[journal-ingest] failed:', err.message);
+    const writeCount = transcript.filter(
+      (t) => t.tool === 'write_note' && t.result && t.result.ok
+    ).length;
+    let disk = { verifiedRows: 0, writtenNotes: [], writtenNotesMissing: undefined };
+    try {
+      disk = await verifyWrittenNotesOnDisk(transcript, config.paths.notesDir);
+    } catch {
+      /* ignore */
+    }
+    const writtenNotesReported = collectWrittenNotesReported(transcript);
     const result = {
       skipped: false,
       day: dayStr,
       resolvedNotesDir: config.paths.notesDir,
       error: err.message,
-      writeNoteOk: transcript.filter(
-        (t) => t.tool === 'write_note' && t.result && t.result.ok
-      ).length,
+      writeNoteOk: writeCount,
+      writeNoteVerified: disk.verifiedRows,
       toolRows: transcript.length,
       entryCount: entries.length,
-      writtenNotes: collectWrittenNotes(transcript),
+      writtenNotes: disk.writtenNotes,
+      writtenNotesReported,
+      verificationMismatch:
+        writeCount !== disk.verifiedRows || !!(disk.writtenNotesMissing && disk.writtenNotesMissing.length),
+      ...(disk.writtenNotesMissing ? { writtenNotesMissing: disk.writtenNotesMissing } : {}),
       usage: usageTotal,
     };
     await logJournalIngestRun({ chatId, day: dayStr, result });

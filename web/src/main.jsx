@@ -817,13 +817,25 @@ function Journal({ api }) {
       if (r.skipped && r.reason === 'empty_day') {
         setIngestMsg('День пуст — нечего разносить по заметкам.');
       } else {
-        const w = r.writeNoteOk != null ? r.writeNoteOk : 0;
+        const toolOk = r.writeNoteOk != null ? r.writeNoteOk : 0;
+        const verified =
+          r.writeNoteVerified != null ? r.writeNoteVerified : toolOk;
         const t = r.toolRows != null ? r.toolRows : 0;
-        setIngestMsg(`Готово: успешных записей в заметки — ${w}, вызовов инструментов — ${t}.`);
+        let msg = `Готово: подтверждено на диске — ${verified} записей`;
+        if (r.verificationMismatch && toolOk !== verified) {
+          msg += ` (инструмент сообщил об успехе ${toolOk} раз — проверьте каталог заметок или лог)`;
+        }
+        msg += `; вызовов инструментов — ${t}.`;
+        setIngestMsg(msg);
         const usageLine = formatAggUsage(r.usage);
+        const missingNote =
+          r.verificationMismatch && Array.isArray(r.writtenNotesMissing) && r.writtenNotesMissing.length > 0
+            ? `Не найдены после записи: ${r.writtenNotesMissing.join(', ')}`
+            : '';
         setIngestDetail({
           writtenNotes: Array.isArray(r.writtenNotes) ? r.writtenNotes : [],
           usageLine: usageLine || '',
+          verificationWarning: missingNote,
         });
       }
     } catch (e) {
@@ -857,8 +869,9 @@ function Journal({ api }) {
     ingestErr ||
     ingestMsg ||
     (ingestDetail &&
-      ((ingestDetail.writtenNotes && ingestDetail.writtenNotes.length > 0) ||
-        ingestDetail.usageLine));
+      (    (ingestDetail.writtenNotes && ingestDetail.writtenNotes.length > 0) ||
+        ingestDetail.usageLine ||
+        ingestDetail.verificationWarning));
 
   const ingestBanner = showIngestBanner ? (
     <div className="journal-ingest-banner">
@@ -876,6 +889,9 @@ function Journal({ api }) {
           </ul>
         </>
       )}
+      {!ingestErr && ingestDetail?.verificationWarning ? (
+        <p className="journal-ingest-msg err">{ingestDetail.verificationWarning}</p>
+      ) : null}
       {!ingestErr && ingestDetail?.usageLine ? (
         <p className="journal-ingest-usage muted">{ingestDetail.usageLine}</p>
       ) : null}
