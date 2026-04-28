@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { TriageLogView } from './triage_log.jsx';
+import { JournalIngestLogView } from './journal_ingest_log.jsx';
 import { BatterySnapshotBlock } from './battery_snapshot.jsx';
 
 function TabButton({ id, active, children, onClick }) {
@@ -172,7 +173,7 @@ export function StatusPanel({ api }) {
             Сводка
           </TabButton>
           <TabButton id="triage" active={tab === 'triage'} onClick={setTab}>
-            Журнал тража
+            Логи разбора
           </TabButton>
         </div>
         <button type="button" className="secondary status-toolbar-refresh" onClick={() => loadStatus()}>
@@ -181,7 +182,12 @@ export function StatusPanel({ api }) {
       </div>
 
       {tab === 'overview' && <StatusOverview s={status} />}
-      {tab === 'triage' && <TriageLogView api={api} embedded />}
+      {tab === 'triage' && (
+        <div className="stack">
+          <TriageLogView api={api} embedded />
+          <JournalIngestLogView api={api} embedded />
+        </div>
+      )}
     </div>
   );
 }

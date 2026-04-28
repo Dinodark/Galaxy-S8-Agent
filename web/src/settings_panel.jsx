@@ -60,24 +60,6 @@ function NumberRow({ label, hint, value, disabled, onSave, path }) {
   );
 }
 
-function LogPreBlock({ title, pathHint, entries, emptyText }) {
-  const text =
-    entries && entries.length > 0
-      ? JSON.stringify([...entries].reverse(), null, 2)
-      : emptyText;
-  return (
-    <div className="settings-log-block">
-      <h3>{title}</h3>
-      {pathHint && (
-        <p className="settings-log-path">
-          Файл: <code>{pathHint}</code>
-        </p>
-      )}
-      <pre className="settings-log-pre">{text}</pre>
-    </div>
-  );
-}
-
 function TextRow({ label, hint, value, disabled, onSave, placeholder, path }) {
   const [local, setLocal] = useState(String(value ?? ''));
   useEffect(() => {
@@ -116,32 +98,6 @@ export function SettingsPanel({ api }) {
   const [loadError, setLoadError] = useState('');
   const [saveError, setSaveError] = useState('');
   const [saving, setSaving] = useState(false);
-  const [triageLogPayload, setTriageLogPayload] = useState(null);
-  const [journalIngestLogPayload, setJournalIngestLogPayload] = useState(null);
-  const [logsLoadError, setLogsLoadError] = useState('');
-  const [logsLoading, setLogsLoading] = useState(false);
-
-  const loadOperationLogs = useCallback(async () => {
-    setLogsLoadError('');
-    setLogsLoading(true);
-    try {
-      const [triage, ingest] = await Promise.all([
-        api.get('/api/logs/inbox-triage?limit=120'),
-        api.get('/api/logs/journal-ingest?limit=120'),
-      ]);
-      setTriageLogPayload(triage);
-      setJournalIngestLogPayload(ingest);
-    } catch (e) {
-      setLogsLoadError(e.message || String(e));
-    } finally {
-      setLogsLoading(false);
-    }
-  }, [api]);
-
-  useEffect(() => {
-    if (tab !== 'logs') return;
-    loadOperationLogs();
-  }, [tab, loadOperationLogs]);
 
   const reload = useCallback(async () => {
     setLoadError('');
@@ -216,9 +172,6 @@ export function SettingsPanel({ api }) {
         </TabButton>
         <TabButton id="schedule" active={tab === 'schedule'} onClick={setTab}>
           Расписание и ИИ
-        </TabButton>
-        <TabButton id="logs" active={tab === 'logs'} onClick={setTab}>
-          Логи
         </TabButton>
         <TabButton id="json" active={tab === 'json'} onClick={setTab}>
           Весь набор (JSON)
@@ -361,45 +314,6 @@ export function SettingsPanel({ api }) {
               модель именно для инструментов, не трогая «литературную» сводку.
             </p>
           </div>
-        </section>
-      )}
-
-      {tab === 'logs' && (
-        <section className="card settings-card">
-          <h2>Логи разбора</h2>
-          <p className="muted settings-lead">
-            Ночной разбор инбокса (triage) и ручная «Обработать день» в журнале пишут сюда же по смыслу, что и
-            настройки triage выше — для проверки, что прошло в заметки. Данные дублируют JSONL в{' '}
-            <code>memory/logs/</code>.
-          </p>
-          <div className="settings-logs-toolbar">
-            <button
-              type="button"
-              className="secondary"
-              disabled={logsLoading}
-              onClick={loadOperationLogs}
-            >
-              {logsLoading ? 'Загрузка…' : 'Обновить'}
-            </button>
-          </div>
-          {logsLoadError && (
-            <div className="settings-banner-error">
-              <strong>Не удалось загрузить логи</strong>
-              <pre>{logsLoadError}</pre>
-            </div>
-          )}
-          <LogPreBlock
-            title="Инбокс (triage)"
-            pathHint={triageLogPayload && triageLogPayload.path}
-            entries={triageLogPayload && triageLogPayload.entries}
-            emptyText="Записей пока нет."
-          />
-          <LogPreBlock
-            title="Журнал (ручной ingest)"
-            pathHint={journalIngestLogPayload && journalIngestLogPayload.path}
-            entries={journalIngestLogPayload && journalIngestLogPayload.entries}
-            emptyText="Записей пока нет."
-          />
         </section>
       )}
 
