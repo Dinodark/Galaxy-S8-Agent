@@ -179,7 +179,7 @@ function renderHtml(index) {
 :root{color-scheme:dark;--bg:#111111;--panel:#171717;--panel-soft:#1d1d1d;--panel-hover:#242424;--muted:#9a9a9a;--text:#f1f1f1;--line:transparent;--accent:#d6d6d6}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);font:14px/1.45 system-ui,-apple-system,Segoe UI,sans-serif;color:var(--text);overflow:hidden}
 header{height:58px;display:flex;align-items:center;gap:16px;padding:0 18px;background:var(--bg)}
-h1{font-size:17px;margin:0}header span{color:var(--muted)}#wrap{display:grid;grid-template-columns:minmax(0,1fr) minmax(320px,38vw);height:calc(100vh - 58px);min-height:0}#graphWrap{position:relative;background:var(--bg);min-height:0}#graph{width:100%;height:100%}#side{background:var(--panel-soft);padding:18px;overflow:hidden;display:flex;flex-direction:column;min-height:0;border-radius:16px 0 0 16px}
+h1{font-size:17px;margin:0}header span{color:var(--muted)}#wrap{display:grid;grid-template-columns:minmax(0,1fr) minmax(320px,38vw);height:calc(100vh - 58px);min-height:0}#graphWrap{position:relative;background:var(--bg);min-height:0}#graph{width:100%;height:100%;touch-action:none}#side{background:var(--panel-soft);padding:18px;overflow:hidden;display:flex;flex-direction:column;min-height:0;border-radius:16px 0 0 16px}
 .legend{position:absolute;left:14px;top:14px;max-width:280px;padding:10px 12px;border-radius:14px;background:var(--panel);box-shadow:none}.legend strong{display:block;margin-bottom:6px}.legendItem{display:flex;align-items:center;gap:8px;color:var(--muted);margin:5px 0}.dot{width:10px;height:10px;border-radius:50%;display:inline-block}
 .pill{display:inline-block;border-radius:999px;padding:3px 8px;margin:2px;color:var(--muted);background:var(--panel-hover)}.node{cursor:pointer}.node rect{stroke:#fff3;stroke-width:1.3;rx:12;ry:12}.node.active rect{stroke:var(--text);stroke-width:2}.node.core rect{stroke:var(--text);stroke-width:2.1}.node text{fill:var(--text);font-size:12px}.node.core text{fill:var(--text);font-size:13px}.link{stroke:#ffffff20;stroke-width:1}.hint{color:var(--muted)}.empty{max-width:520px;margin:10vh auto;color:var(--muted);font-size:18px}
 h2{margin:0 0 8px;font-size:18px}h3{margin:18px 0 8px;font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}pre{white-space:pre-wrap;font-family:inherit;color:var(--text);line-height:1.6}.filePath{color:var(--muted);word-break:break-all}.readerHead{position:sticky;top:0;margin:-18px -18px 16px;padding:18px;background:var(--panel-soft)}
@@ -217,11 +217,12 @@ body.atlas-mobile #graphWrap{min-height:0}
 .node:active{cursor:grabbing}
 @media(max-width:900px){#wrap{grid-template-columns:1fr;grid-template-rows:minmax(55vh,1fr) minmax(280px,45vh)}.legend{position:static;margin:12px}.readerHead{position:static}}
 body.atlas-mobile #wrap{grid-template-rows:1fr!important}
+.atlas-touch-hint{position:absolute;left:12px;right:12px;bottom:10px;margin:0;padding:8px 10px;border-radius:10px;background:var(--panel);color:var(--muted);font-size:12px;line-height:1.35;text-align:center;z-index:4;pointer-events:none}
 </style>
 </head>
 <body>
 <header><h1>Memory Atlas</h1><span>${escHtml(index.version)} · ${escHtml(index.generatedAt)} · ${index.stats.notes} knowledge files · ${index.stats.folders} folders · ${index.stats.links} links</span></header>
-<div id="wrap"><main id="graphWrap"><div class="legend" id="legend"></div><svg id="graph" role="img" aria-label="Knowledge graph"></svg></main><aside id="side"><h2>Выбери файл</h2><p class="hint">Слева база знаний: каждая точка — markdown в memory/notes. Крупный золотой узел — <strong>Маршруты (ядро)</strong>: маршрутный файл, его правите только вы, агент в него не пишет. Остальные цвета — папки.</p></aside></div>
+<div id="wrap"><main id="graphWrap"><div class="legend" id="legend"></div><svg id="graph" role="img" aria-label="Knowledge graph"></svg><p class="atlas-touch-hint" id="atlasTouchHint" hidden>Перетащите узел пальцем. Двойное нажатие по узлу — открыть файл.</p></main><aside id="side"><h2>Выбери файл</h2><p class="hint">Слева база знаний: каждая точка — markdown в memory/notes. Крупный золотой узел — <strong>Маршруты (ядро)</strong>: маршрутный файл, его правите только вы, агент в него не пишет. Остальные цвета — папки.</p></aside></div>
 <div id="atlasModalRoot" class="atlas-modal-root" hidden>
 <div class="atlas-modal-backdrop" aria-hidden="true"></div>
 <section class="atlas-modal-panel" role="dialog" aria-modal="true" aria-labelledby="atlasModalTitleLbl">
@@ -259,12 +260,13 @@ if(st)st.textContent='';
 const ATLAS=${data};
 const svg=document.getElementById('graph'),side=document.getElementById('side'),legend=document.getElementById('legend'),modalRoot=document.getElementById('atlasModalRoot'),modalBody=document.getElementById('atlasModalBody'),modalTitle=document.getElementById('atlasModalTitleLbl'),modalMeta=document.getElementById('atlasModalMeta'),W=()=>svg&&svg.clientWidth,H=()=>svg&&svg.clientHeight;
 const mqMobile=window.matchMedia('(max-width:900px)');
-function updateAtlasMobile(){document.body.classList.toggle('atlas-mobile',mqMobile.matches)}
+function updateAtlasMobile(){document.body.classList.toggle('atlas-mobile',mqMobile.matches);const th=document.getElementById('atlasTouchHint');if(th)th.hidden=!mqMobile.matches}
 mqMobile.addEventListener('change',function(){updateAtlasMobile();if(mqMobile.matches){if(legend)legend.innerHTML=''}else{renderLegend()}if(!mqMobile.matches&&modalRoot&&!modalRoot.hidden)closeAtlasModal()});
 updateAtlasMobile();
 const POSKEY='vatoko-atlas-positions-v1';
 var graphDomBuilt=false;
 let activeId='';
+let atlasMobileTapState={id:null,t:0};
 function size(n){if(n.isCore)return 30;return Math.max(10,Math.min(22,10+Math.sqrt(Math.max(n.size,1))/18))}
 function box(n){const label=(n.label||'').slice(0,32);const charW=n.isCore?8.2:7.2;const w=Math.max(70,Math.min(320,label.length*charW+22));const h=n.isCore?38:32;return {w,h}}
 function nodeTextColor(fill){const c=String(fill||'#ffffff').trim();const m=c.match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i);if(!m)return '#f1f1f1';let h=m[1];if(h.length===3)h=h.split('').map(ch=>ch+ch).join('');const r=parseInt(h.slice(0,2),16),g=parseInt(h.slice(2,4),16),b=parseInt(h.slice(4,6),16);const yiq=(r*299+g*587+b*114)/1000;return yiq>=160?'#111111':'#f1f1f1'}
@@ -297,7 +299,7 @@ for(const n of nodes){
 const g=document.createElementNS('http://www.w3.org/2000/svg','g');
 g.setAttribute('tabindex','0');
 g.setAttribute('role','button');
-g.setAttribute('aria-label',(mqMobile.matches?'Короткое нажатие — открыть, перетащить — переместить: ':'')+(n.label||'файл'));
+g.setAttribute('aria-label',(mqMobile.matches?'Перетащите узел. Двойное нажатие открывает файл. ':'')+(n.label||'файл'));
 g.addEventListener('pointerdown',function(e){onNodePointerDown(e,n);});
 g.addEventListener('click',function(e){if(n._atlasSuppressClick){e.preventDefault();e.stopPropagation();n._atlasSuppressClick=false}});
 g.addEventListener('keydown',function(e){if(e.key==='Enter'||e.key===' '){e.preventDefault();show(n);}});
@@ -367,7 +369,7 @@ document.getElementById('atlasRevert')&&document.getElementById('atlasRevert').a
 }
 function renderLegend(){if(!legend)return;legend.innerHTML='<strong>Папки</strong>'+((ATLAS.graph.folders||[]).map(f=>\`<div class="legendItem"><span class="dot" style="background:\${escapeHtml(f.color)}"></span><span>\${escapeHtml(f.name)}</span></div>\`).join('')||'<div class="hint">Пока нет папок</div>')+'<div style="margin-top:12px"><strong>Роли узлов</strong></div><div class="legendItem"><span class="dot" style="width:14px;height:14px;min-width:14px;box-sizing:border-box;border:1.5px solid #f1f1f1;background:#c9a86b"></span><span>Ядро: маршруты (только владелец)</span></div>'}
 function escapeHtml(s){return String(s??'').replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]))}
-function onNodePointerDown(ev,n){if(ev.pointerType==='mouse'&&ev.button!==0)return;ev.preventDefault();const sx=ev.clientX,sy=ev.clientY;const dragThreshold=(ev.pointerType==='touch'||ev.pointerType==='pen')?28:10;const touchLike=ev.pointerType==='touch'||ev.pointerType==='pen';const tapMaxMs=420;const downAt=performance.now();let moved=false;n.dragging=true;let lastX=n.x,lastY=n.y,lastT=performance.now();const el=ev.currentTarget;try{el.setPointerCapture(ev.pointerId)}catch(_){}function move(ev2){if(ev2.pointerId!==ev.pointerId)return;ev2.preventDefault();if(Math.hypot(ev2.clientX-sx,ev2.clientY-sy)>dragThreshold)moved=true;const r=svg.getBoundingClientRect();const nx=ev2.clientX-r.left,ny=ev2.clientY-r.top,now=performance.now(),dt=Math.max(8,now-lastT);n.vx=(nx-lastX)/dt*16;n.vy=(ny-lastY)/dt*16;lastX=nx;lastY=ny;lastT=now;n.x=nx;n.y=ny;draw()}function up(ev2){if(ev2.pointerId!==ev.pointerId)return;n.dragging=false;savePositions();window.removeEventListener('pointermove',move);window.removeEventListener('pointerup',up);window.removeEventListener('pointercancel',up);try{el.releasePointerCapture(ev.pointerId)}catch(_){}if(moved){n._justDraggedAt=Date.now();draw()}else{var open=touchLike?(performance.now()-downAt<=tapMaxMs):true;if(open){n._atlasSuppressClick=true;show(n)}else{n._atlasSuppressClick=false}}}window.addEventListener('pointermove',move,{passive:false});window.addEventListener('pointerup',up);window.addEventListener('pointercancel',up)}
+function onNodePointerDown(ev,n){if(ev.pointerType==='mouse'&&ev.button!==0)return;ev.preventDefault();const sx=ev.clientX,sy=ev.clientY;const dragThreshold=(ev.pointerType==='touch'||ev.pointerType==='pen')?44:10;const touchLike=ev.pointerType==='touch'||ev.pointerType==='pen';const downAt=performance.now();let moved=false;n.dragging=true;let lastX=n.x,lastY=n.y,lastT=performance.now();const el=ev.currentTarget;try{el.setPointerCapture(ev.pointerId)}catch(_){}function move(ev2){if(ev2.pointerId!==ev.pointerId)return;ev2.preventDefault();if(Math.hypot(ev2.clientX-sx,ev2.clientY-sy)>dragThreshold)moved=true;const r=svg.getBoundingClientRect();const nx=ev2.clientX-r.left,ny=ev2.clientY-r.top,now=performance.now(),dt=Math.max(8,now-lastT);n.vx=(nx-lastX)/dt*16;n.vy=(ny-lastY)/dt*16;lastX=nx;lastY=ny;lastT=now;n.x=nx;n.y=ny;draw()}function up(ev2){if(ev2.pointerId!==ev.pointerId)return;n.dragging=false;savePositions();window.removeEventListener('pointermove',move);window.removeEventListener('pointerup',up);window.removeEventListener('pointercancel',up);try{el.releasePointerCapture(ev.pointerId)}catch(_){}if(moved){atlasMobileTapState={id:null,t:0};n._justDraggedAt=Date.now();draw()}else if(touchLike&&mqMobile.matches){const now=performance.now();n._atlasSuppressClick=true;if(atlasMobileTapState.id===n.id&&(now-atlasMobileTapState.t)<600){atlasMobileTapState={id:null,t:0};show(n)}else{activeId=n.id;atlasMobileTapState={id:n.id,t:now};draw()}}else{n._atlasSuppressClick=true;show(n)}}window.addEventListener('pointermove',move,{passive:false});window.addEventListener('pointerup',up);window.addEventListener('pointercancel',up)}
 window.addEventListener('beforeunload',savePositions);
 tick();</script>
 </body></html>`;

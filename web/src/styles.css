@@ -1500,6 +1500,11 @@ button.calendar-cell:focus-visible {
     display: block;
   }
 
+  .modal-backdrop.mobile-reader .reader-body {
+    padding: 16px;
+    box-sizing: border-box;
+  }
+
   .hero {
     flex-direction: column;
     align-items: flex-start;
