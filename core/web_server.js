@@ -11,6 +11,8 @@ const memory = require('./memory');
 const journal = require('./journal');
 const reminders = require('./reminders');
 const inboxTriageLog = require('./inbox_triage_log');
+const journalIngestLog = require('./journal_ingest_log');
+const { runJournalIngest } = require('./watchers/journal_ingest');
 
 const UPDATE_LOG_FILE = path.join(config.paths.tmpDir, 'update-restart.log');
 const UPDATE_PID_FILE = path.join(config.paths.tmpDir, 'update-restart.pid');
@@ -235,6 +237,37 @@ async function handleApi(req, res, url) {
   if (pathname === '/api/logs/inbox-triage') {
     const limit = Number(url.searchParams.get('limit'));
     return json(res, 200, await inboxTriageLog.readRecent(limit));
+  }
+
+  if (pathname === '/api/logs/journal-ingest') {
+    const limit = Number(url.searchParams.get('limit'));
+    return json(res, 200, await journalIngestLog.readRecent(limit));
+  }
+
+  if (pathname === '/api/journal/ingest' && req.method === 'POST') {
+    let body;
+    try {
+      body = await readJsonBody(req);
+    } catch {
+      return json(res, 400, { error: 'invalid JSON body' });
+    }
+    if (!chatId) {
+      return json(res, 400, { error: 'no owner chat configured (telegram.allowedUserIds)' });
+    }
+    const day = body && typeof body.day === 'string' ? body.day.trim() : '';
+    if (!day) {
+      return json(res, 400, { error: 'expected JSON { day: "YYYY-MM-DD" }' });
+    }
+    try {
+      const result = await runJournalIngest({ chatId, day });
+      return json(res, 200, result);
+    } catch (err) {
+      const msg = err && err.message ? err.message : String(err);
+      if (/invalid day/i.test(msg)) {
+        return json(res, 400, { error: msg });
+      }
+      return json(res, 500, { error: msg });
+    }
   }
 
   if (pathname === '/api/settings/set' && req.method === 'POST') {

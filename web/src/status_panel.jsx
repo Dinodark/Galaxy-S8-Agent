@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { TriageLogView } from './triage_log.jsx';
+import { BatterySnapshotBlock } from './battery_snapshot.jsx';
 
 function TabButton({ id, active, children, onClick }) {
   return (
@@ -104,7 +105,8 @@ function StatusOverview({ s }) {
 
       <section className="card status-card">
         <h3 className="status-card-title">Батарея телефона</h3>
-        <div className="status-card-body">
+        <BatterySnapshotBlock battery={s.battery} />
+        <div className="status-card-body status-battery-after-sample">
           <Row label="Наблюдение">{s.battery?.enabled ? 'вкл' : 'выкл'}</Row>
           {s.battery?.enabled && (
             <>
@@ -116,6 +118,10 @@ function StatusOverview({ s }) {
               </Row>
             </>
           )}
+          <p className="muted status-footnote">
+            Значение заряда запрашивается при загрузке этой страницы через{' '}
+            <code>termux-battery-status</code> (Telegram-бот на том же телефоне в Termux).
+          </p>
         </div>
       </section>
     </div>

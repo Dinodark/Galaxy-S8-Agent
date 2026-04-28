@@ -572,6 +572,21 @@ iframe {
   background: var(--color-surface);
 }
 
+.reader-pane-top-has-actions {
+  flex-direction: row;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.reader-pane-head-text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
 .reader-pane-top span {
   color: var(--color-muted);
   font-size: 12px;
@@ -639,11 +654,17 @@ iframe {
 }
 
 .reader-modal {
-  display: grid;
-  grid-template-rows: 62px minmax(0, 1fr);
+  display: flex;
+  flex-direction: column;
   width: 100%;
   height: 100%;
   background: var(--color-bg);
+}
+
+.reader-modal-actions {
+  padding: 8px 12px;
+  border-bottom: 1px solid #2a2a2a;
+  flex-shrink: 0;
 }
 
 .reader-top {
@@ -653,9 +674,10 @@ iframe {
   padding: 0 8px;
   min-height: 48px;
   background: var(--color-surface);
+  flex-shrink: 0;
 }
 
-.reader-top div {
+.reader-top-titles {
   display: flex;
   min-width: 0;
   flex-direction: column;
@@ -683,8 +705,31 @@ iframe {
 }
 
 .reader-body {
+  flex: 1;
+  min-height: 0;
   overflow: auto;
   padding: 0;
+}
+
+.journal-ingest-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.journal-ingest-msg {
+  font-size: 13px;
+  margin: -4px 0 12px;
+}
+
+.journal-ingest-msg.ok {
+  color: #7ad7a8;
+}
+
+.journal-ingest-msg.err {
+  color: #ff8a8a;
 }
 
 .reader-body pre {
@@ -1068,6 +1113,44 @@ button.calendar-cell:focus-visible {
   line-height: 1.45;
 }
 
+.settings-logs-toolbar {
+  margin-bottom: 14px;
+}
+
+.settings-log-block {
+  margin-bottom: 28px;
+}
+
+.settings-log-block h3 {
+  margin: 0 0 8px;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.settings-log-path {
+  font-size: 12px;
+  color: var(--color-muted);
+  margin: 0 0 8px;
+}
+
+.settings-log-path code {
+  font-size: 12px;
+}
+
+.settings-log-pre {
+  margin: 0;
+  padding: 12px 14px;
+  max-height: min(52vh, 520px);
+  overflow: auto;
+  font-size: 12px;
+  line-height: 1.45;
+  background: var(--color-surface-soft);
+  border-radius: var(--radius-md);
+  border: 1px solid #2a2a2a;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 .settings-field {
   margin-bottom: 20px;
   max-width: 720px;
@@ -1386,4 +1469,58 @@ button.calendar-cell:focus-visible {
   .status-row {
     grid-template-columns: 1fr;
   }
+}
+
+/* --- Live battery sample (Termux) --- */
+.battery-live {
+  margin-bottom: 4px;
+}
+
+.battery-live-pct {
+  font-size: clamp(26px, 5vw, 34px);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+}
+
+.battery-live-meta {
+  margin: 6px 0 0;
+  font-size: 13px;
+}
+
+.battery-live-meta code {
+  font-size: 12px;
+}
+
+.battery-live-error {
+  margin: 0 0 8px;
+}
+
+.battery-live-hint {
+  margin: 10px 0 0;
+  font-size: 12px;
+}
+
+.status-battery-after-sample {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #2a2a2a;
+}
+
+.status-footnote {
+  margin: 12px 0 0;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.settings-subtitle {
+  margin: 22px 0 10px;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.settings-battery-card {
+  margin-top: 8px;
+  padding-top: 12px;
+  border-top: 1px solid #2a2a2a;
 }

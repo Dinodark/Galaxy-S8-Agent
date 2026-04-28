@@ -5,6 +5,7 @@ const journal = require('./journal');
 const reminders = require('./reminders');
 const modes = require('./modes');
 const { startDailyReviewer } = require('./watchers/daily_review');
+const { readBatterySnapshot } = require('./watchers/battery');
 
 function systemTz() {
   try {
@@ -47,6 +48,7 @@ async function buildStatus(chatId) {
   const entries = await journal.readDay(chatId, today);
   const pendingReminders = await reminders.listPending({ chatId });
   const nextReview = await nextDailyReviewFire();
+  const batterySample = await readBatterySnapshot();
 
   return {
     mode,
@@ -83,6 +85,7 @@ async function buildStatus(chatId) {
       enabled: config.battery.enabled,
       lowThreshold: config.battery.lowThreshold,
       pollIntervalMs: config.battery.pollIntervalMs,
+      sample: batterySample,
     },
   };
 }

@@ -12,6 +12,33 @@ function isChargingStatus(s) {
   return v === 'CHARGING' || v === 'FULL';
 }
 
+/**
+ * Live battery sample for dashboards/status (never throws).
+ * On desktop / without Termux returns { ok: false, code: 'NO_TERMUX' | ... }.
+ */
+async function readBatterySnapshot() {
+  try {
+    const r = await readBattery();
+    const pct = Number(r && r.percentage);
+    if (!Number.isFinite(pct)) {
+      return { ok: false, reason: 'unexpected_payload', raw: r };
+    }
+    const status = String(r.status || '');
+    return {
+      ok: true,
+      percentage: Math.round(pct),
+      status,
+      charging: isChargingStatus(status),
+    };
+  } catch (err) {
+    return {
+      ok: false,
+      error: err.message,
+      code: err.code || null,
+    };
+  }
+}
+
 function startBatteryWatcher({ onLowBattery, log = console }) {
   const cfg = config.battery;
   if (!cfg.enabled) {
@@ -77,4 +104,4 @@ function startBatteryWatcher({ onLowBattery, log = console }) {
   };
 }
 
-module.exports = { startBatteryWatcher };
+module.exports = { startBatteryWatcher, readBatterySnapshot };

@@ -92,8 +92,20 @@ function useApi() {
           opts.body = JSON.stringify(body);
         }
         const response = await fetch(withToken(path), opts);
-        if (!response.ok) throw new Error(response.status + ' ' + response.statusText);
-        return response.json();
+        let data = {};
+        try {
+          data = await response.json();
+        } catch {
+          /* body may be empty or non-JSON */
+        }
+        if (!response.ok) {
+          const msg =
+            data && typeof data.error === 'string'
+              ? data.error
+              : response.status + ' ' + response.statusText;
+          throw new Error(msg);
+        }
+        return data;
       },
     };
   }, [token]);
@@ -207,29 +219,33 @@ function atlasThemeQuery() {
     .join('&');
 }
 
-function ReaderModal({ title, meta, onClose, children, className = '' }) {
+function ReaderModal({ title, meta, onClose, children, className = '', actions }) {
   return (
     <div className={'modal-backdrop ' + className} role="dialog" aria-modal="true">
       <section className="reader-modal">
         <header className="reader-top">
           <button className="back-button" onClick={onClose}>Назад</button>
-          <div>
+          <div className="reader-top-titles">
             <strong>{title}</strong>
             {meta && <span>{meta}</span>}
           </div>
         </header>
+        {actions && <div className="reader-modal-actions">{actions}</div>}
         <div className="reader-body">{children}</div>
       </section>
     </div>
   );
 }
 
-function ReaderPane({ title, meta, children }) {
+function ReaderPane({ title, meta, children, actions }) {
   return (
     <section className="card reader-pane">
-      <header className="reader-pane-top">
-        <strong>{title}</strong>
-        {meta && <span>{meta}</span>}
+      <header className={'reader-pane-top' + (actions ? ' reader-pane-top-has-actions' : '')}>
+        <div className="reader-pane-head-text">
+          <strong>{title}</strong>
+          {meta && <span>{meta}</span>}
+        </div>
+        {actions}
       </header>
       <div className="reader-pane-body">{children}</div>
     </section>
@@ -592,6 +608,9 @@ function Journal({ api }) {
   const [days, setDays] = useState([]);
   const [selectedDay, setSelectedDay] = useState('');
   const [entries, setEntries] = useState(null);
+  const [ingestBusy, setIngestBusy] = useState(false);
+  const [ingestMsg, setIngestMsg] = useState('');
+  const [ingestErr, setIngestErr] = useState('');
   const selectedDayStorageKey = 'galaxy-dashboard-selected-journal-day';
 
   useEffect(() => {
@@ -610,7 +629,51 @@ function Journal({ api }) {
     setSelectedDay(day);
     localStorage.setItem(selectedDayStorageKey, day);
     setEntries(data.entries);
+    setIngestMsg('');
+    setIngestErr('');
   }
+
+  async function runDayIngest() {
+    if (!selectedDay || ingestBusy) return;
+    setIngestBusy(true);
+    setIngestMsg('');
+    setIngestErr('');
+    try {
+      const r = await api.post('/api/journal/ingest', { day: selectedDay });
+      if (r.skipped && r.reason === 'empty_day') {
+        setIngestMsg('День пуст — нечего разносить по заметкам.');
+      } else {
+        const w = r.writeNoteOk != null ? r.writeNoteOk : 0;
+        const t = r.toolRows != null ? r.toolRows : 0;
+        setIngestMsg(`Готово: успешных записей в заметки — ${w}, вызовов инструментов — ${t}.`);
+      }
+    } catch (e) {
+      setIngestErr(e.message || String(e));
+    } finally {
+      setIngestBusy(false);
+    }
+  }
+
+  const ingestActions =
+    entries && selectedDay ? (
+      <div className="journal-ingest-toolbar">
+        <button
+          type="button"
+          className="secondary"
+          disabled={ingestBusy}
+          onClick={runDayIngest}
+        >
+          {ingestBusy ? 'Обработка…' : 'Обработать день'}
+        </button>
+      </div>
+    ) : null;
+
+  const ingestBanner =
+    ingestMsg || ingestErr ? (
+      <p className={'journal-ingest-msg ' + (ingestErr ? 'err' : 'ok')}>
+        {ingestErr || ingestMsg}
+      </p>
+    ) : null;
 
   return (
     <div className="split-page">
@@ -628,7 +691,12 @@ function Journal({ api }) {
       </div>
       <div className="desktop-reader">
         {entries ? (
-          <ReaderPane title={formatJournalDayLabel(selectedDay)} meta={entries.length + ' entries'}>
+          <ReaderPane
+            title={formatJournalDayLabel(selectedDay)}
+            meta={entries.length + ' entries'}
+            actions={ingestActions}
+          >
+            {ingestBanner}
             <JournalEntries entries={entries} />
           </ReaderPane>
         ) : (
@@ -642,11 +710,13 @@ function Journal({ api }) {
           className="mobile-reader"
           title={formatJournalDayLabel(selectedDay)}
           meta={entries.length + ' entries'}
+          actions={ingestActions}
           onClose={() => {
             setEntries(null);
             setSelectedDay('');
           }}
         >
+          {ingestBanner}
           <JournalEntries entries={entries} />
         </ReaderModal>
       )}
