@@ -760,11 +760,11 @@ iframe {
 }
 
 .entry.user {
-  box-shadow: inset 3px 0 0 var(--color-user-mark);
+  background: color-mix(in srgb, var(--color-surface) 82%, var(--color-user-mark) 18%);
 }
 
 .entry.assistant {
-  box-shadow: inset 3px 0 0 var(--color-agent-mark);
+  background: color-mix(in srgb, var(--color-surface) 82%, var(--color-agent-mark) 18%);
 }
 
 .entry-meta {
