@@ -318,7 +318,16 @@ async function handleApi(req, res, url) {
     if (!chatId) return json(res, 200, { days: [], entries: [] });
     const day = url.searchParams.get('day');
     if (day) {
-      return json(res, 200, { day, entries: await journal.readDay(chatId, day) });
+      const entries = await journal.readDay(chatId, day);
+      const lastRow = await journalIngestLog.lastIngestForDay(day);
+      const lastJournalIngest = lastRow
+        ? {
+            ts: lastRow.ts,
+            skipped: lastRow.skipped === true,
+            writeNoteOk: lastRow.writeNoteOk,
+          }
+        : null;
+      return json(res, 200, { day, entries, lastJournalIngest });
     }
     return json(res, 200, { days: await journal.listDays(chatId) });
   }

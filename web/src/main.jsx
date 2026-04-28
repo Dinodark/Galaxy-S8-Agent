@@ -187,6 +187,19 @@ function formatJournalDayLabel(value) {
   });
 }
 
+/** Дата для confirm() повторной обработки журнала. */
+function formatJournalIngestHumanDate(iso) {
+  try {
+    return new Date(iso).toLocaleDateString('ru-RU', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+    });
+  } catch {
+    return iso || '';
+  }
+}
+
 /** Суммарный usage из нескольких вызовов chat (ingest / агент). */
 function formatAggUsage(u) {
   if (!u || typeof u !== 'object') return '';
@@ -330,7 +343,8 @@ function excerpt(text, max = 220) {
   return clean.length > max ? clean.slice(0, max - 1) + '…' : clean;
 }
 
-function extractSummaryInsights(text) {
+/** Текст секции «Мои мысли» … до «На завтра» в сводке (файл memory/notes/summary-*.md). */
+function extractInsightsSection(text) {
   const lines = String(text || '')
     .split(/\r?\n/)
     .map((line) => line.trim())
@@ -339,7 +353,14 @@ function extractSummaryInsights(text) {
   const tomorrowIndex = lines.findIndex((line) => /^##\s+На завтра/i.test(line));
   const start = thoughtsIndex >= 0 ? thoughtsIndex + 1 : 0;
   const end = tomorrowIndex > start ? tomorrowIndex : lines.length;
-  return excerpt(lines.slice(start, end).join(' '), 260);
+  return lines.slice(start, end).join('\n').trim();
+}
+
+function extractSummaryInsights(text) {
+  const body = extractInsightsSection(text);
+  if (!body) return '';
+  const singleLine = body.replace(/\s+/g, ' ');
+  return excerpt(singleLine, 260);
 }
 
 function FeedItem({ title, meta, children }) {
@@ -358,10 +379,12 @@ function Home({ api, setStateText, setView }) {
     status: null,
     notes: [],
     journal: [],
-    latestSummary: null,
-    summaryInsight: '',
+    summariesList: [],
     error: '',
   });
+  const [summaryIdx, setSummaryIdx] = useState(0);
+  const [summaryContent, setSummaryContent] = useState('');
+  const [insightExpanded, setInsightExpanded] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -375,12 +398,6 @@ function Home({ api, setStateText, setView }) {
         const summaries = notesData.notes
           .filter((note) => note.kind === 'summary')
           .sort((a, b) => String(b.name).localeCompare(String(a.name)));
-        let latestSummary = summaries[0] || null;
-        let summaryInsight = '';
-        if (latestSummary) {
-          const note = await api.get('/api/note?name=' + encodeURIComponent(latestSummary.name));
-          summaryInsight = extractSummaryInsights(note.content);
-        }
 
         if (!cancelled) {
           setState({
@@ -388,10 +405,10 @@ function Home({ api, setStateText, setView }) {
             status,
             notes: notesData.notes,
             journal: journalData.entries || [],
-            latestSummary,
-            summaryInsight,
+            summariesList: summaries,
             error: '',
           });
+          setSummaryIdx(0);
           setStateText('');
         }
       } catch (err) {
@@ -409,6 +426,39 @@ function Home({ api, setStateText, setView }) {
     };
   }, [api, setStateText]);
 
+  useEffect(() => {
+    setInsightExpanded(false);
+  }, [summaryIdx]);
+
+  useEffect(() => {
+    const list = state.summariesList;
+    if (!list.length || summaryIdx < 0 || summaryIdx >= list.length) {
+      setSummaryContent('');
+      return;
+    }
+    let cancelled = false;
+    const name = list[summaryIdx].name;
+    api
+      .get('/api/note?name=' + encodeURIComponent(name))
+      .then((note) => {
+        if (!cancelled) setSummaryContent(note.content || '');
+      })
+      .catch(() => {
+        if (!cancelled) setSummaryContent('');
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [api, state.summariesList, summaryIdx]);
+
+  function stepSummary(delta) {
+    setSummaryIdx((i) => {
+      const n = state.summariesList.length;
+      if (n === 0) return 0;
+      return Math.min(Math.max(0, i + delta), n - 1);
+    });
+  }
+
   if (state.loading) return <div className="card muted">Loading dashboard feed...</div>;
   if (state.error) return <pre>{state.error}</pre>;
 
@@ -418,6 +468,15 @@ function Home({ api, setStateText, setView }) {
     .sort((a, b) => String(b.mtime).localeCompare(String(a.mtime)))
     .slice(0, 5);
   const summariesCount = state.notes.filter((note) => note.kind === 'summary').length;
+  const summariesList = state.summariesList;
+  const currentSummaryName = summariesList[summaryIdx]?.name || '';
+  const insightFullText = extractInsightsSection(summaryContent);
+  const insightPreviewText = extractSummaryInsights(summaryContent);
+  const insightCollapsedShown =
+    insightPreviewText ||
+    (insightFullText ? excerpt(insightFullText.replace(/\s+/g, ' '), 260) : '');
+  const insightEmpty =
+    summariesList.length > 0 && !insightFullText && !insightPreviewText;
 
   return (
     <div className="home">
@@ -493,16 +552,83 @@ function Home({ api, setStateText, setView }) {
         </div>
 
         <div className="stack">
-          <div className="card">
-            <div className="section-head">
-              <h2>Latest insight</h2>
-              <span className="muted">
-                {state.latestSummary?.name
-                  ? formatSummaryTitleLabel(state.latestSummary.name)
-                  : 'no summary yet'}
-              </span>
+          <div
+            className={'card insight-card' + (insightExpanded ? ' insight-card-expanded' : '')}
+            onClick={() => {
+              if (summariesList.length) setInsightExpanded((v) => !v);
+            }}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (!summariesList.length) return;
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                setInsightExpanded((v) => !v);
+              }
+            }}
+            aria-expanded={insightExpanded}
+          >
+            <div className="section-head insight-head">
+              <div className="insight-title-block">
+                <h2>Latest insight</h2>
+                <span className="muted insight-date-label">
+                  {currentSummaryName
+                    ? formatSummaryTitleLabel(currentSummaryName)
+                    : 'нет сводок'}
+                </span>
+              </div>
+              <div className="insight-nav">
+                <button
+                  type="button"
+                  className="insight-arrow"
+                  aria-label="Новее"
+                  disabled={summaryIdx <= 0}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    stepSummary(-1);
+                  }}
+                >
+                  ‹
+                </button>
+                <span className="muted insight-counter">
+                  {summariesList.length ? `${summaryIdx + 1} / ${summariesList.length}` : '—'}
+                </span>
+                <button
+                  type="button"
+                  className="insight-arrow"
+                  aria-label="Старее"
+                  disabled={summaryIdx >= summariesList.length - 1}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    stepSummary(1);
+                  }}
+                >
+                  ›
+                </button>
+              </div>
             </div>
-            <p>{state.summaryInsight || 'Инсайты появятся после первой вечерней сводки.'}</p>
+            <p
+              className={
+                'insight-body-text' + (insightExpanded ? ' insight-body-text-full' : '')
+              }
+            >
+              {summariesList.length === 0 && 'Инсайты появятся после первой вечерней сводки.'}
+              {summariesList.length > 0 && insightEmpty && (
+                <>В этой сводке нет блока «Мои мысли» или он пуст.</>
+              )}
+              {summariesList.length > 0 &&
+                !insightEmpty &&
+                (insightExpanded ? insightFullText || insightCollapsedShown : insightCollapsedShown)}
+            </p>
+            {summariesList.length > 0 && currentSummaryName && (
+              <p
+                className="muted insight-source"
+                onClick={(e) => e.stopPropagation()}
+              >
+                Фрагмент из <code>memory/notes/{currentSummaryName}</code>, секция «Мои мысли» (до «На завтра»).
+                {insightExpanded ? ' Клик по карточке — свернуть.' : ' Клик по карточке — развернуть целиком.'}
+              </p>
+            )}
           </div>
 
           <div className="card">
@@ -648,6 +774,7 @@ function Journal({ api }) {
   const [ingestMsg, setIngestMsg] = useState('');
   const [ingestErr, setIngestErr] = useState('');
   const [ingestDetail, setIngestDetail] = useState(null);
+  const [lastJournalIngest, setLastJournalIngest] = useState(null);
   const selectedDayStorageKey = 'galaxy-dashboard-selected-journal-day';
 
   useEffect(() => {
@@ -666,6 +793,7 @@ function Journal({ api }) {
     setSelectedDay(day);
     localStorage.setItem(selectedDayStorageKey, day);
     setEntries(data.entries);
+    setLastJournalIngest(data.lastJournalIngest || null);
     setIngestMsg('');
     setIngestErr('');
     setIngestDetail(null);
@@ -673,6 +801,13 @@ function Journal({ api }) {
 
   async function runDayIngest() {
     if (!selectedDay || ingestBusy) return;
+    if (lastJournalIngest && lastJournalIngest.ts) {
+      const when = formatJournalIngestHumanDate(lastJournalIngest.ts);
+      const ok = window.confirm(
+        `Журнал был обработан ${when}. Уверены, что хотите обработать его ещё раз?`
+      );
+      if (!ok) return;
+    }
     setIngestBusy(true);
     setIngestMsg('');
     setIngestErr('');
@@ -695,6 +830,12 @@ function Journal({ api }) {
       setIngestErr(e.message || String(e));
     } finally {
       setIngestBusy(false);
+      try {
+        const refreshed = await api.get('/api/journal?day=' + encodeURIComponent(selectedDay));
+        setLastJournalIngest(refreshed.lastJournalIngest || null);
+      } catch {
+        /* ignore */
+      }
     }
   }
 
@@ -707,7 +848,7 @@ function Journal({ api }) {
           disabled={ingestBusy}
           onClick={runDayIngest}
         >
-          {ingestBusy ? 'Обработка…' : 'Обработать день'}
+          {ingestBusy ? 'Обработка…' : lastJournalIngest ? 'Обработать снова' : 'Обработать день'}
         </button>
       </div>
     ) : null;

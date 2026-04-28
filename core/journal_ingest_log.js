@@ -48,8 +48,45 @@ async function readRecent(limit = 80) {
   return { path: REL_PATH_IN_MEMORY, entries };
 }
 
+/**
+ * Последняя запись в логе для календарного дня журнала (для UI «уже обработан»).
+ * Игнорируем только попытки с невалидной датой.
+ */
+async function lastIngestForDay(dayStr) {
+  const normalized = String(dayStr || '').trim();
+  if (!normalized) return null;
+
+  const file = logPath();
+  if (!(await fse.pathExists(file))) return null;
+
+  let raw = await fse.readFile(file, 'utf8');
+  if (raw.length > 2_000_000) {
+    raw = raw.slice(raw.length - 1_500_000);
+    const nl = raw.indexOf('\n');
+    if (nl >= 0) raw = raw.slice(nl + 1);
+  }
+
+  const lines = raw.split(/\r?\n/).filter(Boolean);
+  let latest = null;
+  for (const line of lines) {
+    let e;
+    try {
+      e = JSON.parse(line);
+    } catch {
+      continue;
+    }
+    if (e.parseError) continue;
+    if (String(e.day || '') !== normalized) continue;
+    if (e.skipped && e.reason === 'invalid_day') continue;
+    if (!e.ts) continue;
+    if (!latest || new Date(e.ts) > new Date(latest.ts)) latest = e;
+  }
+  return latest;
+}
+
 module.exports = {
   logJournalIngestRun,
   readRecent,
+  lastIngestForDay,
   REL_PATH_IN_MEMORY,
 };
