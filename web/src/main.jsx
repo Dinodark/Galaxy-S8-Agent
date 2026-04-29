@@ -4,7 +4,8 @@ import './styles.css';
 import { SettingsPanel } from './settings_panel.jsx';
 import { AgentFlowDiagram } from './agent_flow.jsx';
 import { StatusPanel } from './status_panel.jsx';
-import { formatBalanceMain, formatBalanceSubtitle, formatUsd } from './openrouter_money.js';
+import { BatterySnapshotBlock } from './battery_snapshot.jsx';
+import { formatBalanceMain, formatBalanceSubtitle } from './openrouter_money.js';
 import { useDesignSystem } from './design_system.js';
 
 const navItems = [
@@ -412,6 +413,62 @@ function FeedItem({ title, meta, children }) {
   );
 }
 
+/** Батарея + остаток OpenRouter — низ левой панели. */
+function SideStatusFooter({ api }) {
+  const [status, setStatus] = useState(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      try {
+        const s = await api.get('/api/status');
+        if (!cancelled) setStatus(s);
+      } catch {
+        if (!cancelled) setStatus(null);
+      }
+    }
+    load();
+    const id = setInterval(load, 60_000);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+  }, [api]);
+
+  if (!status) {
+    return (
+      <footer className="side-status-footer">
+        <p className="muted side-status-muted">Статус…</p>
+      </footer>
+    );
+  }
+
+  const or = status.openrouter;
+
+  return (
+    <footer className="side-status-footer" aria-label="Батарея и баланс">
+      <div className="side-status-block">
+        <div className="side-status-label">Батарея</div>
+        <BatterySnapshotBlock battery={status.battery} compact />
+      </div>
+      <div className="side-status-block">
+        <div className="side-status-label">Остаток OpenRouter</div>
+        <div className="side-balance-values">
+          <strong title="limit_remaining, USD (GET /api/v1/key)">
+            {formatBalanceMain(or)}
+          </strong>
+          <small className="muted">
+            {or?.ok
+              ? formatBalanceSubtitle(or) ||
+                (or.currency === 'USD' ? 'суммы в USD с панели ключа' : 'лимит / расход')
+              : or?.error || 'данные ключа недоступны'}
+          </small>
+        </div>
+      </div>
+    </footer>
+  );
+}
+
 function Home({ api, setStateText, setView }) {
   const [state, setState] = useState({
     loading: true,
@@ -554,20 +611,6 @@ function Home({ api, setStateText, setView }) {
           <strong>{summariesCount}</strong>
           <small>daily reviews</small>
         </div>
-        <div className="stat-card">
-          <span>Остаток OpenRouter</span>
-          <strong title="limit_remaining, USD (GET /api/v1/key)">
-            {formatBalanceMain(state.status.openrouter)}
-          </strong>
-          <small>
-            {state.status.openrouter?.ok
-              ? formatBalanceSubtitle(state.status.openrouter) ||
-                (state.status.openrouter.currency === 'USD'
-                  ? 'суммы в USD с панели ключа'
-                  : 'лимит / расход')
-              : state.status.openrouter?.error || 'данные ключа недоступны'}
-          </small>
-        </div>
       </section>
 
       <section className="home-grid">
@@ -692,15 +735,6 @@ function Home({ api, setStateText, setView }) {
               STT: {state.status.stt.enabled ? 'on' : 'off'} · Daily review:{' '}
               {state.status.dailyReview.enabled ? 'on' : 'off'} · Reminders:{' '}
               {state.status.reminders.pending}
-              {state.status.openrouter?.ok && (
-                <>
-                  {' '}
-                  · баланс {formatBalanceMain(state.status.openrouter)}
-                  {formatUsd(state.status.openrouter.usage_daily) && (
-                    <> · сегодня {formatUsd(state.status.openrouter.usage_daily)}</>
-                  )}
-                </>
-              )}
             </p>
           </div>
         </div>
@@ -1441,44 +1475,47 @@ function App() {
   return (
     <div id="app">
       <aside className={'side ' + (menuOpen ? 'open' : '')}>
-        <h1>Vatoko Galaxy</h1>
-        <div className="nav">
-          {navItems.map(([id, label]) => (
-            <button
-              className={view === id ? 'active' : ''}
-              key={id}
-              onClick={() => navigate(id)}
-            >
-              {label}
-            </button>
-          ))}
+        <div className="side-body">
+          <h1>Vatoko Galaxy</h1>
+          <div className="nav">
+            {navItems.map(([id, label]) => (
+              <button
+                className={view === id ? 'active' : ''}
+                key={id}
+                onClick={() => navigate(id)}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          <section className="side-presets" aria-label="Пресеты темы">
+            <div className="side-presets-head">Пресеты</div>
+            {design.loading ? (
+              <p className="muted side-presets-empty">Загрузка…</p>
+            ) : (design.presets || []).length === 0 ? (
+              <p className="muted side-presets-empty">Пока только базовый пресет.</p>
+            ) : (
+              <ul className="side-presets-list">
+                {(design.presets || []).map((preset) => (
+                  <li key={preset.id}>
+                    <button
+                      type="button"
+                      className={
+                        'side-preset-chip' +
+                        (design.activePresetId === preset.id ? ' side-preset-chip-active' : '')
+                      }
+                      onClick={() => switchPreset(preset.id)}
+                    >
+                      {preset.name}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+          <p className="muted side-footnote">Dashboard for notes, projects, journal, and agent state.</p>
         </div>
-        <section className="side-presets" aria-label="Пресеты темы">
-          <div className="side-presets-head">Пресеты</div>
-          {design.loading ? (
-            <p className="muted side-presets-empty">Загрузка…</p>
-          ) : (design.presets || []).length === 0 ? (
-            <p className="muted side-presets-empty">Пока только базовый пресет.</p>
-          ) : (
-            <ul className="side-presets-list">
-              {(design.presets || []).map((preset) => (
-                <li key={preset.id}>
-                  <button
-                    type="button"
-                    className={
-                      'side-preset-chip' +
-                      (design.activePresetId === preset.id ? ' side-preset-chip-active' : '')
-                    }
-                    onClick={() => switchPreset(preset.id)}
-                  >
-                    {preset.name}
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
-        <p className="muted side-footnote">Dashboard for notes, projects, journal, and agent state.</p>
+        <SideStatusFooter api={api} />
       </aside>
       {menuOpen && <button className="drawer-backdrop" onClick={() => setMenuOpen(false)} aria-label="Close menu" />}
       <main className="main">
