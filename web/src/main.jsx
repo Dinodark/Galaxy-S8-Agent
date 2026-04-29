@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import './styles.css';
 import { SettingsPanel } from './settings_panel.jsx';
@@ -747,17 +747,25 @@ function FileBrowser({ kind, api, desktopDetail = false }) {
   const [notes, setNotes] = useState([]);
   const [selected, setSelected] = useState(null);
   const [content, setContent] = useState('');
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState('');
+  const [saveBusy, setSaveBusy] = useState(false);
+  const [saveError, setSaveError] = useState('');
   const kindLabel = kind === 'summary' ? 'сводку' : 'файл';
   const selectedStorageKey = 'galaxy-dashboard-selected-' + kind;
   const selectedDisplayTitle = selected
     ? formatNoteReaderTitle(selected, kind)
     : '';
 
-  useEffect(() => {
-    api.get('/api/notes').then((data) => {
+  const refreshNoteList = useCallback(() => {
+    return api.get('/api/notes').then((data) => {
       setNotes(data.notes.filter((note) => note.kind === kind));
     });
   }, [api, kind]);
+
+  useEffect(() => {
+    refreshNoteList();
+  }, [refreshNoteList]);
 
   const groups = useMemo(() => groupNotesByFolderForBrowser(notes), [notes]);
 
@@ -770,10 +778,91 @@ function FileBrowser({ kind, api, desktopDetail = false }) {
   }, [notes]);
 
   async function openNote(name) {
+    setEditing(false);
+    setSaveError('');
     setSelected(name);
     localStorage.setItem(selectedStorageKey, name);
     const note = await api.get('/api/note?name=' + encodeURIComponent(name));
     setContent(note.content);
+    setDraft(note.content);
+  }
+
+  function beginEditSummary() {
+    setSaveError('');
+    setDraft(content);
+    setEditing(true);
+  }
+
+  function cancelEditSummary() {
+    setSaveError('');
+    setDraft(content);
+    setEditing(false);
+  }
+
+  async function saveSummary() {
+    if (!selected) return;
+    setSaveBusy(true);
+    setSaveError('');
+    try {
+      await api.post('/api/notes/save', { name: selected, content: draft });
+      setContent(draft);
+      setEditing(false);
+      await refreshNoteList();
+    } catch (e) {
+      setSaveError(e && e.message ? e.message : String(e));
+    } finally {
+      setSaveBusy(false);
+    }
+  }
+
+  const summaryReaderActions =
+    kind === 'summary' && selected ? (
+      <div className="reader-file-actions">
+        {!editing ? (
+          <button type="button" className="secondary" onClick={beginEditSummary}>
+            Редактировать
+          </button>
+        ) : (
+          <>
+            <button
+              type="button"
+              className="secondary"
+              disabled={saveBusy}
+              onClick={cancelEditSummary}
+            >
+              Отмена
+            </button>
+            <button
+              type="button"
+              disabled={saveBusy || draft === content}
+              onClick={saveSummary}
+            >
+              {saveBusy ? 'Сохранение…' : 'Сохранить'}
+            </button>
+          </>
+        )}
+      </div>
+    ) : null;
+
+  function renderNoteBody() {
+    if (kind === 'summary' && editing) {
+      return (
+        <>
+          {saveError && <p className="summary-save-err">{saveError}</p>}
+          <textarea
+            className="summary-editor"
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            spellCheck={false}
+            aria-label="Текст сводки"
+          />
+        </>
+      );
+    }
+    if (kind === 'summary') {
+      return <SummaryMarkdown text={content} />;
+    }
+    return <pre>{content}</pre>;
   }
 
   return (
@@ -814,8 +903,12 @@ function FileBrowser({ kind, api, desktopDetail = false }) {
       {desktopDetail && (
         <div className="desktop-reader">
           {selected ? (
-            <ReaderPane title={selectedDisplayTitle} meta={kind}>
-              {kind === 'summary' ? <SummaryMarkdown text={content} /> : <pre>{content}</pre>}
+            <ReaderPane
+              title={selectedDisplayTitle}
+              meta={kind}
+              actions={summaryReaderActions}
+            >
+              {renderNoteBody()}
             </ReaderPane>
           ) : (
             <div className="card reader-empty">
@@ -829,9 +922,14 @@ function FileBrowser({ kind, api, desktopDetail = false }) {
           className={desktopDetail ? 'mobile-reader' : ''}
           title={selectedDisplayTitle}
           meta={kind}
-          onClose={() => setSelected(null)}
+          onClose={() => {
+            setSelected(null);
+            setEditing(false);
+            setSaveError('');
+          }}
+          actions={summaryReaderActions}
         >
-          {kind === 'summary' ? <SummaryMarkdown text={content} /> : <pre>{content}</pre>}
+          {renderNoteBody()}
         </ReaderModal>
       )}
     </div>

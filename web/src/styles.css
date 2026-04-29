@@ -1114,6 +1114,38 @@ iframe {
   margin: 6px 0;
 }
 
+.reader-file-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.summary-save-err {
+  max-width: 920px;
+  margin: 0 auto 10px;
+  color: var(--color-danger-text);
+  font-size: 14px;
+}
+
+.summary-editor {
+  display: block;
+  width: 100%;
+  max-width: 920px;
+  min-height: min(70vh, 640px);
+  margin: 0 auto;
+  box-sizing: border-box;
+  padding: 14px 16px;
+  font-family: ui-monospace, 'Cascadia Code', 'Consolas', monospace;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--color-text);
+  background: var(--color-surface-soft);
+  border: 1px solid var(--line, #2a2a2a);
+  border-radius: var(--radius-md, 8px);
+  resize: vertical;
+}
+
 .modal-backdrop.mobile-reader {
   display: none;
 }
