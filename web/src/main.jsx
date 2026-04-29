@@ -1,4 +1,11 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, {
+  Fragment,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { createRoot } from 'react-dom/client';
 import './styles.css';
 import { SettingsPanel } from './settings_panel.jsx';
@@ -318,58 +325,312 @@ function ReaderPane({ title, meta, children, actions }) {
   );
 }
 
-function SummaryMarkdown({ text }) {
+/** Разбор *курсива* вне кода и ссылок; не трогает **. */
+function parseItalicOnly(text, keyPrefix) {
+  const result = [];
+  if (!text) return result;
+  const re = /\*([^*]+)\*/g;
+  let last = 0;
+  let m;
+  let k = 0;
+  while ((m = re.exec(text)) !== null) {
+    if (m.index > last) {
+      result.push(text.slice(last, m.index));
+    }
+    result.push(
+      <em key={`${keyPrefix}-em-${k++}`}>{m[1]}</em>
+    );
+    last = re.lastIndex;
+  }
+  if (last < text.length) {
+    result.push(text.slice(last));
+  }
+  return result.length ? result : [text];
+}
+
+/** Ссылки [label](url) и курсив в оставшемся тексте. */
+function parseLinksAndItalic(text, keyPrefix) {
+  if (!text) return [];
+  const nodes = [];
+  const linkRe = /\[([^\]]+)\]\(([^)\s]+)\)/g;
+  let pos = 0;
+  let m;
+  let idx = 0;
+  while ((m = linkRe.exec(text)) !== null) {
+    if (m.index > pos) {
+      nodes.push(
+        ...parseItalicOnly(text.slice(pos, m.index), `${keyPrefix}-b-${idx}`)
+      );
+    }
+    nodes.push(
+      <a
+        key={`${keyPrefix}-a-${idx}`}
+        href={m[2]}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="md-link"
+      >
+        {m[1]}
+      </a>
+    );
+    pos = m.index + m[0].length;
+    idx++;
+  }
+  if (pos < text.length) {
+    nodes.push(...parseItalicOnly(text.slice(pos), `${keyPrefix}-tail`));
+  }
+  return nodes.length ? nodes : parseItalicOnly(text, keyPrefix);
+}
+
+function expandInlineSegment(segment, keyPrefix, codeStore) {
+  const parts = segment.split(/\x00CODE(\d+)\x00/);
+  const out = [];
+  for (let i = 0; i < parts.length; i++) {
+    if (i % 2 === 1) {
+      const code = codeStore[Number(parts[i])];
+      out.push(
+        <code key={`${keyPrefix}-c-${i}`} className="md-inline-code">
+          {code}
+        </code>
+      );
+    } else {
+      out.push(...parseLinksAndItalic(parts[i], `${keyPrefix}-t-${i}`));
+    }
+  }
+  return out;
+}
+
+/**
+ * Инлайн: `код`, **жирный**, *курсив*, [текст](url).
+ * Порядок: код → жирный → ссылки и курсив внутри сегментов.
+ */
+function renderInlineMarkdown(text, keyPrefix = 'inl') {
+  const str = String(text ?? '');
+  if (!str) return null;
+
+  const codeStore = [];
+  const masked = str.replace(/`([^`]+)`/g, (_, code) => {
+    const id = codeStore.length;
+    codeStore.push(code);
+    return `\x00CODE${id}\x00`;
+  });
+
+  const boldParts = masked.split(/\*\*/);
+  const nodes = [];
+  boldParts.forEach((seg, bi) => {
+    const subKey = `${keyPrefix}-b${bi}`;
+    const inner = expandInlineSegment(seg, subKey, codeStore);
+    if (bi % 2 === 1) {
+      nodes.push(<strong key={subKey}>{inner}</strong>);
+    } else {
+      nodes.push(...inner);
+    }
+  });
+
+  return nodes.length ? nodes : null;
+}
+
+/** Читабельный markdown для сводок и заметок (без таблиц и HTML). */
+function MarkdownDoc({ text }) {
+  const lines = String(text || '').split(/\r?\n/);
   const blocks = [];
-  let list = [];
+  let i = 0;
+  let listMode = null;
+  let listItems = [];
 
   function flushList() {
-    if (list.length === 0) return;
-    blocks.push({ type: 'list', items: list });
-    list = [];
+    if (!listMode || listItems.length === 0) {
+      listMode = null;
+      listItems = [];
+      return;
+    }
+    blocks.push({ type: listMode, items: [...listItems] });
+    listMode = null;
+    listItems = [];
   }
 
-  String(text || '').split(/\r?\n/).forEach((line) => {
-    const trimmed = line.trim();
-    if (!trimmed) {
+  while (i < lines.length) {
+    const t = lines[i].trim();
+
+    if (!t) {
       flushList();
-      return;
+      i++;
+      continue;
     }
 
-    if (trimmed.startsWith('# ')) {
+    if (/^(\*{3,}|-{3,}|_{3,})$/.test(t)) {
       flushList();
-      blocks.push({ type: 'h1', text: trimmed.slice(2).trim() });
-      return;
+      blocks.push({ type: 'hr' });
+      i++;
+      continue;
     }
 
-    if (trimmed.startsWith('## ')) {
+    if (t.startsWith('#### ')) {
       flushList();
-      blocks.push({ type: 'h2', text: trimmed.slice(3).trim() });
-      return;
+      blocks.push({ type: 'h4', text: t.slice(5).trim() });
+      i++;
+      continue;
+    }
+    if (t.startsWith('### ')) {
+      flushList();
+      blocks.push({ type: 'h3', text: t.slice(4).trim() });
+      i++;
+      continue;
+    }
+    if (t.startsWith('## ')) {
+      flushList();
+      blocks.push({ type: 'h2', text: t.slice(3).trim() });
+      i++;
+      continue;
+    }
+    if (t.startsWith('# ')) {
+      flushList();
+      blocks.push({ type: 'h1', text: t.slice(2).trim() });
+      i++;
+      continue;
     }
 
-    if (trimmed.startsWith('- ')) {
-      list.push(trimmed.slice(2).trim());
-      return;
+    if (t.startsWith('>')) {
+      flushList();
+      const quoteLines = [];
+      while (i < lines.length) {
+        const lt = lines[i].trim();
+        if (!lt) break;
+        if (lt.startsWith('>')) {
+          quoteLines.push(lt.replace(/^>\s?/, '').trim());
+          i++;
+        } else break;
+      }
+      blocks.push({ type: 'blockquote', lines: quoteLines });
+      continue;
+    }
+
+    const olMatch = t.match(/^(\d+)\.\s+(.*)$/);
+    if (olMatch) {
+      if (listMode !== 'ol') {
+        flushList();
+        listMode = 'ol';
+      }
+      listItems.push(olMatch[2]);
+      i++;
+      continue;
+    }
+
+    if (/^-\s+/.test(t)) {
+      if (listMode !== 'ul') {
+        flushList();
+        listMode = 'ul';
+      }
+      listItems.push(t.replace(/^-\s+/, ''));
+      i++;
+      continue;
+    }
+
+    if (/^\*\s+/.test(t) && !t.startsWith('**')) {
+      if (listMode !== 'ul') {
+        flushList();
+        listMode = 'ul';
+      }
+      listItems.push(t.replace(/^\*\s+/, ''));
+      i++;
+      continue;
     }
 
     flushList();
-    blocks.push({ type: 'p', text: trimmed });
-  });
+
+    const paraLines = [t];
+    i++;
+    while (i < lines.length) {
+      const nt = lines[i].trim();
+      if (!nt) break;
+      if (
+        nt.startsWith('#') ||
+        nt.startsWith('>') ||
+        /^(\*{3,}|-{3,}|_{3,})$/.test(nt) ||
+        /^-\s+/.test(nt) ||
+        (/^\*\s+/.test(nt) && !nt.startsWith('**')) ||
+        /^\d+\.\s+/.test(nt)
+      ) {
+        break;
+      }
+      paraLines.push(nt);
+      i++;
+    }
+    blocks.push({ type: 'p', lines: paraLines });
+  }
+
   flushList();
 
   return (
-    <div className="summary-markdown">
+    <div className="md-doc">
       {blocks.map((block, index) => {
-        if (block.type === 'h1') return <h1 key={index}>{block.text}</h1>;
-        if (block.type === 'h2') return <h2 key={index}>{block.text}</h2>;
-        if (block.type === 'list') {
+        const key = `blk-${index}`;
+        if (block.type === 'hr') {
+          return <hr key={key} className="md-hr" />;
+        }
+        if (block.type === 'h1') {
           return (
-            <ul key={index}>
-              {block.items.map((item, itemIndex) => <li key={itemIndex}>{item}</li>)}
+            <h1 key={key}>{renderInlineMarkdown(block.text, `${key}-h1`)}</h1>
+          );
+        }
+        if (block.type === 'h2') {
+          return (
+            <h2 key={key}>{renderInlineMarkdown(block.text, `${key}-h2`)}</h2>
+          );
+        }
+        if (block.type === 'h3') {
+          return (
+            <h3 key={key}>{renderInlineMarkdown(block.text, `${key}-h3`)}</h3>
+          );
+        }
+        if (block.type === 'h4') {
+          return (
+            <h4 key={key}>{renderInlineMarkdown(block.text, `${key}-h4`)}</h4>
+          );
+        }
+        if (block.type === 'blockquote') {
+          return (
+            <blockquote key={key} className="md-blockquote">
+              {block.lines.map((qline, qi) => (
+                <p key={`${key}-q-${qi}`}>
+                  {renderInlineMarkdown(qline, `${key}-qb-${qi}`)}
+                </p>
+              ))}
+            </blockquote>
+          );
+        }
+        if (block.type === 'ul') {
+          return (
+            <ul key={key}>
+              {block.items.map((item, ii) => (
+                <li key={`${key}-li-${ii}`}>
+                  {renderInlineMarkdown(item, `${key}-uli-${ii}`)}
+                </li>
+              ))}
             </ul>
           );
         }
-        return <p key={index}>{block.text}</p>;
+        if (block.type === 'ol') {
+          return (
+            <ol key={key}>
+              {block.items.map((item, ii) => (
+                <li key={`${key}-oli-${ii}`}>
+                  {renderInlineMarkdown(item, `${key}-oli-${ii}`)}
+                </li>
+              ))}
+            </ol>
+          );
+        }
+        return (
+          <p key={key} className="md-paragraph">
+            {block.lines.map((line, li) => (
+              <Fragment key={`${key}-ln-${li}`}>
+                {li > 0 ? <br /> : null}
+                {renderInlineMarkdown(line, `${key}-ln-${li}`)}
+              </Fragment>
+            ))}
+          </p>
+        );
       })}
     </div>
   );
@@ -787,19 +1048,19 @@ function FileBrowser({ kind, api, desktopDetail = false }) {
     setDraft(note.content);
   }
 
-  function beginEditSummary() {
+  function beginEditFile() {
     setSaveError('');
     setDraft(content);
     setEditing(true);
   }
 
-  function cancelEditSummary() {
+  function cancelEditFile() {
     setSaveError('');
     setDraft(content);
     setEditing(false);
   }
 
-  async function saveSummary() {
+  async function saveFile() {
     if (!selected) return;
     setSaveBusy(true);
     setSaveError('');
@@ -815,11 +1076,11 @@ function FileBrowser({ kind, api, desktopDetail = false }) {
     }
   }
 
-  const summaryReaderActions =
-    kind === 'summary' && selected ? (
+  const fileReaderActions =
+    (kind === 'summary' || kind === 'note') && selected ? (
       <div className="reader-file-actions">
         {!editing ? (
-          <button type="button" className="secondary" onClick={beginEditSummary}>
+          <button type="button" className="secondary" onClick={beginEditFile}>
             Редактировать
           </button>
         ) : (
@@ -828,14 +1089,14 @@ function FileBrowser({ kind, api, desktopDetail = false }) {
               type="button"
               className="secondary"
               disabled={saveBusy}
-              onClick={cancelEditSummary}
+              onClick={cancelEditFile}
             >
               Отмена
             </button>
             <button
               type="button"
               disabled={saveBusy || draft === content}
-              onClick={saveSummary}
+              onClick={saveFile}
             >
               {saveBusy ? 'Сохранение…' : 'Сохранить'}
             </button>
@@ -845,22 +1106,23 @@ function FileBrowser({ kind, api, desktopDetail = false }) {
     ) : null;
 
   function renderNoteBody() {
-    if (kind === 'summary' && editing) {
+    const editMode = editing && (kind === 'summary' || kind === 'note');
+    if (editMode) {
       return (
         <>
-          {saveError && <p className="summary-save-err">{saveError}</p>}
+          {saveError && <p className="md-save-err">{saveError}</p>}
           <textarea
-            className="summary-editor"
+            className="md-raw-editor"
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             spellCheck={false}
-            aria-label="Текст сводки"
+            aria-label={kind === 'summary' ? 'Текст сводки' : 'Текст заметки'}
           />
         </>
       );
     }
-    if (kind === 'summary') {
-      return <SummaryMarkdown text={content} />;
+    if (kind === 'summary' || kind === 'note') {
+      return <MarkdownDoc text={content} />;
     }
     return <pre>{content}</pre>;
   }
@@ -906,7 +1168,7 @@ function FileBrowser({ kind, api, desktopDetail = false }) {
             <ReaderPane
               title={selectedDisplayTitle}
               meta={kind}
-              actions={summaryReaderActions}
+              actions={fileReaderActions}
             >
               {renderNoteBody()}
             </ReaderPane>
@@ -927,7 +1189,7 @@ function FileBrowser({ kind, api, desktopDetail = false }) {
             setEditing(false);
             setSaveError('');
           }}
-          actions={summaryReaderActions}
+          actions={fileReaderActions}
         >
           {renderNoteBody()}
         </ReaderModal>
