@@ -16,6 +16,7 @@ const journalIngestLog = require('./journal_ingest_log');
 const { isSummaryFilename } = require('./notes_paths');
 const { runJournalIngest } = require('./watchers/journal_ingest');
 
+const { getUpdateStatus } = require('./git_update_status');
 const UPDATE_LOG_FILE = path.join(config.paths.tmpDir, 'update-restart.log');
 const UPDATE_PID_FILE = path.join(config.paths.tmpDir, 'update-restart.pid');
 const UPDATE_SCRIPT = path.join(__dirname, '..', 'scripts', 'update_restart.sh');
@@ -227,6 +228,22 @@ async function handleApi(req, res, url) {
 
   if (pathname === '/api/actions/update-log') {
     return json(res, 200, await readUpdateLog());
+  }
+
+  if (pathname === '/api/actions/update-check') {
+    if (req.method !== 'GET') {
+      return json(res, 405, { error: 'method not allowed' });
+    }
+    try {
+      return json(res, 200, await getUpdateStatus());
+    } catch (err) {
+      return json(res, 200, {
+        ok: false,
+        isGit: false,
+        error: err && err.message ? err.message : String(err),
+        recommendUpdate: false,
+      });
+    }
   }
 
   if (pathname === '/api/actions/update-restart') {

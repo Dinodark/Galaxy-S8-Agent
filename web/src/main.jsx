@@ -1389,6 +1389,8 @@ function Atlas({ api, token, setStateText }) {
 
 function UpdatePanel({ api }) {
   const [log, setLog] = useState(null);
+  const [check, setCheck] = useState(null);
+  const [checkLoading, setCheckLoading] = useState(true);
   const logScrollRef = useRef(null);
 
   const displayLog =
@@ -1396,6 +1398,21 @@ function UpdatePanel({ api }) {
 
   async function refreshLog() {
     setLog(await api.get('/api/actions/update-log'));
+  }
+
+  async function refreshCheck() {
+    setCheckLoading(true);
+    try {
+      setCheck(await api.get('/api/actions/update-check'));
+    } catch (e) {
+      setCheck({
+        ok: false,
+        recommendUpdate: false,
+        error: e && e.message ? e.message : String(e),
+      });
+    } finally {
+      setCheckLoading(false);
+    }
   }
 
   async function triggerUpdate() {
@@ -1411,6 +1428,7 @@ function UpdatePanel({ api }) {
 
   useEffect(() => {
     refreshLog();
+    refreshCheck();
   }, []);
 
   useEffect(() => {
@@ -1421,8 +1439,79 @@ function UpdatePanel({ api }) {
     });
   }, [displayLog]);
 
+  function renderUpdateBanner() {
+    if (checkLoading) {
+      return (
+        <div className="update-check-banner update-check-banner--ok">
+          <strong>Проверка git…</strong>
+          <span className="muted">Сравниваем с origin (может занять до минуты без сети).</span>
+        </div>
+      );
+    }
+    if (!check || check.isGit === false || check.ok === false) {
+      return (
+        <div className="update-check-banner update-check-banner--warn">
+          <strong>Обновления не проверены</strong>
+          <span>{check?.error || 'Нет данных.'}</span>
+          <p className="update-check-meta">
+            На телефоне нужны установленные git и клон репозитория; кнопка «Обновить» ниже всё равно выполнит git pull.
+          </p>
+        </div>
+      );
+    }
+    const behind = check.behind;
+    const ahead = check.ahead;
+    const rec = check.recommendUpdate;
+    if (rec && typeof behind === 'number' && behind > 0) {
+      return (
+        <div className="update-check-banner update-check-banner--updates">
+          <strong>Доступно обновление агента</strong>
+          <span>
+            На удалённой ветке на <strong>{behind}</strong>{' '}
+            {behind === 1 ? 'коммит новее' : 'коммита новее'}, чем у тебя локально.
+            {typeof ahead === 'number' && ahead > 0
+              ? ` У тебя локально на ${ahead} комм. впереди origin — перед обновлением может понадобиться merge/rebase.`
+              : ''}
+          </span>
+          <p className="update-check-meta">
+            Ветка: <code>{check.branch || '—'}</code>
+            {check.compareRef ? (
+              <>
+                {' · '}
+                сравнение с <code>{check.upstream || check.compareRef}</code>
+              </>
+            ) : null}
+            {check.fetchError ? ` · fetch: ${check.fetchError}` : ''}
+          </p>
+        </div>
+      );
+    }
+    if (typeof behind === 'number' && typeof ahead === 'number' && behind === 0) {
+      return (
+        <div className="update-check-banner update-check-banner--ok">
+          <strong>Версия актуальна</strong>
+          <span>
+            Локальная ветка совпадает с удалённой (0 новых коммитов на origin).
+            {ahead > 0 ? ` Локально впереди на ${ahead} комм.` : ''}
+          </span>
+          <p className="update-check-meta">
+            Ветка: <code>{check.branch || '—'}</code>
+            {check.fetchError ? ` · fetch: ${check.fetchError}` : ''}
+          </p>
+        </div>
+      );
+    }
+    return (
+      <div className="update-check-banner update-check-banner--warn">
+        <strong>Статус сравнения неясен</strong>
+        <span>{check.error || check.fetchError || 'Нет upstream или не удалось посчитать коммиты.'}</span>
+      </div>
+    );
+  }
+
   return (
     <div className="stack update-page">
+      {renderUpdateBanner()}
       <div className="card">
         <h2>Update & restart agent</h2>
         <p className="muted">
@@ -1432,6 +1521,9 @@ function UpdatePanel({ api }) {
         <div className="actions">
           <button className="danger" onClick={triggerUpdate}>Update & restart</button>
           <button className="secondary" onClick={refreshLog}>Refresh log</button>
+          <button type="button" className="secondary" onClick={() => { refreshCheck(); refreshLog(); }}>
+            Проверить обновления
+          </button>
         </div>
       </div>
       <div className="card update-log-card">

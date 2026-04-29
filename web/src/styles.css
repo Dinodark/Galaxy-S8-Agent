@@ -838,6 +838,40 @@ button.secondary {
 }
 
 /* Update: log panel height-bounded, scroll inside; JS scrolls to end on load/refresh */
+.update-check-banner {
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+  margin-bottom: 14px;
+  border: 1px solid var(--line);
+  background: var(--color-surface-soft);
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.update-check-banner strong {
+  display: block;
+  margin-bottom: 4px;
+}
+
+.update-check-banner--ok {
+  border-color: color-mix(in srgb, var(--color-muted) 35%, transparent);
+}
+
+.update-check-banner--updates {
+  border-color: color-mix(in srgb, var(--color-accent) 55%, transparent);
+  background: color-mix(in srgb, var(--color-accent) 8%, var(--color-surface-soft));
+}
+
+.update-check-banner--warn {
+  border-color: color-mix(in srgb, var(--color-muted) 50%, transparent);
+}
+
+.update-check-meta {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: var(--color-muted);
+}
+
 .update-page {
   min-height: 0;
 }
