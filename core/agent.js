@@ -12,6 +12,8 @@ const {
 } = require('./knowledge_orchestrator');
 const {
   userAskedToWriteMemory,
+  userAskedForMemoryInventory,
+  userWantsKnowledgeDiscussion,
   implicitCaptureFromMedia,
   shouldUseDeterministicMemoryInventory,
   userAskedForReminder,
@@ -20,6 +22,10 @@ const {
   extractWriteNotePayload,
   stripWriteNoteJsonFences,
 } = require('./write_note_recovery');
+const {
+  extractPrintedToolCall,
+  stripPrintedToolInvocations,
+} = require('./tool_call_recovery');
 
 let cachedSystemPrompt = null;
 
@@ -254,7 +260,7 @@ function recoverWriteNoteArgs(userMessage, assistantContent) {
 }
 
 function sanitizeAssistantReplyForTelegram(content) {
-  return stripWriteNoteJsonFences(String(content || ''));
+  return stripPrintedToolInvocations(stripWriteNoteJsonFences(String(content || '')));
 }
 
 function briefWriteNoteReply(result, append) {
@@ -297,7 +303,9 @@ async function runAgent({ chatId, userMessage, via = 'text' }) {
     }
   }
 
-  if (shouldUseDeterministicMemoryInventory(userMessage)) {
+  const knowledgeDiscussion = userWantsKnowledgeDiscussion(userMessage);
+
+  if (shouldUseDeterministicMemoryInventory(userMessage) && !knowledgeDiscussion) {
     const inventory = await buildMemoryInventoryContext(toolCtx);
     const files = Array.isArray(inventory.result.files) ? inventory.result.files : [];
     transcript.push({
@@ -315,6 +323,22 @@ async function runAgent({ chatId, userMessage, via = 'text' }) {
       toolCalls: transcript,
       steps: 1,
     };
+  }
+
+  if (
+    knowledgeDiscussion ||
+    (userAskedForMemoryInventory(userMessage) &&
+      !shouldUseDeterministicMemoryInventory(userMessage))
+  ) {
+    const inventory = await buildMemoryInventoryContext(toolCtx);
+    transcript.push({
+      tool: 'list_notes',
+      args: {},
+      result: inventory.result,
+      grounded: true,
+      preloaded: true,
+    });
+    turnContext.push(inventory.message);
   }
 
   for (let step = 0; step < config.agent.maxSteps; step++) {
@@ -349,6 +373,45 @@ async function runAgent({ chatId, userMessage, via = 'text' }) {
       }
 
       history = await memory.appendToHistory(chatId, pushed);
+      continue;
+    }
+
+    const printedTool = extractPrintedToolCall(assistantMsg.content || '');
+    if (printedTool) {
+      const { name: toolName, args: toolArgs } = printedTool;
+      const result = await tools.execute(toolName, toolArgs, toolCtx);
+      transcript.push({
+        tool: toolName,
+        args: toolArgs,
+        result,
+        recoveredFromText: true,
+      });
+      const fakeId = `recover_${step}_${Date.now()}`;
+      const stripped = stripPrintedToolInvocations(stripWriteNoteJsonFences(assistantMsg.content || ''));
+      const assistantContent =
+        stripped && stripped.trim().length > 0 ? stripped.trim() : null;
+      history = await memory.appendToHistory(chatId, [
+        {
+          role: 'assistant',
+          content: assistantContent,
+          tool_calls: [
+            {
+              id: fakeId,
+              type: 'function',
+              function: {
+                name: toolName,
+                arguments: JSON.stringify(toolArgs || {}),
+              },
+            },
+          ],
+        },
+        {
+          role: 'tool',
+          tool_call_id: fakeId,
+          name: toolName,
+          content: JSON.stringify(result).slice(0, 8000),
+        },
+      ]);
       continue;
     }
 

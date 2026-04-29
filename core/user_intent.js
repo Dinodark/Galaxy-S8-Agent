@@ -25,11 +25,21 @@ function userAskedForMemoryInventory(text) {
    * (that case used to fail the old two-regex AND).
    */
   const aboutFilesOrKb =
-    /файл|замет|баз[ауы]\s+знан|memory|notes|memory\/notes|полн(ого|ый|ая|ое)?\s*список|список\s+файл|все\s+файл|файлов(ая|ую|ой)?\s*структур|каталог|дерев|папк|структур/.test(
+    /файл|замет|баз[ауы]\s+знан|memory|notes|memory\/notes|полн(ого|ый|ая|ое)?\s*список|список\s+файл|все\s+файл|файлов(ая|ую|ой)?\s*структур|каталог|дерев|папк|структур|проект|инбокс|сводк/i.test(
       s
     );
 
   return wantsListing && aboutFilesOrKb;
+}
+
+/**
+ * Вопросы «над чем работаем», «что в базе» — нужен ответ модели с контекстом, а не только дерево файлов.
+ */
+function userWantsKnowledgeDiscussion(text) {
+  const s = String(text || '').toLowerCase();
+  return /проект|над\s+чем\s+(мы\s+|вы\s+|я\s+)?работ|в\s+работе\s+сейчас|активн\w*\s+проект|баз[ау]\s+знан|что\s+(ты\s+|вы\s+)?(помнишь|знаешь)\s+про|обсудим|инбокс|какие\s+у\s+нас\s+проект/i.test(
+    s
+  );
 }
 
 function userAskedForReminder(text) {
@@ -69,6 +79,7 @@ function shouldUseDeterministicMemoryInventory(userMessage) {
 module.exports = {
   userAskedToWriteMemory,
   userAskedForMemoryInventory,
+  userWantsKnowledgeDiscussion,
   userAskedForReminder,
   implicitCaptureFromMedia,
   shouldUseDeterministicMemoryInventory,

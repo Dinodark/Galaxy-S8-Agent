@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 const {
   userAskedToWriteMemory,
   userAskedForMemoryInventory,
+  userWantsKnowledgeDiscussion,
   userAskedForReminder,
   implicitCaptureFromMedia,
   shouldUseDeterministicMemoryInventory,
@@ -26,6 +27,13 @@ test('userAskedToWriteMemory: false for bare continuation (merge must supply fir
 test('userAskedForMemoryInventory: list-only without write', () => {
   const q = 'Какие файлы есть в базе знаний?';
   assert.equal(userAskedForMemoryInventory(q), true);
+  assert.equal(userAskedToWriteMemory(q), false);
+});
+
+test('userAskedForMemoryInventory: проекты в работе (какие + проект)', () => {
+  const q = 'Какие у нас проекты в работе сейчас?';
+  assert.equal(userAskedForMemoryInventory(q), true);
+  assert.equal(userWantsKnowledgeDiscussion(q), true);
   assert.equal(userAskedToWriteMemory(q), false);
 });
 

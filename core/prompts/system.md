@@ -91,9 +91,10 @@ Categories of tools:
    instead of calling the tool. Journal capture does not replace structured
    notes when they asked (explicitly or by intent) to save.
 5. **Never paste tool payloads in chat.** Do not output fenced `json`
-   blocks, `{ "name": ... }` objects, or pseudo tool calls — the host executes real
-   tools from function calls only. If you catch yourself writing JSON for
-   `write_note`, stop and call `write_note` instead.
+   blocks, `{ "name": ... }` / `{"call":"list_notes"}`-style text, or pseudo
+   tool calls — use real function calls only. If you need the file list or a
+   note, invoke `list_notes` / `read_note` / `write_note` through the API, not
+   as JSON in the message.
 
 ### What the tools are for
 6. When the user **explicitly asks** to remember something, save it
