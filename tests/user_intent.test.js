@@ -3,6 +3,8 @@ const assert = require('node:assert/strict');
 const {
   userAskedToWriteMemory,
   userAskedForMemoryInventory,
+  userAskedForReminder,
+  implicitCaptureFromMedia,
   shouldUseDeterministicMemoryInventory,
 } = require('../core/user_intent');
 
@@ -40,6 +42,29 @@ test('userAskedForMemoryInventory: write wins over inventory keywords', () => {
     'Сохрани в базу: а покажи ещё список файлов в базе знаний для справки';
   assert.equal(userAskedToWriteMemory(m), true);
   assert.equal(userAskedForMemoryInventory(m), false);
+});
+
+test('implicitCaptureFromMedia: voice long enough → true', () => {
+  const long = 'x'.repeat(100);
+  assert.equal(implicitCaptureFromMedia('voice', long), true);
+  assert.equal(implicitCaptureFromMedia('text', long), false);
+});
+
+test('implicitCaptureFromMedia: too short or inventory query → false', () => {
+  assert.equal(implicitCaptureFromMedia('voice', 'short'), false);
+  assert.equal(
+    implicitCaptureFromMedia('voice', 'какие файлы есть в базе знаний?'),
+    false
+  );
+});
+
+test('userAskedForReminder: через N дней … уточнить', () => {
+  assert.equal(
+    userAskedForReminder(
+      'через 3 дня уточнить статус задач у фаундера'
+    ),
+    true
+  );
 });
 
 test('shouldUseDeterministicMemoryInventory: off for long multi-paragraph "list" turns', () => {

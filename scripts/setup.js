@@ -118,6 +118,9 @@ async function main() {
         reaction: '✍',
         autoExitOnDailyReview: true,
       },
+      chat: {
+        ackReaction: '👍',
+      },
       web: {
         enabled: true,
         host: '0.0.0.0',

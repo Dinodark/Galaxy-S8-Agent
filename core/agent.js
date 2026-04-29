@@ -12,9 +12,14 @@ const {
 } = require('./knowledge_orchestrator');
 const {
   userAskedToWriteMemory,
+  implicitCaptureFromMedia,
   shouldUseDeterministicMemoryInventory,
   userAskedForReminder,
 } = require('./user_intent');
+const {
+  extractWriteNotePayload,
+  stripWriteNoteJsonFences,
+} = require('./write_note_recovery');
 
 let cachedSystemPrompt = null;
 
@@ -103,9 +108,7 @@ async function fallbackSaveUserMessage({
   });
   if (result && result.ok && result.result && result.result.saved) {
     const saved = result.result.saved;
-    return (
-      `Записал в \`memory/notes/${saved}\` (инбокс, запасной путь без write_note от модели).`
-    );
+    return `Инбокс: \`memory/notes/${saved}\` (запасная запись).`;
   }
   return (
     'Не удалось сохранить в память автоматически: ' +
@@ -233,10 +236,9 @@ function recoveredReminderReply(result) {
   return `Напоминание установлено: ${r.text}\nКогда: ${when}\nID: ${r.id}`;
 }
 
-/** When the model prints write_note-shaped JSON instead of calling the tool — execute it. */
+/** When the model prints write_note-shaped JSON instead of calling the tool — execute it. Устойчиво к ``` внутри строк. */
 function recoverWriteNoteArgs(userMessage, assistantContent) {
-  if (!userAskedToWriteMemory(userMessage)) return null;
-  const obj = extractJsonObjectFromMarkdown(assistantContent);
+  const obj = extractWriteNotePayload(assistantContent);
   if (!obj) return null;
   if (obj.fire_at != null || obj.cron != null) return null;
   const name = typeof obj.name === 'string' ? obj.name.trim() : '';
@@ -251,6 +253,10 @@ function recoverWriteNoteArgs(userMessage, assistantContent) {
   return { name, content, append };
 }
 
+function sanitizeAssistantReplyForTelegram(content) {
+  return stripWriteNoteJsonFences(String(content || ''));
+}
+
 function briefWriteNoteReply(result, append) {
   if (!result || !result.ok || !result.result || !result.result.saved) {
     return 'Не удалось записать: ' + (result && result.error ? result.error : 'unknown error');
@@ -260,7 +266,7 @@ function briefWriteNoteReply(result, append) {
   return `Готово: \`memory/notes/${saved}\` — ${how}.`;
 }
 
-async function runAgent({ chatId, userMessage }) {
+async function runAgent({ chatId, userMessage, via = 'text' }) {
   await ensureHistorySeeded(chatId);
 
   const newMessages = [{ role: 'user', content: userMessage }];
@@ -270,7 +276,9 @@ async function runAgent({ chatId, userMessage }) {
   const transcript = [];
   const toolCtx = { chatId };
   const turnContext = [];
-  const writeIntent = userAskedToWriteMemory(userMessage);
+  const writeIntent =
+    userAskedToWriteMemory(userMessage) ||
+    implicitCaptureFromMedia(via, userMessage);
   let orchestration = null;
 
   if (writeIntent) {
@@ -363,7 +371,7 @@ async function runAgent({ chatId, userMessage }) {
     }
 
     const recoveredWriteArgs = recoverWriteNoteArgs(userMessage, assistantMsg.content);
-    if (writeIntent && recoveredWriteArgs && !hasSuccessfulWriteCall(transcript)) {
+    if (recoveredWriteArgs && !hasSuccessfulWriteCall(transcript)) {
       let nameForWrite = recoveredWriteArgs.name.trim();
       if (isKnowledgeCoreIndexPath(memory.sanitizeName(nameForWrite))) {
         nameForWrite = 'inbox.md';
@@ -400,7 +408,6 @@ async function runAgent({ chatId, userMessage }) {
       };
     }
 
-    history = await memory.appendToHistory(chatId, pushed);
     if (writeIntent && !hasSuccessfulWriteCall(transcript)) {
       let targetName = (orchestration && orchestration.fallbackName) || 'inbox.md';
       if (isKnowledgeCoreIndexPath(targetName)) targetName = 'inbox.md';
@@ -417,8 +424,11 @@ async function runAgent({ chatId, userMessage }) {
         steps: step + 1,
       };
     }
+
+    const replyClean = sanitizeAssistantReplyForTelegram(assistantMsg.content || '');
+    history = await memory.appendToHistory(chatId, [{ role: 'assistant', content: replyClean }]);
     return {
-      reply: assistantMsg.content || '',
+      reply: replyClean,
       toolCalls: transcript,
       steps: step + 1,
     };

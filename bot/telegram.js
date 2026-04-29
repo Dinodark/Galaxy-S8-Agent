@@ -130,6 +130,14 @@ async function setReaction(chatId, messageId, emoji) {
   }
 }
 
+/** Instant feedback in chat mode (see `chat.ackReaction` in settings; empty = disabled). */
+async function ackIncomingMessage(chatId, messageId) {
+  if (!messageId) return;
+  const emoji = await settings.get('chat.ackReaction');
+  if (!emoji) return;
+  await setReaction(chatId, messageId, emoji);
+}
+
 function start() {
   try {
     const { ensureKnowledgeTree } = require('../core/bootstrap_knowledge');
@@ -548,7 +556,7 @@ function start() {
       .catch((e) => console.warn('[journal] append user failed:', e.message));
 
     await bot.sendChatAction(chatId, 'typing');
-    const { reply, toolCalls } = await runAgent({ chatId, userMessage });
+    const { reply, toolCalls } = await runAgent({ chatId, userMessage, via });
 
     if (toolCalls.length > 0) {
       console.log(
@@ -579,6 +587,7 @@ function start() {
         });
         return;
       }
+      await ackIncomingMessage(msg.chat.id, msg.message_id);
       const coalesceMs = config.telegram.textCoalesceMs;
       scheduleCoalescedTextMessage(msg.chat.id, msg.text, {
         coalesceMs,
@@ -623,6 +632,10 @@ function start() {
     if (!isAllowed(userId)) return replyUnauthorized(bot, msg);
 
     const chatId = msg.chat.id;
+    const mode = await modes.getMode(chatId);
+    if (mode !== 'silent') {
+      await ackIncomingMessage(chatId, msg.message_id);
+    }
 
     if (!(await stt.isEnabled())) {
       await bot.sendMessage(
@@ -660,7 +673,6 @@ function start() {
         `[stt] ${kind} transcribed in ${ms}ms (${trimmed.length} chars)`
       );
 
-      const mode = await modes.getMode(chatId);
       if (mode === 'silent') {
         await captureSilently(chatId, trimmed, {
           via: kind,

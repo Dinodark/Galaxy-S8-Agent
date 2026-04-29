@@ -33,7 +33,25 @@ function userAskedForMemoryInventory(text) {
 }
 
 function userAskedForReminder(text) {
-  return /\bremind\b|напомни|напомин/i.test(String(text || ''));
+  const s = String(text || '');
+  if (/\bremind\b|напомни|напомин|не\s+забудь/i.test(s)) return true;
+  /** Follow-up later without the word «напомни» (recovery path + model hint). */
+  return /через\s+\d+\s+(день|дня|дней)[^.!?]{0,80}(уточнить|проверить|спросить|написать|напомнить\s+себе)/i.test(
+    s
+  );
+}
+
+/**
+ * Voice/audio/video notes are usually substantive dumps; treat long ones as save-worthy
+ * so orchestrator + inbox fallback run without explicit «запомни».
+ */
+function implicitCaptureFromMedia(via, text) {
+  const v = String(via || 'text');
+  if (!/^(voice|audio|video_note)$/.test(v)) return false;
+  if (userAskedForMemoryInventory(text)) return false;
+  const s = String(text || '');
+  if (s.length < 80) return false;
+  return true;
 }
 
 /**
@@ -52,5 +70,6 @@ module.exports = {
   userAskedToWriteMemory,
   userAskedForMemoryInventory,
   userAskedForReminder,
+  implicitCaptureFromMedia,
   shouldUseDeterministicMemoryInventory,
 };

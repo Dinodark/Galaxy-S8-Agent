@@ -32,6 +32,10 @@ function defaults() {
       reaction: '✍',
       autoExitOnDailyReview: true,
     },
+    chat: {
+      /** Reaction on user messages in chat mode while processing (empty = off). */
+      ackReaction: '👍',
+    },
     web: {
       enabled: true,
       host: '0.0.0.0',
@@ -233,6 +237,10 @@ function validatePathValue(settingPath, value, mergedSettings) {
   }
   if (settingPath === 'silent.autoExitOnDailyReview') return parseBool(value);
 
+  if (settingPath === 'chat.ackReaction') {
+    return String(value ?? '').trim();
+  }
+
   if (settingPath === 'web.enabled') return parseBool(value);
   if (settingPath === 'web.host') {
     const host = String(value || '').trim();
@@ -285,6 +293,7 @@ function aliasToPath(alias, rawValue) {
     stt_max_duration_sec: 'stt.maxDurationSec',
     silent_reaction: 'silent.reaction',
     silent_auto_exit: 'silent.autoExitOnDailyReview',
+    chat_ack_reaction: 'chat.ackReaction',
     web_enabled: 'web.enabled',
     web_host: 'web.host',
     web_port: 'web.port',
