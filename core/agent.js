@@ -26,6 +26,7 @@ const {
   extractPrintedToolCall,
   stripPrintedToolInvocations,
 } = require('./tool_call_recovery');
+const { routeUserIntent, applyRouterMerge } = require('./intent_router');
 
 let cachedSystemPrompt = null;
 
@@ -282,9 +283,38 @@ async function runAgent({ chatId, userMessage, via = 'text' }) {
   const transcript = [];
   const toolCtx = { chatId };
   const turnContext = [];
-  const writeIntent =
-    userAskedToWriteMemory(userMessage) ||
-    implicitCaptureFromMedia(via, userMessage);
+
+  const hWrite = userAskedToWriteMemory(userMessage);
+  const hImplicit = implicitCaptureFromMedia(via, userMessage);
+  const hKd = userWantsKnowledgeDiscussion(userMessage);
+
+  let routeResult = { ok: false, skipped: true };
+  try {
+    routeResult = await routeUserIntent(userMessage);
+  } catch (e) {
+    routeResult = {
+      ok: false,
+      error: e && e.message ? e.message : String(e),
+    };
+  }
+
+  const irCfg = config.agent.intentRouter || {};
+  const routerMinConf =
+    typeof irCfg.minConfidence === 'number' &&
+    Number.isFinite(irCfg.minConfidence)
+      ? irCfg.minConfidence
+      : 0.38;
+
+  const merged = applyRouterMerge(
+    hWrite,
+    hImplicit,
+    hKd,
+    routeResult,
+    routerMinConf
+  );
+  let writeIntent = merged.writeIntent;
+  let knowledgeDiscussion = merged.knowledgeDiscussion;
+
   let orchestration = null;
 
   if (writeIntent) {
@@ -302,8 +332,6 @@ async function runAgent({ chatId, userMessage, via = 'text' }) {
       // orchestration is optional; never block the turn
     }
   }
-
-  const knowledgeDiscussion = userWantsKnowledgeDiscussion(userMessage);
 
   if (shouldUseDeterministicMemoryInventory(userMessage) && !knowledgeDiscussion) {
     const inventory = await buildMemoryInventoryContext(toolCtx);
@@ -433,8 +461,15 @@ async function runAgent({ chatId, userMessage, via = 'text' }) {
       };
     }
 
-    const recoveredWriteArgs = recoverWriteNoteArgs(userMessage, assistantMsg.content);
-    if (recoveredWriteArgs && !hasSuccessfulWriteCall(transcript)) {
+    /** Без записи или implicit-capture-intent не исполняем JSON write_note из ответа. */
+    const allowWriteNoteRecovery =
+      writeIntent || hImplicit;
+
+    const recoveredWriteArgs =
+      allowWriteNoteRecovery && !hasSuccessfulWriteCall(transcript)
+        ? recoverWriteNoteArgs(userMessage, assistantMsg.content)
+        : null;
+    if (recoveredWriteArgs) {
       let nameForWrite = recoveredWriteArgs.name.trim();
       if (isKnowledgeCoreIndexPath(memory.sanitizeName(nameForWrite))) {
         nameForWrite = 'inbox.md';

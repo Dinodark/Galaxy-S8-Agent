@@ -32,6 +32,8 @@ async function chatCompletion({
   toolChoice = 'auto',
   model,
   timeoutMs,
+  response_format,
+  temperature,
 }) {
   const effectiveModel = model || config.openrouter.model;
   const body = {
@@ -42,6 +44,8 @@ async function chatCompletion({
     body.tools = tools;
     body.tool_choice = toolChoice;
   }
+  if (response_format) body.response_format = response_format;
+  if (temperature !== undefined && temperature !== null) body.temperature = temperature;
 
   let res;
   try {

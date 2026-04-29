@@ -37,6 +37,12 @@ test('userAskedForMemoryInventory: проекты в работе (какие + 
   assert.equal(userAskedToWriteMemory(q), false);
 });
 
+test('userAskedForMemoryInventory: опечатка в слове проекты, но «работе» держит тему', () => {
+  const q = 'Скажи, какие проеуты у нас в работе?';
+  assert.equal(userAskedForMemoryInventory(q), true);
+  assert.equal(userWantsKnowledgeDiscussion(q), true);
+});
+
 test('userAskedForMemoryInventory: "полный список" without the word "файл"', () => {
   const q1 = 'дай полный список';
   const q2 = 'какие у нас есть файлы? дай полный список';

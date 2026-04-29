@@ -57,6 +57,13 @@ const config = {
   agent: {
     maxSteps: Number(optional('AGENT_MAX_STEPS', '8')),
     historyWindow: Number(optional('HISTORY_WINDOW', '30')),
+    /** LLM-классификатор цели сообщения перед основным агентом (тот же API, см. OPENROUTER_ROUTER_MODEL). */
+    intentRouter: {
+      enabled: parseBool(process.env.OPENROUTER_INTENT_ROUTER, true),
+      model: optional('OPENROUTER_ROUTER_MODEL', ''),
+      minConfidence: Number(optional('OPENROUTER_ROUTER_MIN_CONFIDENCE', '0.38')),
+      timeoutMs: Number(optional('OPENROUTER_ROUTER_TIMEOUT_MS', '25000')),
+    },
   },
   safety: {
     allowShell: parseBool(process.env.ALLOW_SHELL, false),
