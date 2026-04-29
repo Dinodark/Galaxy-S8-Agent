@@ -13,6 +13,7 @@ const {
   countToolsInTranscript,
   verifyWrittenNotesOnDisk,
 } = require('../tool_transcript_utils');
+const { rebuildAfterNotesChange } = require('../memory_atlas');
 
 const PROMPT_FILE = path.join(__dirname, '..', 'prompts', 'journal_ingest.md');
 
@@ -206,6 +207,7 @@ async function runJournalIngest({ chatId, day, log = console } = {}) {
         disk.writtenNotesMissing || ''
       );
     }
+    await rebuildAfterNotesChange({ chatId }, log);
     return result;
   } catch (err) {
     log.warn('[journal-ingest] failed:', err.message);

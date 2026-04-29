@@ -7,6 +7,7 @@ const journal = require('../journal');
 const settings = require('../settings');
 const memory = require('../memory');
 const { runInboxTriage } = require('./inbox_triage');
+const { rebuildAfterNotesChange } = require('../memory_atlas');
 
 const PROMPT_FILE = path.join(__dirname, '..', 'prompts', 'daily_review.md');
 const {
@@ -195,6 +196,8 @@ async function runReview(chatId, { log = console, force = false } = {}) {
     log.warn('[daily-review] inbox triage crashed:', err.message);
     triage = { skipped: false, cleared: false, error: err.message };
   }
+
+  await rebuildAfterNotesChange({ chatId }, log);
 
   return {
     skipped: false,

@@ -395,6 +395,19 @@ async function buildAtlas({ chatId } = {}) {
   return { index, indexFile: INDEX_FILE, htmlFile: HTML_FILE };
 }
 
+/**
+ * Пересобрать atlas.html после изменений в memory/notes (сводка, триаж, журнал и т.д.).
+ * Ошибки только в лог — не блокируют основной сценарий.
+ */
+async function rebuildAfterNotesChange({ chatId } = {}, log = console) {
+  try {
+    await buildAtlas({ chatId });
+    log.log('[memory-atlas] atlas.html regenerated');
+  } catch (err) {
+    log.warn('[memory-atlas] regenerate failed:', err.message);
+  }
+}
+
 async function status() {
   if (!(await fse.pathExists(INDEX_FILE))) {
     return { exists: false };
@@ -409,4 +422,10 @@ async function status() {
   };
 }
 
-module.exports = { buildAtlas, status, INDEX_FILE, HTML_FILE };
+module.exports = {
+  buildAtlas,
+  rebuildAfterNotesChange,
+  status,
+  INDEX_FILE,
+  HTML_FILE,
+};
