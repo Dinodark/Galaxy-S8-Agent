@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { TriageLogView } from './triage_log.jsx';
 import { JournalIngestLogView } from './journal_ingest_log.jsx';
 import { BatterySnapshotBlock } from './battery_snapshot.jsx';
-import { formatUsd } from './openrouter_money.js';
+import { formatUsd, formatBudgetHorizon } from './openrouter_money.js';
 
 function TabButton({ id, active, children, onClick }) {
   return (
@@ -120,6 +120,16 @@ function StatusOverview({ s }) {
               <Row label="Остаток по лимиту ключа">{formatUsd(s.openrouter.limit_remaining) ?? '—'}</Row>
               <Row label="Потолок лимита ключа">{formatUsd(s.openrouter.limit) ?? '—'}</Row>
               <Row label="Расход ключа за день">{formatUsd(s.openrouter.usage_daily) ?? '—'}</Row>
+              <Row label="Расход ключа за 7 дней (всего)">
+                {formatUsd(s.openrouter.usage_weekly) ?? '—'}
+              </Row>
+              <Row label="Расход ключа за 30 дней (всего)">
+                {formatUsd(s.openrouter.usage_monthly) ?? '—'}
+              </Row>
+              <Row label="Оценка: на сколько дней хватит">
+                {formatBudgetHorizon(s.openrouter) ||
+                  '— (нужен остаток и ненулевой расход OpenRouter: неделя / месяц / сегодня)'}
+              </Row>
               <Row label="Расход ключа всего">{formatUsd(s.openrouter.usage) ?? '—'}</Row>
               {s.openrouter.label && (
                 <Row label="Метка ключа">{String(s.openrouter.label)}</Row>

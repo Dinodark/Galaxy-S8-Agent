@@ -149,6 +149,7 @@ async function getOpenRouterKeySummary() {
 
     const d = keyRes.data.data != null ? keyRes.data.data : keyRes.data;
     const pick = {};
+    // usage_weekly / usage_monthly — расход за окно (средний день: core/openrouter_horizon.js)
     const keys = [
       'label',
       'limit',
