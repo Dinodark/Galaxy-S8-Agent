@@ -1994,6 +1994,55 @@ button.calendar-cell:focus-visible {
   max-width: 220px;
 }
 
+.triage-cell-compact {
+  max-width: 100px;
+}
+
+.triage-cell-warn {
+  color: var(--color-danger-text);
+  font-weight: 600;
+}
+
+.triage-cell-detail {
+  min-width: 180px;
+  max-width: 420px;
+}
+
+.triage-note-line {
+  margin: 0 0 8px;
+  font-size: 12px;
+}
+
+.triage-steps-details {
+  margin-top: 4px;
+}
+
+.triage-steps-details summary {
+  cursor: pointer;
+  color: var(--color-accent);
+  font-size: 12px;
+  user-select: none;
+}
+
+.triage-steps-list {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.triage-step-code {
+  display: block;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: ui-monospace, 'Cascadia Code', 'Consolas', monospace;
+  color: var(--color-text);
+}
+
+.triage-no-steps {
+  font-size: 11px;
+}
+
 /* --- Status panel (tabs + overview) --- */
 .status-overview {
   display: grid;

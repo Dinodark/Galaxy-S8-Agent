@@ -97,9 +97,23 @@ async function notifyInboxTriageResult(bot, chatId, result) {
   const snap = t.archivedRel ? `Снимок: \`${t.archivedRel}\`.` : '';
   if (t.cleared) {
     const n = typeof t.writeNoteOk === 'number' ? t.writeNoteOk : '?';
+    const v =
+      typeof t.writeNoteVerified === 'number' ? t.writeNoteVerified : n;
+    const paths = Array.isArray(t.writtenNotes) ? t.writtenNotes : [];
+    const pathLine =
+      paths.length > 0
+        ? `\nЗаписано в: ${paths
+            .slice(0, 6)
+            .map((p) => `\`${p}\``)
+            .join(', ')}${paths.length > 6 ? '…' : ''}`
+        : '';
+    const warn =
+      t.verificationMismatch && n !== v
+        ? `\n⚠️ На диске подтверждено ${v} из ${n} (см. веб → Журнал разбора инбокса).`
+        : '';
     await bot.sendMessage(
       chatId,
-      `Инбокс: ночной разбор выполнен (${n} успешных write_note), очередь очищена. ${snap}`.trim()
+      `Инбокс: ночной разбор (${n} write_note ok, на диске ${v}) — очередь очищена. ${snap}${pathLine}${warn}`.trim()
     );
   } else if (t.reason === 'no_successful_write_note') {
     await bot.sendMessage(

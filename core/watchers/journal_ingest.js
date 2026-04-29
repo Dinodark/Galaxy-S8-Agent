@@ -8,6 +8,11 @@ const journal = require('../journal');
 const config = require('../../config');
 const { loadProjectsIndex, planWriteOrchestration } = require('../knowledge_orchestrator');
 const { logJournalIngestRun } = require('../journal_ingest_log');
+const {
+  collectWrittenNotesReported,
+  countToolsInTranscript,
+  verifyWrittenNotesOnDisk,
+} = require('../tool_transcript_utils');
 
 const PROMPT_FILE = path.join(__dirname, '..', 'prompts', 'journal_ingest.md');
 
@@ -44,71 +49,6 @@ function formatJournalBlock(entries, tz) {
 
 function triageToolSchemas() {
   return tools.listSchemas().filter((s) => INGEST_TOOL_NAMES.has(s.function.name));
-}
-
-/** Paths the tool handler returned as `saved` (deduped; does not prove file on disk). */
-function collectWrittenNotesReported(transcript) {
-  const out = [];
-  const seen = new Set();
-  for (const row of transcript) {
-    if (row.tool !== 'write_note' || !row.result || !row.result.ok) continue;
-    const saved = row.result.result && row.result.result.saved;
-    if (!saved || seen.has(saved)) continue;
-    seen.add(saved);
-    out.push(saved);
-  }
-  return out;
-}
-
-/**
- * After the run, confirm each reported path exists under notesDir (same tree as list_notes).
- * Rows count = per successful tool call (duplicates ok).
- */
-/** Per-tool rows in the ingest transcript (one row per executed tool call). */
-function countToolsInTranscript(transcript) {
-  const c = { list_notes: 0, read_note: 0, write_note: 0 };
-  for (const row of transcript || []) {
-    const t = row.tool;
-    if (t === 'list_notes' || t === 'read_note' || t === 'write_note') {
-      c[t] += 1;
-    }
-  }
-  return c;
-}
-
-async function verifyWrittenNotesOnDisk(transcript, notesRoot) {
-  let verifiedRows = 0;
-  const missing = [];
-  const verifiedPathsDedup = [];
-  const seenPath = new Set();
-
-  for (const row of transcript) {
-    if (row.tool !== 'write_note' || !row.result || !row.result.ok) continue;
-    const saved = row.result.result && row.result.result.saved;
-    if (!saved) continue;
-    const full = path.join(notesRoot, saved);
-    try {
-      const st = await fse.stat(full);
-      if (st.isFile()) {
-        verifiedRows += 1;
-        if (!seenPath.has(saved)) {
-          seenPath.add(saved);
-          verifiedPathsDedup.push(saved);
-        }
-      } else {
-        missing.push(saved);
-      }
-    } catch {
-      missing.push(saved);
-    }
-  }
-
-  const uniqueMissing = [...new Set(missing)];
-  return {
-    verifiedRows,
-    writtenNotes: verifiedPathsDedup.sort(),
-    writtenNotesMissing: uniqueMissing.length ? uniqueMissing : undefined,
-  };
 }
 
 /**

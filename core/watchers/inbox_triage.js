@@ -7,6 +7,12 @@ const memory = require('../memory');
 const settings = require('../settings');
 const { loadProjectsIndex, planWriteOrchestration } = require('../knowledge_orchestrator');
 const { logTriageRun } = require('../inbox_triage_log');
+const {
+  collectWrittenNotesReported,
+  countToolsInTranscript,
+  verifyWrittenNotesOnDisk,
+  summarizeMemoryToolStep,
+} = require('../tool_transcript_utils');
 
 const PROMPT_FILE = path.join(__dirname, '..', 'prompts', 'inbox_triage.md');
 
@@ -166,12 +172,35 @@ async function runInboxTriage({ chatId, today, log = console } = {}) {
     const writeCount = transcript.filter(
       (t) => t.tool === 'write_note' && t.result && t.result.ok
     ).length;
+    const disk = await verifyWrittenNotesOnDisk(
+      transcript,
+      config.paths.notesDir
+    );
+    const verificationMismatch =
+      writeCount !== disk.verifiedRows ||
+      !!(disk.writtenNotesMissing && disk.writtenNotesMissing.length);
+    const toolCounts = countToolsInTranscript(transcript);
+    const triageSteps = transcript.map((row, i) =>
+      summarizeMemoryToolStep(row, i)
+    );
+    const writtenNotesReported = collectWrittenNotesReported(transcript);
+
+    if (verificationMismatch) {
+      log.warn(
+        '[inbox-triage] verification mismatch — handler ok vs disk:',
+        writeCount,
+        'vs',
+        disk.verifiedRows,
+        disk.writtenNotesMissing || ''
+      );
+    }
+
     const requireWrites = dr.clearInboxOnlyAfterWrites !== false;
     const cleared = shouldClearInboxAfterTriage(writeCount, requireWrites);
     if (cleared) {
       await clearInboxFile();
       log.log(
-        `[inbox-triage] cleared ${INBOX_REL} (${writeCount} write_note ok, ${transcript.length} tool rows)`
+        `[inbox-triage] cleared ${INBOX_REL} (${writeCount} write_note ok, ${disk.verifiedRows} verified on disk, ${transcript.length} tool rows)`
       );
     } else {
       log.warn(
@@ -183,23 +212,60 @@ async function runInboxTriage({ chatId, today, log = console } = {}) {
       skipped: false,
       cleared,
       archivedRel: archiveRel,
+      resolvedNotesDir: config.paths.notesDir,
       writeNoteOk: writeCount,
+      writeNoteVerified: disk.verifiedRows,
       toolRows: transcript.length,
+      toolCounts,
+      triageSteps,
+      writtenNotes: disk.writtenNotes,
+      writtenNotesReported,
+      verificationMismatch,
+      ...(disk.writtenNotesMissing
+        ? { writtenNotesMissing: disk.writtenNotesMissing }
+        : {}),
       ...(cleared ? {} : { reason: 'no_successful_write_note' }),
     };
     await logTriageRun({ chatId, today, result });
     return result;
   } catch (err) {
     log.warn('[inbox-triage] failed — inbox.md not cleared:', err.message);
+    const writeCount = transcript.filter(
+      (t) => t.tool === 'write_note' && t.result && t.result.ok
+    ).length;
+    let disk = {
+      verifiedRows: 0,
+      writtenNotes: [],
+      writtenNotesMissing: undefined,
+    };
+    try {
+      disk = await verifyWrittenNotesOnDisk(transcript, config.paths.notesDir);
+    } catch {
+      /* ignore */
+    }
+    const verificationMismatch =
+      writeCount !== disk.verifiedRows ||
+      !!(disk.writtenNotesMissing && disk.writtenNotesMissing.length);
+    const triageSteps = transcript.map((row, i) =>
+      summarizeMemoryToolStep(row, i)
+    );
     const result = {
       skipped: false,
       cleared: false,
       error: err.message,
       archivedRel: archiveRel,
-      writeNoteOk: transcript.filter(
-        (t) => t.tool === 'write_note' && t.result && t.result.ok
-      ).length,
+      resolvedNotesDir: config.paths.notesDir,
+      writeNoteOk: writeCount,
+      writeNoteVerified: disk.verifiedRows,
       toolRows: transcript.length,
+      toolCounts: countToolsInTranscript(transcript),
+      triageSteps,
+      writtenNotes: disk.writtenNotes,
+      writtenNotesReported: collectWrittenNotesReported(transcript),
+      verificationMismatch,
+      ...(disk.writtenNotesMissing
+        ? { writtenNotesMissing: disk.writtenNotesMissing }
+        : {}),
     };
     await logTriageRun({ chatId, today, result });
     return result;
