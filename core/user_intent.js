@@ -43,9 +43,117 @@ function userWantsKnowledgeDiscussion(text) {
   );
 }
 
+/**
+ * Левый край «слова» для кириллицы: \\b в JS не годится для русских букв.
+ */
+const CYR_TOKEN_L = '(?:^|[\\s—–,.;:!?\'"«„(-])';
+
+function hasClassicReminderPhrase(t) {
+  const s = String(t || '');
+  if (/\bremind\b/i.test(s)) return true;
+  if (new RegExp(`${CYR_TOKEN_L}не\\s+забудь`, 'i').test(s)) return true;
+  if (new RegExp(`${CYR_TOKEN_L}напомни`, 'i').test(s)) return true;
+  return /напоминай|напоминать|напоминание/i.test(s);
+}
+
+/** «по понедельникам», «каждый вторник», сокращения пн–вс, «по будням». */
+function weekdayRecurrenceCue(text) {
+  const t = String(text || '');
+  const li = new RegExp(
+    `${CYR_TOKEN_L}по\\s+(?:пн|вт|ср|чт|пт|сб|вс)(?=[\\s—–,.;:!?)\\]»]|$)`,
+    'i'
+  );
+  if (li.test(t)) return true;
+  if (
+    new RegExp(
+      `${CYR_TOKEN_L}по\\s+(?:понедельник|вторник|сред|четверг|пятниц|суббот|воскресен)[а-яё]*`,
+      'i'
+    ).test(t)
+  ) {
+    return true;
+  }
+  if (
+    new RegExp(
+      `(?:^|[\\s—–,.;:!?'"(«])кажды(?:й|е)\\s+(?:понедельник|вторник|сред|четверг|пятниц|суббот|воскресен)[а-яё]*`,
+      'i'
+    ).test(t)
+  ) {
+    return true;
+  }
+  if (
+    new RegExp(`${CYR_TOKEN_L}по\\s+(?:будням|выходным)(?=[\\s—–,.;:!?)\\]»]|$)`, 'i').test(
+      t
+    )
+  ) {
+    return true;
+  }
+  return false;
+}
+
+/** Контент про календарь / расписание / повтор без явного «напомни». */
+function calendarOrScheduleDomainCue(text) {
+  const low = String(text || '').toLowerCase();
+  return (
+    /календар/.test(low) ||
+    /расписан/.test(low) ||
+    /регулярн/.test(low) ||
+    /еженедельн/.test(low) ||
+    /раз\s+в\s+неделю/.test(low)
+  );
+}
+
+/** Глагол «записать расписание / создать слот», без привязки к заметкам KB. */
+function calendarSchedulingVerbCue(text) {
+  const t = String(text || '');
+  if (hasClassicReminderPhrase(t)) return true;
+  return (
+    /добавь|добавить|создай|создать|поставь|поставить|запланируй|запланировать|назначь|назначить/i.test(
+      t
+    ) ||
+    /внеси\s+в\s+календар|занеси\s+в\s+календар/i.test(t)
+  );
+}
+
+/** Просмотр / вопрос про расписание — не путать с созданием напоминания. */
+function looksLikeScheduleOrCalendarQuestion(text) {
+  const low = String(text || '').toLowerCase();
+  return (
+    /что\s+(у\s+меня|есть|на|в)/.test(low) ||
+    new RegExp(`${CYR_TOKEN_L}какие\\s+(у\\s+меня\\s+)?`, 'i').test(low) ||
+    /^(покажи|открой|выведи)(\s|$)/.test(low) ||
+    (/^расскажи/i.test(low) && /календар/i.test(low)) ||
+    /^как\s+(мне\s+)?(посмотреть|узнать|открыть|показать)/.test(low)
+  );
+}
+
 function userAskedForReminder(text) {
   const s = String(text || '');
-  if (/\bremind\b|напомни|напомин|не\s+забудь/i.test(s)) return true;
+  if (hasClassicReminderPhrase(s)) return true;
+
+  /** Явный глагол + дни недели (в т.ч. «добавь … по понедельникам»). */
+  if (weekdayRecurrenceCue(s) && calendarSchedulingVerbCue(s)) return true;
+
+  /**
+   * «Регулярное событие / календарь» + дни недели, без классического глагола —
+   * но не вопрос про просмотр слотов.
+   */
+  if (
+    weekdayRecurrenceCue(s) &&
+    calendarOrScheduleDomainCue(s) &&
+    !looksLikeScheduleOrCalendarQuestion(s)
+  ) {
+    return true;
+  }
+
+  /** Календарь / регулярные занятия + глагол записи, даже без явного «по вторникам». */
+  if (
+    (/календар/i.test(s) ||
+      /регулярн(?:ое|ые|ых)?(?:\s+собы|\s+событ|\s+занят)/i.test(s)) &&
+    calendarSchedulingVerbCue(s)
+  ) {
+    return true;
+  }
+
   /** Follow-up later without the word «напомни» (recovery path + model hint). */
   return /через\s+\d+\s+(день|дня|дней)[^.!?]{0,80}(уточнить|проверить|спросить|написать|напомнить\s+себе)/i.test(
     s

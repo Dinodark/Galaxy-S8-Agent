@@ -63,8 +63,22 @@ function testRouterLowConfidenceFallsBack() {
   assert.strictEqual(merged.source.kind, 'router_low_conf');
 }
 
+function testReminderClearsWriteIntent() {
+  const merged = applyRouterMerge(
+    true,
+    false,
+    false,
+    { ok: true, skipped: false, intent: 'reminder', confidence: 0.9 },
+    0.38
+  );
+  assert.strictEqual(merged.writeIntent, false);
+  assert.strictEqual(merged.source.kind, 'router');
+  assert.strictEqual(merged.source.intent, 'reminder');
+}
+
 testParseRouterJson();
 testKbQuestionPreservesImplicitCapture();
 testKbQuestionPureQuestionNoImplicit();
 testChatPreservesHeuristicKd();
 testRouterLowConfidenceFallsBack();
+testReminderClearsWriteIntent();

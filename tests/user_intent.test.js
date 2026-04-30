@@ -95,6 +95,31 @@ test('userAskedForReminder: через N дней … уточнить', () => {
   );
 });
 
+test('userAskedForReminder: календарь + дни недели', () => {
+  assert.equal(
+    userAskedForReminder(
+      'Добавь в календарь тайчи по понедельникам и пятницам в 9'
+    ),
+    true
+  );
+  assert.equal(userAskedForReminder('регулярное событие: ушу каждый вторник в 10'), true);
+  assert.equal(userAskedForReminder('запланируй репетицию по четвергам в 18:30'), true);
+});
+
+test('userAskedForReminder: вопрос про календарь без создания слота — false', () => {
+  assert.equal(
+    userAskedForReminder('что у меня в календаре по понедельникам?'),
+    false
+  );
+});
+
+test('userAskedForReminder: «по понедельникам» без действия — false', () => {
+  assert.equal(
+    userAskedForReminder('мы раньше ходили по понедельникам в спортзал'),
+    false
+  );
+});
+
 test('shouldUseDeterministicMemoryInventory: off for long multi-paragraph "list" turns', () => {
   const q = 'Какие файлы есть в базе знаний?';
   const long =

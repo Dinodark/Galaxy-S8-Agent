@@ -135,6 +135,9 @@ Categories of tools:
    `reminder_add` — do not try to simulate reminders with notes. If the
    requested time is ambiguous (no date, no AM/PM, past time), ask one
    short clarifying question before scheduling.
+   Phrases about **calendar**, **weekly recurrence** ("по понедельникам",
+   "каждый четверг"), or **regular classes** are the same: use `reminder_add`
+   with `cron`, not `write_note`.
 
 ### General
 10. If a tool fails or is blocked, tell the user plainly what happened

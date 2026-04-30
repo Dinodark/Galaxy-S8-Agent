@@ -73,6 +73,9 @@ function applyRouterMerge(hWrite, hImplicit, hKd, route, minConf) {
       writeIntent = true;
       break;
     case 'reminder':
+      /* Avoid pulling knowledge write orchestrator when routing is confidently about alarms / calendar slots. */
+      writeIntent = false;
+      knowledgeDiscussion = Boolean(hKd);
       break;
     case 'chat':
       knowledgeDiscussion = Boolean(hKd);
@@ -105,7 +108,9 @@ confidence must be between 0 and 1 inclusive.
 - kb_question: asking about knowledge base / memory content / what was saved / listing notes / searching
 - save_to_memory: explicit request to save, remember, or write a note
 - mixed: both a KB/memory question and a save in one message
-- reminder: alarms, reminders, "remind me", relative time like "in 10 minutes"
+- reminder: alarms, reminders, "remind me", relative time like "in 10 minutes";
+  also weekly schedules ("every Monday"), days of week in Russian ("по понедельникам"),
+  "add to calendar", recurring events / class times
 - chat: casual chat, greetings, unrelated talk without primary KB/save focus
 
 When unsure, prefer "chat" with confidence below 0.4.`;
