@@ -440,13 +440,8 @@ async function handleApi(req, res, url) {
     }
   }
 
-  if (pathname === '/api/reminders') {
-    const tz =
-      (await settings.get('dailyReview.tz').catch(() => '')) ||
-      reminders.systemTz();
-    if (!chatId) return json(res, 200, { count: 0, tz, reminders: [] });
-    const items = await reminders.listPending({ chatId });
-    const out = items.map((r) => ({
+  function serializeReminder(r) {
+    return {
       id: r.id,
       text: r.text,
       fire_at: r.fireAt,
@@ -455,8 +450,128 @@ async function handleApi(req, res, url) {
       max_count: r.maxCount == null ? null : r.maxCount,
       fired_count: r.firedCount || 0,
       created_at: r.createdAt || null,
+      enabled: r.enabled !== false,
+      paused_until: r.pausedUntil || null,
+    };
+  }
+
+  if (pathname === '/api/reminders') {
+    const tz =
+      (await settings.get('dailyReview.tz').catch(() => '')) ||
+      reminders.systemTz();
+    if (!chatId) return json(res, 200, { count: 0, tz, reminders: [], calendar_by_day: null });
+    const itemsRaw = await reminders.listPending({ chatId });
+    const items = itemsRaw.map((r) => ({
+      ...r,
+      enabled: r.enabled !== false,
+      pausedUntil: r.pausedUntil ?? null,
     }));
-    return json(res, 200, { count: out.length, tz, reminders: out });
+    const out = items.map(serializeReminder);
+
+    const cal = url.searchParams.get('calendar');
+    let calendarByDay = null;
+    if (cal && /^\d{4}-\d{2}$/.test(cal)) {
+      const [y, m] = cal.split('-').map(Number);
+      if (m >= 1 && m <= 12) {
+        calendarByDay = reminders.remindersByCalendarMonth(items, y, m, tz);
+      }
+    }
+
+    return json(res, 200, {
+      count: out.length,
+      tz,
+      reminders: out,
+      calendar_by_day: calendarByDay,
+    });
+  }
+
+  if (pathname === '/api/reminders/add' && req.method === 'POST') {
+    if (!chatId) return json(res, 400, { error: 'no owner chat configured' });
+    let body;
+    try {
+      body = await readJsonBody(req);
+    } catch {
+      return json(res, 400, { error: 'invalid JSON body' });
+    }
+    const text =
+      body && typeof body.text === 'string'
+        ? body.text.trim()
+        : '';
+    if (!text) return json(res, 400, { error: 'text is required' });
+    try {
+      const rec = await reminders.add({
+        chatId,
+        text,
+        fireAt: body && body.fire_at != null ? String(body.fire_at) : null,
+        cron: body && body.cron != null ? String(body.cron).trim() : null,
+        tz: body && body.tz != null ? String(body.tz) : null,
+        until: body && body.until != null ? body.until : null,
+        maxCount: body && body.max_count != null ? body.max_count : null,
+      });
+      return json(res, 200, serializeReminder(rec));
+    } catch (err) {
+      return json(res, 400, { error: err.message || String(err) });
+    }
+  }
+
+  if (pathname === '/api/reminders/update' && req.method === 'POST') {
+    if (!chatId) return json(res, 400, { error: 'no owner chat configured' });
+    let body;
+    try {
+      body = await readJsonBody(req);
+    } catch {
+      return json(res, 400, { error: 'invalid JSON body' });
+    }
+    const id = body && typeof body.id === 'string' ? body.id.trim() : '';
+    if (!id) return json(res, 400, { error: 'id is required' });
+    try {
+      const next = await reminders.update(id, {
+        chatId,
+        text:
+          body && Object.prototype.hasOwnProperty.call(body, 'text')
+            ? body.text
+            : undefined,
+        fireAt:
+          body && Object.prototype.hasOwnProperty.call(body, 'fire_at')
+            ? body.fire_at
+            : undefined,
+        cron:
+          body && Object.prototype.hasOwnProperty.call(body, 'cron') ? body.cron : undefined,
+        tz: body && Object.prototype.hasOwnProperty.call(body, 'tz') ? body.tz : undefined,
+        until:
+          body && Object.prototype.hasOwnProperty.call(body, 'until') ? body.until : undefined,
+        maxCount:
+          body && Object.prototype.hasOwnProperty.call(body, 'max_count')
+            ? body.max_count
+            : undefined,
+        enabled:
+          body && Object.prototype.hasOwnProperty.call(body, 'enabled') ? body.enabled : undefined,
+        pausedUntil:
+          body && Object.prototype.hasOwnProperty.call(body, 'paused_until')
+            ? body.paused_until
+            : undefined,
+        clearPause: body ? body.clear_pause === true : false,
+      });
+      if (!next) return json(res, 404, { error: 'reminder not found' });
+      return json(res, 200, serializeReminder(next));
+    } catch (err) {
+      return json(res, 400, { error: err.message || String(err) });
+    }
+  }
+
+  if (pathname === '/api/reminders/delete' && req.method === 'POST') {
+    if (!chatId) return json(res, 400, { error: 'no owner chat configured' });
+    let body;
+    try {
+      body = await readJsonBody(req);
+    } catch {
+      return json(res, 400, { error: 'invalid JSON body' });
+    }
+    const id = body && typeof body.id === 'string' ? body.id.trim() : '';
+    if (!id) return json(res, 400, { error: 'id is required' });
+    const ok = await reminders.remove(id);
+    if (!ok) return json(res, 404, { error: 'reminder not found' });
+    return json(res, 200, { ok: true, id });
   }
 
   if (pathname === '/api/notes/save' && req.method === 'POST') {

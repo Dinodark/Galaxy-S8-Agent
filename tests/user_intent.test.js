@@ -64,12 +64,26 @@ test('implicitCaptureFromMedia: voice long enough → true', () => {
   assert.equal(implicitCaptureFromMedia('text', long), false);
 });
 
+test('implicitCaptureFromMedia: medium voice (≥40) non-inventory → true', () => {
+  assert.equal(implicitCaptureFromMedia('voice', 'x'.repeat(45)), true);
+});
+
+test('implicitCaptureFromMedia: long voice bypasses inventory keywords', () => {
+  const mixed =
+    'какие у нас проекты в работе расскажи ещё ' + 'y'.repeat(200);
+  assert.equal(implicitCaptureFromMedia('voice', mixed), true);
+});
+
 test('implicitCaptureFromMedia: too short or inventory query → false', () => {
   assert.equal(implicitCaptureFromMedia('voice', 'short'), false);
   assert.equal(
     implicitCaptureFromMedia('voice', 'какие файлы есть в базе знаний?'),
     false
   );
+  const invOnly =
+    'какие файлы есть в базе знаний и что в памяти по проектам сейчас? ' +
+    'x'.repeat(20);
+  assert.equal(implicitCaptureFromMedia('voice', invOnly), false);
 });
 
 test('userAskedForReminder: через N дней … уточнить', () => {

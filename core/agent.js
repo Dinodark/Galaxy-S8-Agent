@@ -85,6 +85,23 @@ function withRuntimeContext(history) {
   return [ctx, ...history];
 }
 
+/** Подсказка модели: с голоса чаще нужен write_note, иначе ответ уходит в чат без файла. */
+function buildVoiceWriteHint(via, userMessage) {
+  const v = String(via || 'text');
+  if (!/^(voice|audio|video_note)$/.test(v)) return null;
+  const s = String(userMessage || '');
+  if (s.length < 40) return null;
+  return {
+    role: 'system',
+    content:
+      'This user message is from voice (or video note) transcription. If it contains ' +
+      'substantive material to keep (tasks, facts, names, plans, diary, lists) — call ' +
+      '`write_note` (append) to the path from the orchestrator block or `inbox.md`. ' +
+      'Do not only chat if the user is clearly dumping information to remember. ' +
+      'Pure short Q&A without new facts may be answered in text only.',
+  };
+}
+
 function hasSuccessfulWriteCall(transcript) {
   return transcript.some(
     (item) => item && item.tool === 'write_note' && item.result && item.result.ok
@@ -333,6 +350,11 @@ async function runAgent({ chatId, userMessage, via = 'text' }) {
     }
   }
 
+  const voiceHint = buildVoiceWriteHint(via, userMessage);
+  if (voiceHint) {
+    turnContext.push(voiceHint);
+  }
+
   if (shouldUseDeterministicMemoryInventory(userMessage) && !knowledgeDiscussion) {
     const inventory = await buildMemoryInventoryContext(toolCtx);
     const files = Array.isArray(inventory.result.files) ? inventory.result.files : [];
@@ -506,7 +528,10 @@ async function runAgent({ chatId, userMessage, via = 'text' }) {
       };
     }
 
-    if (writeIntent && !hasSuccessfulWriteCall(transcript)) {
+    if (
+      (writeIntent || hImplicit) &&
+      !hasSuccessfulWriteCall(transcript)
+    ) {
       let targetName = (orchestration && orchestration.fallbackName) || 'inbox.md';
       if (isKnowledgeCoreIndexPath(targetName)) targetName = 'inbox.md';
       const reply = await fallbackSaveUserMessage({

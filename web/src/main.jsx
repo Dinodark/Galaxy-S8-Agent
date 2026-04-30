@@ -97,6 +97,71 @@ function formatReminderDayModalLabel(date) {
   return `${wd}, ${rest}`;
 }
 
+/** Пн=0 … Вс=6 в UI → поле day-of-week в cron (0=вс, 1=пн …). */
+const UI_MON_FIRST_TO_CRON_DOW = [1, 2, 3, 4, 5, 6, 0];
+
+function cronDowToUiIndex(cronDow) {
+  const n = Number(cronDow);
+  if (n === 0 || n === 7) return 6;
+  if (n >= 1 && n <= 6) return n - 1;
+  return -1;
+}
+
+/** Разбор только простых weekly cron `m h * * dow` (списки и диапазоны в dow). */
+function parseSimpleWeeklyCron(expr) {
+  const m = String(expr || '')
+    .trim()
+    .match(/^(\d{1,2}) (\d{1,2}) \* \* ([\d*,\-]+)$/);
+  if (!m) return null;
+  const minute = Number(m[1]);
+  const hour = Number(m[2]);
+  if (!Number.isInteger(minute) || minute < 0 || minute > 59) return null;
+  if (!Number.isInteger(hour) || hour < 0 || hour > 23) return null;
+  const sel = [false, false, false, false, false, false, false];
+  for (const part of m[3].split(',')) {
+    const p = part.trim();
+    if (!p) continue;
+    if (p.includes('-')) {
+      const [a, b] = p.split('-').map((x) => Number(String(x).trim()));
+      if (!Number.isInteger(a) || !Number.isInteger(b)) return null;
+      for (let d = Math.min(a, b); d <= Math.max(a, b); d += 1) {
+        const ui = cronDowToUiIndex(d);
+        if (ui < 0) return null;
+        sel[ui] = true;
+      }
+    } else {
+      const d = Number(p);
+      if (!Number.isInteger(d)) return null;
+      const ui = cronDowToUiIndex(d);
+      if (ui < 0) return null;
+      sel[ui] = true;
+    }
+  }
+  if (!sel.some(Boolean)) return null;
+  return { minute, hour, dowSelected: sel };
+}
+
+function buildWeeklyCronFromUi(hour, minute, dowSelected) {
+  const parts = [];
+  dowSelected.forEach((on, i) => {
+    if (on) parts.push(UI_MON_FIRST_TO_CRON_DOW[i]);
+  });
+  parts.sort((a, b) => a - b);
+  if (parts.length === 0) {
+    throw new Error('Выбери хотя бы один день недели.');
+  }
+  return `${minute} ${hour} * * ${parts.join(',')}`;
+}
+
+function formatWeeklyCronHuman(cron, tz) {
+  const p = parseSimpleWeeklyCron(cron);
+  if (!p) return cron;
+  const names = ['пн', 'вт', 'ср', 'чт', 'пт', 'сб', 'вс'];
+  const days = p.dowSelected.map((on, i) => (on ? names[i] : null)).filter(Boolean);
+  const dayStr = days.join(', ');
+  return `${dayStr} ${String(p.hour).padStart(2, '0')}:${String(p.minute).padStart(2, '0')}${tz ? ` (${tz})` : ''}`;
+}
+
 function parseSummaryDate(name) {
   const m = String(name || '').match(/summary-(\d{4})-(\d{2})-(\d{2})\.md$/);
   if (!m) return null;
@@ -1540,13 +1605,15 @@ function ReminderDayModal({ dayLabel, items, onClose, cronTz }) {
                 <strong>{item.text}</strong>
               </div>
               <div className="reminder-meta">
-                <span>{fmtTime(item.fire_at)}</span>
+                <span>
+                  {item.recurrence?.cron
+                    ? `След.: ${fmtTime(item.fire_at)}`
+                    : fmtTime(item.fire_at)}
+                </span>
                 {item.recurrence?.cron && (
                   <code>
-                    {item.recurrence.cron}
-                    {item.recurrence.tz || cronTz
-                      ? ` (${item.recurrence.tz || cronTz})`
-                      : ''}
+                    {formatWeeklyCronHuman(item.recurrence.cron, item.recurrence.tz || cronTz)}{' '}
+                    <span className="muted">[{item.recurrence.cron}]</span>
                   </code>
                 )}
               </div>
@@ -1558,32 +1625,194 @@ function ReminderDayModal({ dayLabel, items, onClose, cronTz }) {
   );
 }
 
-function Reminders({ api }) {
-  const [state, setState] = useState({ loading: true, error: '', tz: '', reminders: [] });
-  const [monthOffset, setMonthOffset] = useState(0);
-  const [dayModal, setDayModal] = useState(null);
+const WEEKDAY_LABELS_RU = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
+
+function RecurringEventModal({ open, initial, tzDefault, saving, errorText, onClose, onSubmit }) {
+  const [text, setText] = useState('');
+  const [minute, setMinute] = useState(0);
+  const [hour, setHour] = useState(9);
+  const [dow, setDow] = useState(() => [true, false, false, false, true, false, false]);
+  const [cronRaw, setCronRaw] = useState('');
+  const [advanced, setAdvanced] = useState(false);
+  const [tzUse, setTzUse] = useState('Europe/Moscow');
 
   useEffect(() => {
-    let cancelled = false;
-    api
-      .get('/api/reminders')
-      .then((data) => {
-        if (cancelled) return;
-        setState({
-          loading: false,
-          error: '',
-          tz: data.tz || Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
-          reminders: Array.isArray(data.reminders) ? data.reminders : [],
-        });
-      })
-      .catch((err) => {
-        if (cancelled) return;
-        setState({ loading: false, error: err.message, tz: '', reminders: [] });
-      });
-    return () => {
-      cancelled = true;
+    if (!open) return;
+    const tzz = tzDefault || Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+    setTzUse(tzz);
+    if (!initial) {
+      setText('');
+      setMinute(0);
+      setHour(9);
+      setDow([true, false, false, false, false, false, false]);
+      setCronRaw(`0 9 * * 1`);
+      setAdvanced(false);
+      return;
+    }
+    setText(initial.text || '');
+    const cron = initial.recurrence?.cron || '';
+    const parsed = parseSimpleWeeklyCron(cron);
+    const recTz = initial.recurrence?.tz || tzz;
+    setTzUse(recTz);
+    if (parsed) {
+      setAdvanced(false);
+      setMinute(parsed.minute);
+      setHour(parsed.hour);
+      setDow(parsed.dowSelected);
+      setCronRaw(cron);
+    } else {
+      setAdvanced(true);
+      setCronRaw(cron || '0 9 * * 1');
+    }
+  }, [open, initial, tzDefault]);
+
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key === 'Escape') onClose();
     };
-  }, [api]);
+    if (open) window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [open, onClose]);
+
+  if (!open) return null;
+
+  function toggleDow(i) {
+    const next = [...dow];
+    next[i] = !next[i];
+    setDow(next);
+  }
+
+  async function handleSave(e) {
+    e.preventDefault();
+    const cron = advanced
+      ? String(cronRaw || '').trim()
+      : buildWeeklyCronFromUi(hour, minute, dow);
+    if (!cron) return;
+    if (!text.trim()) return;
+    const ok = await onSubmit({
+      text: text.trim(),
+      cron,
+      tz: String(tzUse || '').trim() || tzDefault,
+      id: initial && initial.id,
+    });
+    if (ok) onClose();
+  }
+
+  return (
+    <div className="reminder-day-modal" role="dialog" aria-modal="true">
+      <button type="button" className="reminder-day-modal__backdrop" aria-label="Закрыть" onClick={onClose} />
+      <div className="reminder-day-modal__panel recurring-modal-panel">
+        <header className="reminder-day-modal__head">
+          <strong>{initial ? 'Редактировать расписание' : 'Новое регулярное напоминание'}</strong>
+          <button type="button" className="reminder-day-modal__close" onClick={onClose}>
+            ×
+          </button>
+        </header>
+        <form className="recurring-modal-form" onSubmit={handleSave}>
+          <label className="recurring-field">
+            <span>Текст</span>
+            <input
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              placeholder="Ушу, репетиция…"
+              required
+            />
+          </label>
+          {!advanced ? (
+            <>
+              <div className="recurring-field">
+                <span>Дни недели</span>
+                <div className="weekday-toggles">
+                  {WEEKDAY_LABELS_RU.map((lbl, i) => (
+                    <label key={lbl} className="weekday-chip">
+                      <input type="checkbox" checked={dow[i]} onChange={() => toggleDow(i)} />
+                      {lbl}
+                    </label>
+                  ))}
+                </div>
+              </div>
+              <div className="recurring-field recurring-time-row">
+                <label>
+                  <span>Час</span>
+                  <input
+                    type="number"
+                    min={0}
+                    max={23}
+                    value={hour}
+                    onChange={(e) => setHour(Number(e.target.value))}
+                  />
+                </label>
+                <label>
+                  <span>Мин.</span>
+                  <input
+                    type="number"
+                    min={0}
+                    max={59}
+                    value={minute}
+                    onChange={(e) => setMinute(Number(e.target.value))}
+                  />
+                </label>
+              </div>
+            </>
+          ) : (
+            <label className="recurring-field">
+              <span>Cron (5 полей POSIX)</span>
+              <input
+                value={cronRaw}
+                onChange={(e) => setCronRaw(e.target.value)}
+                placeholder="0 9 * * 1,5"
+                spellCheck={false}
+              />
+            </label>
+          )}
+          <label className="recurring-field">
+            <span>Часовой пояс</span>
+            <input value={tzUse} onChange={(e) => setTzUse(e.target.value)} spellCheck={false} />
+          </label>
+          <label className="recurring-checkbox">
+            <input
+              type="checkbox"
+              checked={advanced}
+              onChange={(e) => setAdvanced(e.target.checked)}
+            />
+            Расширенный режим (свой cron)
+          </label>
+          {errorText ? <p className="recurring-form-error">{errorText}</p> : null}
+          <footer className="recurring-modal-footer">
+            <button type="button" className="secondary" onClick={onClose}>
+              Отмена
+            </button>
+            <button type="submit" className="secondary reminder-accent-btn" disabled={saving}>
+              {saving ? 'Сохраняю…' : 'Сохранить'}
+            </button>
+          </footer>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function reminderPausedUntil(rem) {
+  if (!rem.paused_until) return null;
+  const t = new Date(rem.paused_until).getTime();
+  if (Number.isNaN(t) || Date.now() >= t) return null;
+  return rem.paused_until;
+}
+
+function Reminders({ api }) {
+  const [state, setState] = useState({
+    loading: true,
+    error: '',
+    tz: '',
+    reminders: [],
+    calendarByDay: null,
+  });
+  const [monthOffset, setMonthOffset] = useState(0);
+  const [dayModal, setDayModal] = useState(null);
+  const [editor, setEditor] = useState(null);
+  const [actionBusyId, setActionBusyId] = useState('');
+  const [formError, setFormError] = useState('');
+  const [saveBusy, setSaveBusy] = useState(false);
 
   const monthData = useMemo(() => {
     const now = new Date();
@@ -1599,8 +1828,56 @@ function Reminders({ api }) {
       cells.push(new Date(year, month, d));
     }
     while (cells.length % 7 !== 0) cells.push(null);
-    return { base, cells };
+    const calendarYm = `${base.getFullYear()}-${String(base.getMonth() + 1).padStart(2, '0')}`;
+    return { base, cells, calendarYm };
   }, [monthOffset]);
+
+  const reload = useCallback(async () => {
+    const cal = `/api/reminders?calendar=${encodeURIComponent(monthData.calendarYm)}`;
+    try {
+      const data = await api.get(cal);
+      setState(() => ({
+        loading: false,
+        error: '',
+        tz: data.tz || Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
+        reminders: Array.isArray(data.reminders) ? data.reminders : [],
+        calendarByDay: data.calendar_by_day || null,
+      }));
+    } catch (err) {
+      setState((prev) => ({
+        loading: false,
+        error: err.message,
+        tz: prev.tz || '',
+        reminders: prev.reminders.length ? prev.reminders : [],
+        calendarByDay: prev.reminders.length ? prev.calendarByDay : null,
+      }));
+    }
+  }, [api, monthData.calendarYm]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const cal = `/api/reminders?calendar=${encodeURIComponent(monthData.calendarYm)}`;
+        const data = await api.get(cal);
+        if (cancelled) return;
+        setState({
+          loading: false,
+          error: '',
+          tz: data.tz || Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
+          reminders: Array.isArray(data.reminders) ? data.reminders : [],
+          calendarByDay: data.calendar_by_day || null,
+        });
+      } catch (err) {
+        if (!cancelled) {
+          setState({ loading: false, error: err.message, tz: '', reminders: [], calendarByDay: null });
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [api, monthData.calendarYm]);
 
   function dayKey(date) {
     const y = date.getFullYear();
@@ -1609,8 +1886,23 @@ function Reminders({ api }) {
     return `${y}-${m}-${d}`;
   }
 
+  const remindersById = useMemo(() => {
+    const m = new Map();
+    for (const r of state.reminders) m.set(r.id, r);
+    return m;
+  }, [state.reminders]);
+
   const remindersByDay = useMemo(() => {
     const byDay = new Map();
+    if (state.calendarByDay && typeof state.calendarByDay === 'object') {
+      for (const [k, tiny] of Object.entries(state.calendarByDay)) {
+        const full = (Array.isArray(tiny) ? tiny : [])
+          .map((t) => remindersById.get(t.id) || t)
+          .filter(Boolean);
+        if (full.length) byDay.set(k, full);
+      }
+      return byDay;
+    }
     for (const reminder of state.reminders) {
       const dt = new Date(reminder.fire_at);
       if (Number.isNaN(dt.getTime())) continue;
@@ -1619,7 +1911,7 @@ function Reminders({ api }) {
       byDay.get(key).push(reminder);
     }
     return byDay;
-  }, [state.reminders]);
+  }, [state.reminders, state.calendarByDay, remindersById]);
 
   const upcoming = useMemo(
     () =>
@@ -1629,8 +1921,65 @@ function Reminders({ api }) {
     [state.reminders]
   );
 
-  if (state.loading) return <div className="card muted">Loading reminders...</div>;
-  if (state.error) return <pre>{state.error}</pre>;
+  const recurringList = useMemo(
+    () => state.reminders.filter((r) => r.recurrence && r.recurrence.cron),
+    [state.reminders]
+  );
+
+  async function saveRecurring({ text, cron, tz, id }) {
+    setFormError('');
+    setSaveBusy(true);
+    try {
+      if (id) {
+        await api.post('/api/reminders/update', {
+          id,
+          text,
+          cron,
+          tz,
+        });
+      } else {
+        await api.post('/api/reminders/add', { text, cron, tz });
+      }
+      await reload();
+      return true;
+    } catch (e) {
+      setFormError(e.message || String(e));
+      return false;
+    } finally {
+      setSaveBusy(false);
+    }
+  }
+
+  async function updateOne(id, body) {
+    setActionBusyId(id);
+    try {
+      await api.post('/api/reminders/update', { id, ...body });
+      await reload();
+    } finally {
+      setActionBusyId('');
+    }
+  }
+
+  async function deleteOne(id) {
+    if (!window.confirm('Удалить это напоминание?')) return;
+    setActionBusyId(id);
+    try {
+      await api.post('/api/reminders/delete', { id });
+      await reload();
+    } finally {
+      setActionBusyId('');
+    }
+  }
+
+  async function pauseWeek(id) {
+    const until = new Date(Date.now() + 7 * 86400000).toISOString();
+    await updateOne(id, { paused_until: until });
+  }
+
+  if (state.loading && state.reminders.length === 0) {
+    return <div className="card muted">Loading reminders...</div>;
+  }
+  if (state.error && state.reminders.length === 0) return <pre>{state.error}</pre>;
 
   return (
     <div className="reminders-page">
@@ -1642,6 +1991,18 @@ function Reminders({ api }) {
           cronTz={state.tz}
         />
       )}
+      <RecurringEventModal
+        open={editor != null}
+        initial={typeof editor === 'object' && editor && editor.id ? editor : null}
+        tzDefault={state.tz}
+        saving={saveBusy}
+        errorText={formError}
+        onClose={() => {
+          setEditor(null);
+          setFormError('');
+        }}
+        onSubmit={saveRecurring}
+      />
       <section className="card">
         <div className="reminders-head">
           <div>
@@ -1694,30 +2055,140 @@ function Reminders({ api }) {
             );
           })}
         </div>
+        {state.error && state.reminders.length > 0 ? (
+          <p className="reminders-soft-error">{state.error}</p>
+        ) : null}
       </section>
 
-      <section className="card">
-        <div className="section-head">
-          <h2>Ближайшие напоминания</h2>
-          <span className="muted">{state.reminders.length} всего</span>
-        </div>
-        <div className="reminders-list">
-          {upcoming.length === 0 && <p className="muted">Пока нет активных напоминаний.</p>}
-          {upcoming.map((item) => (
-            <article className="reminder-item" key={item.id}>
-              <div className="reminder-main">
-                <strong>{item.text}</strong>
-              </div>
-              <div className="reminder-meta">
-                <span>{fmtTime(item.fire_at)}</span>
-                {item.recurrence?.cron && (
-                  <code>{item.recurrence.cron} ({item.recurrence.tz || state.tz})</code>
-                )}
-              </div>
-            </article>
-          ))}
-        </div>
-      </section>
+      <div className="reminders-side-stack">
+        <section className="card">
+          <div className="section-head">
+            <h2>Ближайшие напоминания</h2>
+            <span className="muted">{state.reminders.length} всего</span>
+          </div>
+          <div className="reminders-list">
+            {upcoming.length === 0 && (
+              <p className="muted">Пока нет активных напоминаний.</p>
+            )}
+            {upcoming.map((item) => (
+              <article className="reminder-item" key={item.id}>
+                <div className="reminder-main">
+                  <strong>{item.text}</strong>
+                  {(!item.enabled || reminderPausedUntil(item)) && (
+                    <span className="reminder-pill-muted">нет уведомлений</span>
+                  )}
+                </div>
+                <div className="reminder-meta">
+                  <span>{fmtTime(item.fire_at)}</span>
+                  {item.recurrence?.cron && (
+                    <code>{formatWeeklyCronHuman(item.recurrence.cron, item.recurrence.tz || state.tz)}</code>
+                  )}
+                </div>
+              </article>
+            ))}
+          </div>
+        </section>
+
+        <section className="card">
+          <div className="section-head reminders-recurring-head">
+            <h2>Регулярные события</h2>
+            <button
+              type="button"
+              className="secondary reminder-accent-btn"
+              onClick={() => {
+                setFormError('');
+                setEditor('add');
+              }}
+            >
+              + Добавить
+            </button>
+          </div>
+          <p className="muted recurring-hint">
+            Правила по дням недели (cron). Совпадающие слоты отмечаются на календаре на весь месяц.
+            Отключение — без удаления; «Пауза» — временно без уведомлений до даты.
+          </p>
+          <div className="reminders-list">
+            {recurringList.length === 0 ? (
+              <p className="muted">Ещё нет регулярных напоминаний — добавь первое или спроси агента.</p>
+            ) : (
+              recurringList.map((item) => {
+                const paused = reminderPausedUntil(item);
+                const busyHere = actionBusyId === item.id;
+                const status = [];
+                if (item.enabled === false) status.push('выключено');
+                else if (paused) status.push(`пауза до ${fmtTime(paused)}`);
+                else status.push('активно');
+                return (
+                  <article className="reminder-item recurring-item" key={item.id}>
+                    <div className="reminder-main">
+                      <strong>{item.text}</strong>
+                      <span className={`reminder-status ${item.enabled === false ? 'off' : paused ? 'pause' : 'on'}`}>
+                        {busyHere ? '…' : status.join(' · ')}
+                      </span>
+                    </div>
+                    <div className="reminder-meta recurring-item-meta">
+                      <span>Следующий слот: {fmtTime(item.fire_at)}</span>
+                      <code>{formatWeeklyCronHuman(item.recurrence.cron, item.recurrence.tz || state.tz)}</code>
+                    </div>
+                    <div className="recurring-actions">
+                      <button
+                        type="button"
+                        className="secondary"
+                        disabled={busyHere}
+                        onClick={() => {
+                          setFormError('');
+                          setEditor(item);
+                        }}
+                      >
+                        Править
+                      </button>
+                      {paused || item.enabled === false ? (
+                        <button
+                          type="button"
+                          className="secondary"
+                          disabled={busyHere}
+                          onClick={() =>
+                            updateOne(item.id, { enabled: true, clear_pause: true })
+                          }
+                        >
+                          Включить
+                        </button>
+                      ) : (
+                        <>
+                          <button
+                            type="button"
+                            className="secondary"
+                            disabled={busyHere}
+                            onClick={() => pauseWeek(item.id)}
+                          >
+                            Пауза неделя
+                          </button>
+                          <button
+                            type="button"
+                            className="secondary"
+                            disabled={busyHere}
+                            onClick={() => updateOne(item.id, { enabled: false })}
+                          >
+                            Выключить
+                          </button>
+                        </>
+                      )}
+                      <button
+                        type="button"
+                        className="secondary danger-muted"
+                        disabled={busyHere}
+                        onClick={() => deleteOne(item.id)}
+                      >
+                        Удалить
+                      </button>
+                    </div>
+                  </article>
+                );
+              })
+            )}
+          </div>
+        </section>
+      </div>
     </div>
   );
 }

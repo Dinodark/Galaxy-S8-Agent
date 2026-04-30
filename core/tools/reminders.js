@@ -15,7 +15,9 @@ function summarize(rec) {
     text: rec.text,
     fire_at: rec.fireAt,
     fires_in: humanizeDelta(new Date(rec.fireAt).getTime() - Date.now()),
+    enabled: rec.enabled !== false,
   };
+  if (rec.pausedUntil) out.paused_until = rec.pausedUntil;
   if (rec.recurrence) {
     out.cron = rec.recurrence.cron;
     out.tz = rec.recurrence.tz;
@@ -129,6 +131,84 @@ module.exports = {
     handler: async ({ id }) => {
       const ok = await reminders.remove(id);
       return { deleted: ok };
+    },
+  },
+
+  reminder_update: {
+    name: 'reminder_update',
+    description:
+      'Change an existing reminder (one-shot or recurring). Use ids from reminder_list / reminder_add. ' +
+      'For recurring rules you can update `cron`, `tz`, `text`, `fire_at` (next fire ISO), `until`, `max_count`. ' +
+      'Set `enabled` to false to turn off without deleting; set back to true to resume. ' +
+      'Temporary pause: set `paused_until` to an ISO instant (fires resume after that time; recurring schedules roll forward); ' +
+      'use null for `paused_until` to cancel a pause immediately. Shortcut: `clear_pause: true`.',
+    parameters: {
+      type: 'object',
+      properties: {
+        id: { type: 'string', description: 'Reminder id.' },
+        text: { type: 'string', description: 'Replacement reminder text.' },
+        fire_at: {
+          type: 'string',
+          description:
+            'Next fire time (ISO 8601). For recurring, usually omit — next slot is recomputed after cron edits.',
+        },
+        cron: { type: 'string', description: 'New 5-field cron for recurring reminders only.' },
+        tz: {
+          type: 'string',
+          description: 'IANA timezone for the cron interpretation when changing cron or TZ.',
+        },
+        until: { type: ['string', 'null'], description: 'Stop recurring after this ISO instant, or null to clear.' },
+        max_count: {
+          type: ['integer', 'null'],
+          minimum: 1,
+          description: 'Cap total recurring fires or null.',
+        },
+        enabled: { type: 'boolean', description: 'false = fully disabled until turned back on.' },
+        paused_until: {
+          type: ['string', 'null'],
+          description: 'Do not fire before this ISO instant; null clears.',
+        },
+        clear_pause: {
+          type: 'boolean',
+          description: 'If true, clears paused_until (same as paused_until: null).',
+        },
+      },
+      required: ['id'],
+      additionalProperties: false,
+    },
+    handler: async (
+      {
+        id,
+        text,
+        fire_at,
+        cron,
+        tz,
+        until,
+        max_count,
+        enabled,
+        paused_until,
+        clear_pause,
+      },
+      ctx = {}
+    ) => {
+      const chatId = ctx.chatId;
+      if (!chatId) {
+        throw new Error('reminder_update: missing chatId in context.');
+      }
+      const next = await reminders.update(id, {
+        chatId,
+        text,
+        fireAt: fire_at,
+        cron,
+        tz,
+        until,
+        maxCount: max_count,
+        enabled,
+        pausedUntil: paused_until,
+        clearPause: clear_pause === true,
+      });
+      if (!next) return { ok: false, error: 'not_found' };
+      return summarize(next);
     },
   },
 };

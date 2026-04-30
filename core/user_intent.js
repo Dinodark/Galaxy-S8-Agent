@@ -52,16 +52,24 @@ function userAskedForReminder(text) {
   );
 }
 
+/** Мин. длина реплики с голоса, чтобы считать её «содержательной» для implicit write. */
+const VOICE_IMPLICIT_MIN_CHARS = 40;
+/** Ниже этого порога «только список файлов» отсекает implicit; длинная речь — всё равно в захват. */
+const VOICE_IMPLICIT_LONG_BYPASS = 200;
+
 /**
  * Voice/audio/video notes are usually substantive dumps; treat long ones as save-worthy
  * so orchestrator + inbox fallback run without explicit «запомни».
+ * Длинные надиктовки не отсекаем из-за слов «проекты / база» внутри текста (эвристика inventory).
  */
 function implicitCaptureFromMedia(via, text) {
   const v = String(via || 'text');
   if (!/^(voice|audio|video_note)$/.test(v)) return false;
-  if (userAskedForMemoryInventory(text)) return false;
   const s = String(text || '');
-  if (s.length < 80) return false;
+  const len = s.length;
+  if (len < VOICE_IMPLICIT_MIN_CHARS) return false;
+  if (len >= VOICE_IMPLICIT_LONG_BYPASS) return true;
+  if (userAskedForMemoryInventory(s)) return false;
   return true;
 }
 
