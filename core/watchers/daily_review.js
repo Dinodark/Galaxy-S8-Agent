@@ -177,6 +177,7 @@ async function runReview(chatId, { log = console, force = false } = {}) {
   const { message: resp } = await chatCompletion({
     messages,
     model: modelOverride,
+    debugContext: { scope: 'daily_review', chatId, today },
   });
   const summary = ((resp && resp.content) || '').trim();
   if (!summary) {

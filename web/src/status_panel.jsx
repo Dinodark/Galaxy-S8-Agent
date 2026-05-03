@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { TriageLogView } from './triage_log.jsx';
+import { DebugLlmPanel } from './debug_llm_panel.jsx';
 import { JournalIngestLogView } from './journal_ingest_log.jsx';
 import { BatterySnapshotBlock } from './battery_snapshot.jsx';
 import { formatUsd, formatBudgetHorizon } from './openrouter_money.js';
@@ -193,6 +194,7 @@ export function StatusPanel({ api }) {
   const [tab, setTab] = useState('overview');
   const [status, setStatus] = useState(null);
   const [loadError, setLoadError] = useState('');
+  const [debugFocusId, setDebugFocusId] = useState(null);
 
   const loadStatus = useCallback(() => {
     setLoadError('');
@@ -235,6 +237,9 @@ export function StatusPanel({ api }) {
           <TabButton id="triage" active={tab === 'triage'} onClick={setTab}>
             Логи разбора
           </TabButton>
+          <TabButton id="debug" active={tab === 'debug'} onClick={setTab}>
+            Отладка
+          </TabButton>
         </div>
         <button type="button" className="secondary status-toolbar-refresh" onClick={() => loadStatus()}>
           Обновить статус
@@ -244,9 +249,25 @@ export function StatusPanel({ api }) {
       {tab === 'overview' && <StatusOverview s={status} />}
       {tab === 'triage' && (
         <div className="stack">
-          <TriageLogView api={api} embedded />
+          <TriageLogView
+            api={api}
+            embedded
+            onOpenLlmDebug={(id) => {
+              setDebugFocusId(id);
+              setTab('debug');
+            }}
+          />
           <JournalIngestLogView api={api} embedded />
         </div>
+      )}
+      {tab === 'debug' && (
+        <DebugLlmPanel
+          api={api}
+          debugLlm={status.debugLlm}
+          focusId={debugFocusId}
+          onFocusConsumed={() => setDebugFocusId(null)}
+          onSettingsChanged={loadStatus}
+        />
       )}
     </div>
   );

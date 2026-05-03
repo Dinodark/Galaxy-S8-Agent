@@ -95,6 +95,7 @@ async function buildStatus(chatId) {
       sample: batterySample,
     },
     openrouter,
+    debugLlm: s.debugLlm || { enabled: false, maxMb: 20, maxFiles: 80 },
   };
 }
 

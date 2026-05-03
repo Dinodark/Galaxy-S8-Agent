@@ -1,4 +1,5 @@
 const path = require('path');
+const crypto = require('crypto');
 const fse = require('fs-extra');
 const config = require('../config');
 const { chatCompletion } = require('./llm');
@@ -367,9 +368,13 @@ async function runAgent({ chatId, userMessage, via = 'text' }) {
   let writeIntent = merged.writeIntent;
   let knowledgeDiscussion = merged.knowledgeDiscussion;
 
+  const turnId = crypto.randomBytes(8).toString('hex');
+  const llmDebugIds = [];
+
   const logTurn = async (exit, { reply, toolCalls, steps }) => {
     const base = {
       chatId,
+      turnId,
       via: String(via || 'text'),
       userLen: userText.length,
       writeIntent,
@@ -381,6 +386,7 @@ async function runAgent({ chatId, userMessage, via = 'text' }) {
       tools: turnTrace.summarizeToolTranscript(toolCalls),
       replyLen: String(reply || '').length,
     };
+    if (llmDebugIds.length > 0) base.llmDebugIds = llmDebugIds;
     if (config.agent.turnTrace && config.agent.turnTrace.includeUserSha256 && userText.length > 0) {
       base.userSha256 = turnTrace.userMessageSha256(userText);
     }
@@ -452,10 +458,13 @@ async function runAgent({ chatId, userMessage, via = 'text' }) {
   }
 
   for (let step = 0; step < config.agent.maxSteps; step++) {
-    const { message: assistantMsg } = await chatCompletion({
+    const completion = await chatCompletion({
       messages: [...withRuntimeContext(history), ...turnContext],
       tools: toolSchemas,
+      debugContext: { scope: 'agent', chatId, turnId },
     });
+    const { message: assistantMsg, llmDebugId } = completion;
+    if (llmDebugId) llmDebugIds.push(llmDebugId);
 
     const pushed = [assistantMsg];
 

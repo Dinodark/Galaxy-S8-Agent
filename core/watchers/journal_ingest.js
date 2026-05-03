@@ -123,6 +123,7 @@ async function runJournalIngest({ chatId, day, log = console } = {}) {
         tools: triageToolSchemas(),
         model: modelOverride,
         timeoutMs: 120_000,
+        debugContext: { scope: 'journal_ingest', chatId, today: dayStr },
       });
       mergeUsage(usageTotal, usage);
 

@@ -1,4 +1,5 @@
 const path = require('path');
+const crypto = require('crypto');
 const fse = require('fs-extra');
 const config = require('../../config');
 const { chatCompletion } = require('../llm');
@@ -60,6 +61,8 @@ async function clearInboxFile() {
  * On failure, or when no write_note succeeded (if clearInboxOnlyAfterWrites): leaves inbox.md unchanged; snapshot under inbox/archive/ still exists for recovery.
  */
 async function runInboxTriage({ chatId, today, log = console } = {}) {
+  const triageBatchId = `${today}-${crypto.randomBytes(4).toString('hex')}`;
+  const llmDebugIds = [];
   const s = await settings.getSettings();
   const dr = s.dailyReview || {};
   if (dr.inboxTriage === false) {
@@ -120,12 +123,20 @@ async function runInboxTriage({ chatId, today, log = console } = {}) {
 
   try {
     for (let step = 0; step < maxSteps; step++) {
-      const { message: assistantMsg } = await chatCompletion({
+      const completion = await chatCompletion({
         messages,
         tools: triageToolSchemas(),
         model: modelOverride,
         timeoutMs: 120_000,
+        debugContext: {
+          scope: 'inbox_triage',
+          chatId,
+          triageBatchId,
+          today,
+        },
       });
+      const { message: assistantMsg, llmDebugId } = completion;
+      if (llmDebugId) llmDebugIds.push(llmDebugId);
 
       const pushed = [assistantMsg];
 
@@ -212,6 +223,8 @@ async function runInboxTriage({ chatId, today, log = console } = {}) {
       skipped: false,
       cleared,
       archivedRel: archiveRel,
+      triageBatchId,
+      llmDebugIds: llmDebugIds.length ? llmDebugIds : undefined,
       resolvedNotesDir: config.paths.notesDir,
       writeNoteOk: writeCount,
       writeNoteVerified: disk.verifiedRows,
@@ -254,6 +267,8 @@ async function runInboxTriage({ chatId, today, log = console } = {}) {
       cleared: false,
       error: err.message,
       archivedRel: archiveRel,
+      triageBatchId,
+      llmDebugIds: llmDebugIds.length ? llmDebugIds : undefined,
       resolvedNotesDir: config.paths.notesDir,
       writeNoteOk: writeCount,
       writeNoteVerified: disk.verifiedRows,

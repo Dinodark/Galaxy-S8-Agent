@@ -2380,3 +2380,227 @@ button.danger-muted {
 .design-tab .settings-battery-card {
   margin-top: 10px;
 }
+
+/* --- LLM debug (Status → Отладка) --- */
+.debug-llm-title {
+  margin: 0 0 8px;
+  font-size: var(--font-size-h2);
+}
+
+.debug-llm-lead {
+  margin: 0 0 12px;
+  font-size: 13px;
+}
+
+.debug-llm-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 16px;
+  margin-bottom: 8px;
+}
+
+.debug-llm-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.debug-llm-limits {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 16px;
+  align-items: center;
+}
+
+.debug-llm-limits label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--color-muted);
+}
+
+.debug-llm-limits input {
+  width: 88px;
+  padding: var(--input-padding-y) var(--input-padding-x);
+  border-radius: var(--input-radius);
+  border: 1px solid var(--color-glow);
+  background: var(--color-surface-soft);
+  color: var(--color-text);
+}
+
+.debug-llm-error,
+.debug-llm-error-inline {
+  margin: 8px 0 0;
+  padding: 10px;
+  border-radius: var(--radius-sm);
+  background: var(--color-danger-bg);
+  color: var(--color-danger-text);
+  font-size: 12px;
+  white-space: pre-wrap;
+  overflow: auto;
+}
+
+.debug-llm-hint {
+  margin: 8px 0 0;
+  font-size: 13px;
+}
+
+.debug-llm-subtitle {
+  margin: 0 0 10px;
+  font-size: 16px;
+}
+
+.debug-llm-toolbar {
+  margin-bottom: 8px;
+}
+
+.debug-llm-meta {
+  margin: 0 0 10px;
+  font-size: 12px;
+}
+
+.debug-llm-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.debug-llm-card {
+  border: 1px solid var(--color-glow);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-soft);
+  overflow: hidden;
+}
+
+.debug-llm-card-open {
+  border-color: color-mix(in srgb, var(--color-accent) 35%, var(--color-glow));
+}
+
+.debug-llm-card-head {
+  width: 100%;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 12px;
+  margin: 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+}
+
+.debug-llm-card-head:hover {
+  background: var(--color-surface-hover);
+}
+
+.debug-llm-chevron {
+  flex-shrink: 0;
+  width: 1.2em;
+  color: var(--color-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.debug-llm-card-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.debug-llm-card-ts {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.debug-llm-card-scope {
+  font-size: 12px;
+}
+
+.debug-llm-card-preview {
+  font-size: 12px;
+  color: var(--color-muted);
+  word-break: break-word;
+}
+
+.debug-llm-card-size {
+  flex-shrink: 0;
+  font-size: 12px;
+  color: var(--color-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.debug-llm-card-body {
+  padding: 0 12px 12px 36px;
+  border-top: 1px solid var(--color-glow);
+}
+
+.debug-llm-mini {
+  margin: 10px 0 8px;
+  font-size: 12px;
+  word-break: break-all;
+}
+
+.debug-llm-json-block {
+  margin: 8px 0 0;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-glow);
+  background: var(--color-bg);
+}
+
+.debug-llm-json-summary {
+  padding: 8px 10px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  list-style: none;
+}
+
+.debug-llm-json-summary::-webkit-details-marker {
+  display: none;
+}
+
+.debug-llm-json-pre {
+  margin: 0;
+  padding: 0 10px 10px;
+  max-height: 50vh;
+  overflow: auto;
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.triage-llm-debug-links {
+  margin: 0 0 8px;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.triage-llm-debug-btn {
+  margin: 0 6px 4px 0;
+  padding: 4px 8px;
+  font-size: 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-glow);
+  background: var(--color-surface-soft);
+  color: var(--color-accent);
+  cursor: pointer;
+}
+
+.triage-llm-debug-btn:hover:not(:disabled) {
+  background: var(--color-surface-hover);
+}
+
+.triage-llm-debug-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}

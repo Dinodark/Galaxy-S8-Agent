@@ -49,7 +49,7 @@ function formatTriageStepLine(s) {
   return `${s.step}. ${s.tool}`;
 }
 
-export function TriageLogView({ api, embedded = false }) {
+export function TriageLogView({ api, embedded = false, onOpenLlmDebug }) {
   const [data, setData] = useState(null);
   const [error, setError] = useState('');
   const [limit, setLimit] = useState(80);
@@ -182,6 +182,23 @@ export function TriageLogView({ api, embedded = false }) {
                       <td className="triage-cell-detail">
                         {noteParts.length > 0 && (
                           <p className="triage-note-line muted">{noteParts.join(' · ')}</p>
+                        )}
+                        {Array.isArray(row.llmDebugIds) && row.llmDebugIds.length > 0 && (
+                          <div className="triage-llm-debug-links">
+                            <span className="muted">Отладка LLM:</span>{' '}
+                            {row.llmDebugIds.map((did) => (
+                              <button
+                                key={did}
+                                type="button"
+                                className="triage-llm-debug-btn"
+                                title={did}
+                                disabled={!onOpenLlmDebug}
+                                onClick={() => onOpenLlmDebug && onOpenLlmDebug(did)}
+                              >
+                                {did.slice(0, 8)}…
+                              </button>
+                            ))}
+                          </div>
                         )}
                         {steps.length > 0 ? (
                           <details className="triage-steps-details">

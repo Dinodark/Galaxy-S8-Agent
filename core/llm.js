@@ -1,5 +1,6 @@
 const axios = require('axios');
 const config = require('../config');
+const llmDebugStore = require('./llm_debug_store');
 
 class OpenRouterError extends Error {
   constructor(message, { status, code, raw } = {}) {
@@ -34,6 +35,8 @@ async function chatCompletion({
   timeoutMs,
   response_format,
   temperature,
+  /** @type {{ scope: string, chatId?: number|null, turnId?: string|null, triageBatchId?: string|null, today?: string|null }|null|undefined} */
+  debugContext,
 }) {
   const effectiveModel = model || config.openrouter.model;
   const body = {
@@ -64,10 +67,19 @@ async function chatCompletion({
       }
     );
   } catch (err) {
-    throw new OpenRouterError(
+    const id = await llmDebugStore.maybeRecordError({
+      debugContext,
+      messages,
+      requestBody: body,
+      err,
+      effectiveModel,
+    });
+    const wrap = new OpenRouterError(
       `Network error talking to OpenRouter: ${err.message}`,
       { code: err.code }
     );
+    if (id) wrap.llmDebugId = id;
+    throw wrap;
   }
 
   if (res.status >= 400) {
@@ -76,25 +88,52 @@ async function chatCompletion({
       `[llm] OpenRouter HTTP ${res.status} for model=${effectiveModel}:`,
       JSON.stringify(res.data, null, 2)
     );
-    throw new OpenRouterError(
+    const id = await llmDebugStore.maybeRecordError({
+      debugContext,
+      messages,
+      requestBody: body,
+      err: new Error(`HTTP ${res.status}: ${providerMsg}`),
+      effectiveModel,
+    });
+    const e = new OpenRouterError(
       `OpenRouter ${res.status} (${effectiveModel}): ${providerMsg}`,
       { status: res.status, raw: res.data }
     );
+    if (id) e.llmDebugId = id;
+    throw e;
   }
 
   const choice = res.data && res.data.choices && res.data.choices[0];
   if (!choice) {
-    throw new OpenRouterError(
+    const id = await llmDebugStore.maybeRecordError({
+      debugContext,
+      messages,
+      requestBody: body,
+      err: new Error(extractErrorMessage(res.data) || 'empty response'),
+      effectiveModel,
+    });
+    const e = new OpenRouterError(
       'OpenRouter returned no choices: ' +
         (extractErrorMessage(res.data) || 'empty response'),
       { raw: res.data }
     );
+    if (id) e.llmDebugId = id;
+    throw e;
   }
-  return {
+
+  const id = await llmDebugStore.maybeRecordSuccess({
+    debugContext,
+    messages,
+    requestBody: body,
+    responseData: res.data,
+  });
+  const out = {
     message: choice.message,
     usage: res.data && res.data.usage ? res.data.usage : null,
     model: res.data && res.data.model,
   };
+  if (id) out.llmDebugId = id;
+  return out;
 }
 
 /** Sum token counts across multi-step agent / ingest loops. */

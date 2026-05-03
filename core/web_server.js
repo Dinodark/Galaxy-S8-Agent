@@ -15,6 +15,7 @@ const inboxTriageLog = require('./inbox_triage_log');
 const journalIngestLog = require('./journal_ingest_log');
 const { isSummaryFilename } = require('./notes_paths');
 const { runJournalIngest } = require('./watchers/journal_ingest');
+const llmDebugStore = require('./llm_debug_store');
 
 const { getUpdateStatus } = require('./git_update_status');
 const UPDATE_LOG_FILE = path.join(config.paths.tmpDir, 'update-restart.log');
@@ -324,6 +325,25 @@ async function handleApi(req, res, url) {
   if (pathname === '/api/logs/journal-ingest') {
     const limit = Number(url.searchParams.get('limit'));
     return json(res, 200, await journalIngestLog.readRecent(limit));
+  }
+
+  if (pathname === '/api/debug/llm/list') {
+    const limit = Number(url.searchParams.get('limit'));
+    return json(res, 200, await llmDebugStore.listEntries(limit));
+  }
+
+  if (pathname === '/api/debug/llm/entry') {
+    const id = url.searchParams.get('id') || '';
+    if (!llmDebugStore.isSafeId(id)) {
+      return json(res, 400, { error: 'invalid id' });
+    }
+    const entry = await llmDebugStore.readEntry(id);
+    if (!entry) return json(res, 404, { error: 'not found' });
+    return json(res, 200, entry);
+  }
+
+  if (pathname === '/api/debug/llm/clear' && req.method === 'POST') {
+    return json(res, 200, await llmDebugStore.clearAll());
   }
 
   if (pathname === '/api/journal/ingest' && req.method === 'POST') {

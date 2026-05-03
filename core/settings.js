@@ -46,6 +46,12 @@ function defaults() {
     knowledge: {
       orchestrator: true,
     },
+    /** Полные дампы вызовов OpenRouter при включении (logs/llm-debug/). */
+    debugLlm: {
+      enabled: false,
+      maxMb: 20,
+      maxFiles: 80,
+    },
   };
 }
 
@@ -260,6 +266,14 @@ function validatePathValue(settingPath, value, mergedSettings) {
 
   if (settingPath === 'knowledge.orchestrator') return parseBool(value);
 
+  if (settingPath === 'debugLlm.enabled') return parseBool(value);
+  if (settingPath === 'debugLlm.maxMb') {
+    return parseIntInRange(value, 1, 500, 'debugLlm.maxMb');
+  }
+  if (settingPath === 'debugLlm.maxFiles') {
+    return parseIntInRange(value, 5, 2000, 'debugLlm.maxFiles');
+  }
+
   const modeMatch = settingPath.match(/^chats\.(-?\d+)\.mode$/);
   if (modeMatch) {
     const mode = String(value || '').trim();
@@ -299,6 +313,9 @@ function aliasToPath(alias, rawValue) {
     web_port: 'web.port',
     web_token: 'web.token',
     knowledge_orchestrator: 'knowledge.orchestrator',
+    debug_llm: 'debugLlm.enabled',
+    debug_llm_max_mb: 'debugLlm.maxMb',
+    debug_llm_max_files: 'debugLlm.maxFiles',
   };
   if (key === 'daily_review_time' || key === 'review_time') {
     return { path: 'dailyReview.cron', value: normalizeReviewTime(rawValue) };

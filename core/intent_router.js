@@ -127,6 +127,7 @@ When unsure, prefer "chat" with confidence below 0.4.`;
       temperature: 0,
       response_format: withJsonMode ? { type: 'json_object' } : undefined,
       timeoutMs,
+      debugContext: { scope: 'intent_router' },
     });
   }
 
