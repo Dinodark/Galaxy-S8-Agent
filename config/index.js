@@ -64,6 +64,12 @@ const config = {
       minConfidence: Number(optional('OPENROUTER_ROUTER_MIN_CONFIDENCE', '0.38')),
       timeoutMs: Number(optional('OPENROUTER_ROUTER_TIMEOUT_MS', '25000')),
     },
+    /** Append JSONL lines to logs/turn-trace-YYYY-MM-DD.jsonl (chatId, tools, exit, reply length). */
+    turnTrace: {
+      enabled: parseBool(process.env.TURN_TRACE_ENABLED, true),
+      /** If true, log sha256(user message) for dedupe/debug (still no raw text in trace). */
+      includeUserSha256: parseBool(process.env.TURN_TRACE_USER_SHA256, false),
+    },
   },
   safety: {
     allowShell: parseBool(process.env.ALLOW_SHELL, false),

@@ -27,6 +27,7 @@ const {
   stripPrintedToolInvocations,
 } = require('./tool_call_recovery');
 const { routeUserIntent, applyRouterMerge } = require('./intent_router');
+const turnTrace = require('./turn_trace');
 
 let cachedSystemPrompt = null;
 
@@ -281,6 +282,39 @@ function sanitizeAssistantReplyForTelegram(content) {
   return stripPrintedToolInvocations(stripWriteNoteJsonFences(String(content || '')));
 }
 
+function userSeeksExplanationAfterWrite(userMessage) {
+  return /объясни|расскажи|что\s+такое|почему|как\s+это|развернут|подробн|комментар|опиши\s+подроб/i.test(
+    String(userMessage || '')
+  );
+}
+
+function collectWriteNoteSavedPaths(transcript) {
+  const out = [];
+  for (const t of transcript || []) {
+    if (!t || t.tool !== 'write_note') continue;
+    if (t.result && t.result.ok && t.result.result && t.result.result.saved) {
+      out.push(t.result.result.saved);
+    }
+  }
+  return Array.from(new Set(out));
+}
+
+/**
+ * After a successful write_note, avoid long "teacher" replies unless the user asked for depth.
+ */
+function tightenReplyAfterWrite({ transcript, userMessage, reply, writeIntent, hImplicit }) {
+  const r = String(reply || '').trim();
+  if (!hasSuccessfulWriteCall(transcript)) return r;
+  if (!(writeIntent || hImplicit)) return r;
+  if (userSeeksExplanationAfterWrite(userMessage)) return r;
+  const lineCount = r ? r.split('\n').length : 0;
+  if (r.length <= 480 && lineCount <= 10) return r;
+  const paths = collectWriteNoteSavedPaths(transcript);
+  if (paths.length === 0) return r;
+  const bits = paths.map((p) => `\`memory/notes/${p}\``);
+  return paths.length === 1 ? `Готово: ${bits[0]}.` : `Готово: ${bits.join(', ')}.`;
+}
+
 function briefWriteNoteReply(result, append) {
   if (!result || !result.ok || !result.result || !result.result.saved) {
     return 'Не удалось записать: ' + (result && result.error ? result.error : 'unknown error');
@@ -293,6 +327,7 @@ function briefWriteNoteReply(result, append) {
 async function runAgent({ chatId, userMessage, via = 'text' }) {
   await ensureHistorySeeded(chatId);
 
+  const userText = String(userMessage || '');
   const newMessages = [{ role: 'user', content: userMessage }];
   let history = await memory.appendToHistory(chatId, newMessages);
 
@@ -332,6 +367,26 @@ async function runAgent({ chatId, userMessage, via = 'text' }) {
   let writeIntent = merged.writeIntent;
   let knowledgeDiscussion = merged.knowledgeDiscussion;
 
+  const logTurn = async (exit, { reply, toolCalls, steps }) => {
+    const base = {
+      chatId,
+      via: String(via || 'text'),
+      userLen: userText.length,
+      writeIntent,
+      knowledgeDiscussion,
+      intentMerge: merged.source,
+      router: turnTrace.safeRouteSnapshot(routeResult),
+      exit,
+      steps,
+      tools: turnTrace.summarizeToolTranscript(toolCalls),
+      replyLen: String(reply || '').length,
+    };
+    if (config.agent.turnTrace && config.agent.turnTrace.includeUserSha256 && userText.length > 0) {
+      base.userSha256 = turnTrace.userMessageSha256(userText);
+    }
+    await turnTrace.appendTurnTrace(base);
+  };
+
   let orchestration = null;
 
   if (writeIntent) {
@@ -368,6 +423,11 @@ async function runAgent({ chatId, userMessage, via = 'text' }) {
 
     const deterministicReply = buildMemoryInventoryReply(files);
     history = await memory.appendToHistory(chatId, [{ role: 'assistant', content: deterministicReply }]);
+    await logTurn('deterministic_inventory', {
+      reply: deterministicReply,
+      toolCalls: transcript,
+      steps: 1,
+    });
     return {
       reply: deterministicReply,
       toolCalls: transcript,
@@ -476,6 +536,7 @@ async function runAgent({ chatId, userMessage, via = 'text' }) {
       });
       const reply = recoveredReminderReply(result);
       history = await memory.appendToHistory(chatId, [{ role: 'assistant', content: reply }]);
+      await logTurn('recovered_reminder', { reply, toolCalls: transcript, steps: step + 1 });
       return {
         reply,
         toolCalls: transcript,
@@ -513,6 +574,7 @@ async function runAgent({ chatId, userMessage, via = 'text' }) {
         const reply =
           `В ответе был JSON как у write_note, но запись не прошла: ${errText}. Попробуй ещё раз или сформулируй короче.`;
         history = await memory.appendToHistory(chatId, [{ role: 'assistant', content: reply }]);
+        await logTurn('recovered_write_error', { reply, toolCalls: transcript, steps: step + 1 });
         return {
           reply,
           toolCalls: transcript,
@@ -521,6 +583,7 @@ async function runAgent({ chatId, userMessage, via = 'text' }) {
       }
       const reply = briefWriteNoteReply(result, execArgs.append);
       history = await memory.appendToHistory(chatId, [{ role: 'assistant', content: reply }]);
+      await logTurn('recovered_write', { reply, toolCalls: transcript, steps: step + 1 });
       return {
         reply,
         toolCalls: transcript,
@@ -541,6 +604,7 @@ async function runAgent({ chatId, userMessage, via = 'text' }) {
         targetName,
       });
       history = await memory.appendToHistory(chatId, [{ role: 'assistant', content: reply }]);
+      await logTurn('fallback_save', { reply, toolCalls: transcript, steps: step + 1 });
       return {
         reply,
         toolCalls: transcript,
@@ -548,8 +612,16 @@ async function runAgent({ chatId, userMessage, via = 'text' }) {
       };
     }
 
-    const replyClean = sanitizeAssistantReplyForTelegram(assistantMsg.content || '');
+    let replyClean = sanitizeAssistantReplyForTelegram(assistantMsg.content || '');
+    replyClean = tightenReplyAfterWrite({
+      transcript,
+      userMessage,
+      reply: replyClean,
+      writeIntent,
+      hImplicit,
+    });
     history = await memory.appendToHistory(chatId, [{ role: 'assistant', content: replyClean }]);
+    await logTurn('model', { reply: replyClean, toolCalls: transcript, steps: step + 1 });
     return {
       reply: replyClean,
       toolCalls: transcript,
@@ -563,6 +635,11 @@ async function runAgent({ chatId, userMessage, via = 'text' }) {
       '(Agent reached max steps without final answer. Please rephrase or simplify the request.)',
   };
   await memory.appendToHistory(chatId, [fallback]);
+  await logTurn('max_steps', {
+    reply: fallback.content,
+    toolCalls: transcript,
+    steps: config.agent.maxSteps,
+  });
   return { reply: fallback.content, toolCalls: transcript, steps: config.agent.maxSteps };
 }
 
@@ -572,4 +649,6 @@ module.exports = {
   shouldUseDeterministicMemoryInventory,
   userAskedForReminder,
   buildMemoryInventoryReply,
+  /** @internal tests */
+  tightenReplyAfterWrite,
 };
